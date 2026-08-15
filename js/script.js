@@ -5,7 +5,6 @@
    script.js
    =========================================================
    ・日付表示
-   ・40日管理
    ・生活リズム自動保存
    ・今日の目標/一言/実績 自動保存
    ・今日の予定
@@ -106,124 +105,6 @@ function showSave(id, text = "✓ 自動保存") {
         },
         1500
     );
-}
-
-
-/* =========================================================
-   PATGS27 40日管理
-   =========================================================
-
-   40日目標
-   2026/7/18 ～ 2026/8/26
-
-   ※ここを変更すれば運用期間を変更できます。
-   ========================================================= */
-
-const PATGS_START = "2026-07-18";
-const PATGS_END = "2026-08-26";
-
-
-function dateOnly(date) {
-
-    return new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate()
-    );
-}
-
-
-function updateDateDisplay() {
-
-    const today = dateOnly(new Date());
-
-    const start = dateOnly(
-        new Date(PATGS_START + "T00:00:00")
-    );
-
-    const end = dateOnly(
-        new Date(PATGS_END + "T00:00:00")
-    );
-
-    const dayMs =
-        24 * 60 * 60 * 1000;
-
-
-    const elapsed =
-        Math.floor(
-            (today - start) / dayMs
-        ) + 1;
-
-
-    const remaining =
-        Math.max(
-            0,
-            Math.ceil(
-                (end - today) / dayMs
-            )
-        );
-
-
-    if ($("todayDate")) {
-
-        $("todayDate").textContent =
-            today.getFullYear() +
-            "/" +
-            (today.getMonth() + 1) +
-            "/" +
-            today.getDate();
-    }
-
-
-    if ($("dayCount")) {
-
-        if (today < start) {
-
-            $("dayCount").textContent =
-                "開始前";
-
-        } else if (today > end) {
-
-            $("dayCount").textContent =
-                "40日運用終了";
-
-        } else {
-
-            $("dayCount").textContent =
-                "Day " +
-                Math.min(40, elapsed) +
-                " / 40";
-        }
-    }
-
-
-    if ($("daysLeft")) {
-
-        if (today < start) {
-
-            $("daysLeft").textContent =
-                "開始まで";
-
-        } else if (today > end) {
-
-            $("daysLeft").textContent =
-                "終了";
-
-        } else {
-
-            $("daysLeft").textContent =
-                "あと " +
-                remaining +
-                " 日";
-        }
-    }
-
-
-    return {
-        today: today,
-        remaining: remaining,
-        elapsed: elapsed
-    };
 }
 
 
@@ -1107,6 +988,8 @@ function renderMockForm() {
 
 
             renderMockExams();
+
+            renderScoreTrend();
         }
     );
 
@@ -1268,6 +1151,8 @@ function renderMockExams() {
 
 
                         renderMockExams();
+
+                        renderScoreTrend();
                     }
                 );
 
@@ -2530,6 +2415,1077 @@ if ($("addOtherScheduleBtn")) {
 
 
 /* =========================================================
+   データのバックアップ（エクスポート／インポート）
+   ========================================================= */
+
+function exportAllData() {
+
+    const data = {};
+
+
+    for (
+        let i = 0;
+        i < localStorage.length;
+        i++
+    ) {
+
+        const key =
+            localStorage.key(i);
+
+        data[key] =
+            localStorage.getItem(key);
+    }
+
+
+    const blob =
+        new Blob(
+            [
+                JSON.stringify(
+                    data,
+                    null,
+                    2
+                )
+            ],
+            {
+                type: "application/json"
+            }
+        );
+
+
+    const url =
+        URL.createObjectURL(blob);
+
+
+    const link =
+        document.createElement(
+            "a"
+        );
+
+    link.href =
+        url;
+
+    link.download =
+        "patgs27_backup_" +
+        todayKey() +
+        ".json";
+
+
+    document.body.appendChild(
+        link
+    );
+
+    link.click();
+
+    document.body.removeChild(
+        link
+    );
+
+    URL.revokeObjectURL(
+        url
+    );
+
+
+    if ($("backupStatus")) {
+
+        $("backupStatus").textContent =
+            "✓ 書き出しました。";
+    }
+}
+
+
+function importAllData(file) {
+
+    const reader =
+        new FileReader();
+
+
+    reader.onload =
+        function (event) {
+
+            try {
+
+                const data =
+                    JSON.parse(
+                        event.target.result
+                    );
+
+
+                Object.keys(data).forEach(
+                    function (key) {
+
+                        localStorage.setItem(
+                            key,
+                            data[key]
+                        );
+                    }
+                );
+
+
+                if ($("backupStatus")) {
+
+                    $("backupStatus").textContent =
+                        "✓ 読み込みました。ページを再読み込みします。";
+                }
+
+
+                setTimeout(
+                    function () {
+
+                        location.reload();
+                    },
+                    800
+                );
+
+            } catch (error) {
+
+                console.error(
+                    "インポートエラー:",
+                    error
+                );
+
+
+                if ($("backupStatus")) {
+
+                    $("backupStatus").textContent =
+                        "✗ 読み込みに失敗しました。ファイルを確認してください。";
+                }
+            }
+        };
+
+
+    reader.readAsText(file);
+}
+
+
+if ($("exportDataBtn")) {
+
+    $("exportDataBtn").addEventListener(
+        "click",
+        exportAllData
+    );
+}
+
+
+if ($("importDataBtn")) {
+
+    $("importDataBtn").addEventListener(
+        "click",
+        function () {
+
+            $("importDataInput")?.click();
+        }
+    );
+}
+
+
+if ($("importDataInput")) {
+
+    $("importDataInput").addEventListener(
+        "change",
+        function (event) {
+
+            const file =
+                event.target.files[0];
+
+
+            if (file) {
+
+                importAllData(file);
+            }
+        }
+    );
+}
+
+
+/* =========================================================
+   内申点管理
+   ========================================================= */
+
+const NAISHIN_SUBJECTS = [
+    "国語",
+    "数学",
+    "理科",
+    "社会",
+    "英語",
+    "保健体育",
+    "音楽",
+    "技術家庭",
+    "美術"
+];
+
+
+let naishinData =
+    loadJSON(
+        "patgs27_naishin",
+        {}
+    );
+
+
+function saveNaishin() {
+
+    saveJSON(
+        "patgs27_naishin",
+        naishinData
+    );
+}
+
+
+function updateNaishinTotal() {
+
+    let currentSum = 0;
+
+    let targetSum = 0;
+
+
+    NAISHIN_SUBJECTS.forEach(
+        function (subject) {
+
+            const entry =
+                naishinData[subject] ||
+                {};
+
+            currentSum +=
+                Number(entry.current) || 0;
+
+            targetSum +=
+                Number(entry.target) || 0;
+        }
+    );
+
+
+    if ($("naishinTotal")) {
+
+        $("naishinTotal").textContent =
+            "現在合計：" +
+            currentSum +
+            " ／ 目標合計：" +
+            targetSum;
+    }
+}
+
+
+function renderNaishin() {
+
+    const list =
+        $("naishinList");
+
+
+    if (!list) {
+        return;
+    }
+
+
+    list.innerHTML = "";
+
+
+    NAISHIN_SUBJECTS.forEach(
+        function (subject) {
+
+            if (!naishinData[subject]) {
+
+                naishinData[subject] =
+                    {
+                        current: "",
+                        target: ""
+                    };
+            }
+
+
+            const row =
+                document.createElement(
+                    "div"
+                );
+
+
+            const label =
+                document.createElement(
+                    "span"
+                );
+
+            label.textContent =
+                subject +
+                "：";
+
+
+            const current =
+                document.createElement(
+                    "input"
+                );
+
+            current.type =
+                "number";
+
+            current.min =
+                "1";
+
+            current.max =
+                "5";
+
+            current.placeholder =
+                "現在";
+
+            current.value =
+                naishinData[subject].current ||
+                "";
+
+
+            const target =
+                document.createElement(
+                    "input"
+                );
+
+            target.type =
+                "number";
+
+            target.min =
+                "1";
+
+            target.max =
+                "5";
+
+            target.placeholder =
+                "目標";
+
+            target.value =
+                naishinData[subject].target ||
+                "";
+
+
+            function save() {
+
+                naishinData[subject].current =
+                    current.value;
+
+                naishinData[subject].target =
+                    target.value;
+
+
+                saveNaishin();
+
+                updateNaishinTotal();
+            }
+
+
+            current.addEventListener(
+                "input",
+                save
+            );
+
+            target.addEventListener(
+                "input",
+                save
+            );
+
+
+            row.append(
+                label,
+                document.createTextNode(
+                    "現在："
+                ),
+                current,
+                document.createTextNode(
+                    " 目標："
+                ),
+                target
+            );
+
+
+            list.appendChild(
+                row
+            );
+        }
+    );
+
+
+    updateNaishinTotal();
+}
+
+
+/* =========================================================
+   弱点単元・要復習リスト
+   ========================================================= */
+
+let weakPoints =
+    loadJSON(
+        "patgs27_weak_points",
+        []
+    );
+
+
+function saveWeakPoints() {
+
+    saveJSON(
+        "patgs27_weak_points",
+        weakPoints
+    );
+}
+
+
+function renderWeakPoints() {
+
+    const list =
+        $("weakPointList");
+
+
+    if (!list) {
+        return;
+    }
+
+
+    list.innerHTML = "";
+
+
+    weakPoints
+        .slice()
+        .reverse()
+        .forEach(
+            function (item, reverseIndex) {
+
+                const index =
+                    weakPoints.length -
+                    1 -
+                    reverseIndex;
+
+
+                const row =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                const check =
+                    document.createElement(
+                        "input"
+                    );
+
+                check.type =
+                    "checkbox";
+
+                check.checked =
+                    !!item.done;
+
+
+                const label =
+                    document.createElement(
+                        "span"
+                    );
+
+                label.textContent =
+                    "【" +
+                    (
+                        item.subject ||
+                        "その他"
+                    ) +
+                    "】" +
+                    item.text;
+
+
+                if (item.done) {
+
+                    label.style.textDecoration =
+                        "line-through";
+                }
+
+
+                const deleteButton =
+                    document.createElement(
+                        "button"
+                    );
+
+                deleteButton.type =
+                    "button";
+
+                deleteButton.textContent =
+                    "削除";
+
+
+                check.addEventListener(
+                    "change",
+                    function () {
+
+                        weakPoints[index].done =
+                            check.checked;
+
+                        saveWeakPoints();
+
+                        renderWeakPoints();
+                    }
+                );
+
+
+                deleteButton.addEventListener(
+                    "click",
+                    function () {
+
+                        weakPoints.splice(
+                            index,
+                            1
+                        );
+
+                        saveWeakPoints();
+
+                        renderWeakPoints();
+                    }
+                );
+
+
+                row.append(
+                    check,
+                    " ",
+                    label,
+                    " ",
+                    deleteButton
+                );
+
+
+                list.appendChild(
+                    row
+                );
+            }
+        );
+}
+
+
+if ($("addWeakPointBtn")) {
+
+    $("addWeakPointBtn").addEventListener(
+        "click",
+        function () {
+
+            const subject =
+                $("weakPointSubject")?.value ||
+                "";
+
+            const text =
+                $("weakPointText")?.value.trim() ||
+                "";
+
+
+            if (!text) {
+
+                alert(
+                    "内容を入力してください。"
+                );
+
+                return;
+            }
+
+
+            weakPoints.push(
+                {
+                    subject:
+                        subject,
+
+                    text:
+                        text,
+
+                    done:
+                        false,
+
+                    dateTime:
+                        nowText()
+                }
+            );
+
+
+            saveWeakPoints();
+
+
+            $("weakPointText").value =
+                "";
+
+            $("weakPointSubject").value =
+                "";
+
+
+            renderWeakPoints();
+        }
+    );
+}
+
+
+/* =========================================================
+   質問・確認事項メモ
+   ========================================================= */
+
+let questionNotes =
+    loadJSON(
+        "patgs27_questions",
+        []
+    );
+
+
+function saveQuestionNotes() {
+
+    saveJSON(
+        "patgs27_questions",
+        questionNotes
+    );
+}
+
+
+function renderQuestionNotes() {
+
+    const list =
+        $("questionList");
+
+
+    if (!list) {
+        return;
+    }
+
+
+    list.innerHTML = "";
+
+
+    questionNotes
+        .slice()
+        .reverse()
+        .forEach(
+            function (item, reverseIndex) {
+
+                const index =
+                    questionNotes.length -
+                    1 -
+                    reverseIndex;
+
+
+                const row =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                const check =
+                    document.createElement(
+                        "input"
+                    );
+
+                check.type =
+                    "checkbox";
+
+                check.checked =
+                    !!item.done;
+
+
+                const label =
+                    document.createElement(
+                        "span"
+                    );
+
+                label.textContent =
+                    "【" +
+                    (
+                        item.target ||
+                        "未指定"
+                    ) +
+                    "】" +
+                    item.text;
+
+
+                if (item.done) {
+
+                    label.style.textDecoration =
+                        "line-through";
+                }
+
+
+                const deleteButton =
+                    document.createElement(
+                        "button"
+                    );
+
+                deleteButton.type =
+                    "button";
+
+                deleteButton.textContent =
+                    "削除";
+
+
+                check.addEventListener(
+                    "change",
+                    function () {
+
+                        questionNotes[index].done =
+                            check.checked;
+
+                        saveQuestionNotes();
+
+                        renderQuestionNotes();
+                    }
+                );
+
+
+                deleteButton.addEventListener(
+                    "click",
+                    function () {
+
+                        questionNotes.splice(
+                            index,
+                            1
+                        );
+
+                        saveQuestionNotes();
+
+                        renderQuestionNotes();
+                    }
+                );
+
+
+                row.append(
+                    check,
+                    " ",
+                    label,
+                    " ",
+                    deleteButton
+                );
+
+
+                list.appendChild(
+                    row
+                );
+            }
+        );
+}
+
+
+if ($("addQuestionBtn")) {
+
+    $("addQuestionBtn").addEventListener(
+        "click",
+        function () {
+
+            const target =
+                $("questionTarget")?.value ||
+                "";
+
+            const text =
+                $("questionText")?.value.trim() ||
+                "";
+
+
+            if (!text) {
+
+                alert(
+                    "内容を入力してください。"
+                );
+
+                return;
+            }
+
+
+            questionNotes.push(
+                {
+                    target:
+                        target,
+
+                    text:
+                        text,
+
+                    done:
+                        false,
+
+                    dateTime:
+                        nowText()
+                }
+            );
+
+
+            saveQuestionNotes();
+
+
+            $("questionText").value =
+                "";
+
+            $("questionTarget").value =
+                "";
+
+
+            renderQuestionNotes();
+        }
+    );
+}
+
+
+/* =========================================================
+   模試 偏差値の推移グラフ
+   ========================================================= */
+
+function renderScoreTrend() {
+
+    const canvas =
+        $("scoreTrendChart");
+
+
+    if (!canvas) {
+        return;
+    }
+
+
+    const ctx =
+        canvas.getContext(
+            "2d"
+        );
+
+
+    const width =
+        canvas.width;
+
+    const height =
+        canvas.height;
+
+
+    ctx.clearRect(
+        0,
+        0,
+        width,
+        height
+    );
+
+
+    const sorted =
+        mockExams
+            .slice()
+            .filter(
+                function (exam) {
+
+                    return (
+                        exam.scores?.henshenshi !== undefined &&
+                        exam.scores?.henshenshi !== ""
+                    );
+                }
+            )
+            .sort(
+                function (a, b) {
+
+                    return (
+                        a.date || ""
+                    ).localeCompare(
+                        b.date || ""
+                    );
+                }
+            );
+
+
+    if (sorted.length === 0) {
+
+        ctx.fillStyle =
+            "#888";
+
+        ctx.font =
+            "14px sans-serif";
+
+        ctx.fillText(
+            "模試の偏差値データがありません。",
+            10,
+            height / 2
+        );
+
+        return;
+    }
+
+
+    const padding = 40;
+
+
+    const values =
+        sorted.map(
+            function (exam) {
+
+                return Number(
+                    exam.scores.henshenshi
+                );
+            }
+        );
+
+
+    const maxValue =
+        Math.max(
+            70,
+            ...values
+        );
+
+    const minValue =
+        Math.min(
+            30,
+            ...values
+        );
+
+
+    const stepX =
+        sorted.length > 1
+            ? (
+                width -
+                padding * 2
+            ) /
+            (
+                sorted.length -
+                1
+            )
+            : 0;
+
+
+    function toX(i) {
+
+        return (
+            padding +
+            stepX * i
+        );
+    }
+
+
+    function toY(value) {
+
+        return (
+            height -
+            padding -
+            (
+                (value - minValue) /
+                (maxValue - minValue) *
+                (height - padding * 2)
+            )
+        );
+    }
+
+
+    /* 軸 */
+
+    ctx.strokeStyle =
+        "#ccc";
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+        padding,
+        padding
+    );
+
+    ctx.lineTo(
+        padding,
+        height - padding
+    );
+
+    ctx.lineTo(
+        width - padding,
+        height - padding
+    );
+
+    ctx.stroke();
+
+
+    /* 折れ線 */
+
+    ctx.strokeStyle =
+        "#2e7d32";
+
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+
+
+    sorted.forEach(
+        function (exam, i) {
+
+            const x =
+                toX(i);
+
+            const y =
+                toY(
+                    Number(
+                        exam.scores.henshenshi
+                    )
+                );
+
+
+            if (i === 0) {
+
+                ctx.moveTo(
+                    x,
+                    y
+                );
+
+            } else {
+
+                ctx.lineTo(
+                    x,
+                    y
+                );
+            }
+        }
+    );
+
+    ctx.stroke();
+
+
+    /* 点とラベル */
+
+    ctx.fillStyle =
+        "#2e7d32";
+
+    ctx.font =
+        "11px sans-serif";
+
+
+    sorted.forEach(
+        function (exam, i) {
+
+            const x =
+                toX(i);
+
+            const y =
+                toY(
+                    Number(
+                        exam.scores.henshenshi
+                    )
+                );
+
+
+            ctx.beginPath();
+
+            ctx.arc(
+                x,
+                y,
+                3,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.fill();
+
+
+            ctx.fillText(
+                String(
+                    exam.scores.henshenshi
+                ),
+                x - 8,
+                y - 8
+            );
+
+
+            ctx.save();
+
+            ctx.translate(
+                x,
+                height - padding + 14
+            );
+
+            ctx.rotate(
+                -Math.PI / 6
+            );
+
+            ctx.fillText(
+                exam.date || "",
+                0,
+                0
+            );
+
+            ctx.restore();
+        }
+    );
+}
+
+
+/* =========================================================
    初期化
    ========================================================= */
 
@@ -2540,8 +3496,6 @@ function initializePATGS27() {
     loadDaily();
 
     renderTodos();
-
-    updateDateDisplay();
 
     updateWeeklyNotice();
 
@@ -2568,6 +3522,14 @@ function initializePATGS27() {
     renderMaterials();
 
     renderOtherSchedules();
+
+    renderNaishin();
+
+    renderWeakPoints();
+
+    renderQuestionNotes();
+
+    renderScoreTrend();
 
 
     console.log(
