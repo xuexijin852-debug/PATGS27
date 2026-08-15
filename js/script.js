@@ -3035,3 +3035,243 @@ function initializePATGS27() {
 
 
 initializePATGS27();
+
+// =========================================
+// PATGS27 日付カウントダウン
+// =========================================
+
+const PATGS_DATES = {
+    summerVacationEnd: "2026-08-26",
+    entranceExam: "2027-02-16",
+    resultAnnouncement: "2027-02-26"
+};
+
+
+function getDaysUntil(targetDate) {
+
+    const today = new Date();
+
+    today.setHours(0, 0, 0, 0);
+
+    const target = new Date(targetDate);
+
+    target.setHours(0, 0, 0, 0);
+
+    const difference = target - today;
+
+    return Math.ceil(
+        difference / (1000 * 60 * 60 * 24)
+    );
+}
+
+
+function formatDays(days) {
+
+    if (days > 0) {
+        return `あと ${days} 日`;
+    }
+
+    if (days === 0) {
+        return "今日";
+    }
+
+    return `${Math.abs(days)} 日経過`;
+}
+
+
+function updatePATGSDashboard() {
+
+    // 今日の日付
+
+    const todayElement =
+        document.getElementById("todayDate");
+
+    if (todayElement) {
+
+        const today = new Date();
+
+        todayElement.textContent =
+            `${today.getFullYear()}/` +
+            `${today.getMonth() + 1}/` +
+            `${today.getDate()}`;
+
+    }
+
+
+    // 夏休み終了
+
+    const summerElement =
+        document.getElementById("summerVacationDays");
+
+    if (summerElement) {
+
+        const days =
+            getDaysUntil(
+                PATGS_DATES.summerVacationEnd
+            );
+
+        summerElement.textContent =
+            formatDays(days);
+
+    }
+
+
+    // 入試
+
+    const entranceElement =
+        document.getElementById("entranceExamDays");
+
+    if (entranceElement) {
+
+        const days =
+            getDaysUntil(
+                PATGS_DATES.entranceExam
+            );
+
+        entranceElement.textContent =
+            formatDays(days);
+
+    }
+
+
+    // 合格発表
+
+    const resultElement =
+        document.getElementById("resultDays");
+
+    if (resultElement) {
+
+        const days =
+            getDaysUntil(
+                PATGS_DATES.resultAnnouncement
+            );
+
+        resultElement.textContent =
+            formatDays(days);
+
+    }
+
+}
+
+
+updatePATGSDashboard();
+
+// =========================================
+// 今後の重要予定
+// =========================================
+
+const PATGS_SCHEDULE = [
+
+    {
+        name: "夏休み終了",
+        date: "2026-08-26",
+        icon: "🌻"
+    },
+
+    {
+        name: "第1回模試",
+        date: "2026-09-00",
+        icon: "📝"
+    },
+
+    {
+        name: "定期テスト",
+        date: "2026-09-00",
+        icon: "📚"
+    },
+
+    {
+        name: "入試",
+        date: "2027-02-16",
+        icon: "🎓"
+    },
+
+    {
+        name: "合格発表",
+        date: "2027-02-26",
+        icon: "🏆"
+    }
+
+];
+
+
+function updateSchedule() {
+
+    const container =
+        document.getElementById(
+            "upcomingScheduleList"
+        );
+
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    const today = new Date();
+
+    today.setHours(0, 0, 0, 0);
+
+
+    PATGS_SCHEDULE.forEach(event => {
+
+        // 日付未確定なら表示しない
+
+        if (event.date.includes("00")) {
+            return;
+        }
+
+
+        const target =
+            new Date(event.date);
+
+        target.setHours(0, 0, 0, 0);
+
+
+        const diff =
+            Math.ceil(
+                (target - today) /
+                (1000 * 60 * 60 * 24)
+            );
+
+
+        if (diff < 0) {
+            return;
+        }
+
+
+        const item =
+            document.createElement("div");
+
+        item.className =
+            "schedule-item";
+
+
+        item.innerHTML = `
+
+            <div class="schedule-name">
+                ${event.icon}
+                ${event.name}
+            </div>
+
+            <div class="schedule-date">
+                ${event.date}
+            </div>
+
+            <div class="schedule-days">
+                ${
+                    diff === 0
+                        ? "今日"
+                        : `あと ${diff} 日`
+                }
+            </div>
+
+        `;
+
+
+        container.appendChild(item);
+
+    });
+
+}
+
+
+updateSchedule();
