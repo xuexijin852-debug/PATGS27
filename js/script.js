@@ -4461,6 +4461,7 @@ updateSchedule();
 
 // =========================================
 // PATGS27 日付・予定管理
+// 完成版
 // =========================================
 
 const DEFAULT_PATGS_SCHEDULE = [
@@ -4510,23 +4511,20 @@ const DEFAULT_PATGS_SCHEDULE = [
 // 保存・読み込み
 // =========================================
 
-let patgsSchedule =
-    loadJSON(
-        "patgs27_schedule",
-        null
-    );
+let patgsSchedule = loadJSON(
+    "patgs27_schedule",
+    null
+);
 
 
 if (!Array.isArray(patgsSchedule)) {
 
     patgsSchedule =
-        DEFAULT_PATGS_SCHEDULE.map(
-            function (item) {
-                return {
-                    ...item
-                };
-            }
-        );
+        DEFAULT_PATGS_SCHEDULE.map(function (item) {
+            return {
+                ...item
+            };
+        });
 
     saveJSON(
         "patgs27_schedule",
@@ -4545,8 +4543,7 @@ function getDaysUntil(targetDate) {
         return null;
     }
 
-    const today =
-        new Date();
+    const today = new Date();
 
     today.setHours(
         0,
@@ -4556,10 +4553,9 @@ function getDaysUntil(targetDate) {
     );
 
 
-    const target =
-        new Date(
-            targetDate + "T00:00:00"
-        );
+    const target = new Date(
+        targetDate + "T00:00:00"
+    );
 
     target.setHours(
         0,
@@ -4569,13 +4565,16 @@ function getDaysUntil(targetDate) {
     );
 
 
-    const difference =
-        target - today;
-
-
     return Math.round(
-        difference /
-        (1000 * 60 * 60 * 24)
+        (
+            target - today
+        ) /
+        (
+            1000 *
+            60 *
+            60 *
+            24
+        )
     );
 }
 
@@ -4588,21 +4587,16 @@ function formatDays(days) {
 
 
     if (days > 0) {
-
-        return "あと " +
-            days +
-            " 日";
+        return "あと " + days + " 日";
     }
 
 
     if (days === 0) {
-
         return "今日";
     }
 
 
-    return Math.abs(days) +
-        " 日経過";
+    return Math.abs(days) + " 日経過";
 }
 
 
@@ -4634,8 +4628,7 @@ function updatePATGSDashboard() {
 
     if (todayElement) {
 
-        const today =
-            new Date();
+        const today = new Date();
 
         todayElement.textContent =
             today.getFullYear() +
@@ -4664,8 +4657,6 @@ function updatePATGSDashboard() {
         );
 
 
-    // 夏休み終了
-
     const summerElement =
         document.getElementById(
             "summerVacationDays"
@@ -4682,8 +4673,6 @@ function updatePATGSDashboard() {
             );
     }
 
-
-    // 入試
 
     const entranceElement =
         document.getElementById(
@@ -4702,8 +4691,6 @@ function updatePATGSDashboard() {
     }
 
 
-    // 合格発表
-
     const resultElement =
         document.getElementById(
             "resultDays"
@@ -4720,8 +4707,6 @@ function updatePATGSDashboard() {
             );
     }
 
-
-    // カードの日付表示も自動変更
 
     const dateCards =
         document.querySelectorAll(
@@ -4775,46 +4760,16 @@ function renderScheduleSettings() {
                 "schedule-setting-row";
 
 
-            // 名前
-
-            const name =
-                document.createElement(
-                    "input"
-                );
-
-            name.type =
-                "text";
-
-            name.value =
-                event.name || "";
-
-            name.placeholder =
-                "予定名";
-
-
-            // 日付
-
-            const date =
-                document.createElement(
-                    "input"
-                );
-
-            date.type =
-                "date";
-
-            date.value =
-                event.date || "";
-
-
+            // -------------------------
             // アイコン
+            // -------------------------
 
             const icon =
                 document.createElement(
                     "input"
                 );
 
-            icon.type =
-                "text";
+            icon.type = "text";
 
             icon.value =
                 event.icon || "📅";
@@ -4823,18 +4778,53 @@ function renderScheduleSettings() {
                 "アイコン";
 
 
+            // -------------------------
+            // 名前
+            // -------------------------
+
+            const name =
+                document.createElement(
+                    "input"
+                );
+
+            name.type = "text";
+
+            name.value =
+                event.name || "";
+
+            name.placeholder =
+                "予定名";
+
+
+            // -------------------------
+            // 日付
+            // -------------------------
+
+            const date =
+                document.createElement(
+                    "input"
+                );
+
+            date.type = "date";
+
+            date.value =
+                event.date || "";
+
+
+            // -------------------------
             // 保存
+            // -------------------------
 
             function save() {
 
                 event.name =
-                    name.value;
+                    name.value.trim();
 
                 event.date =
                     date.value;
 
                 event.icon =
-                    icon.value ||
+                    icon.value.trim() ||
                     "📅";
 
 
@@ -4868,7 +4858,9 @@ function renderScheduleSettings() {
             );
 
 
+            // -------------------------
             // 削除
+            // -------------------------
 
             const deleteButton =
                 document.createElement(
@@ -4886,13 +4878,18 @@ function renderScheduleSettings() {
                 "click",
                 function () {
 
-                    if (
-                        !confirm(
+                    const confirmed =
+                        confirm(
                             "「" +
-                            (event.name || "この予定") +
+                            (
+                                event.name ||
+                                "この予定"
+                            ) +
                             "」を削除しますか？"
-                        )
-                    ) {
+                        );
+
+
+                    if (!confirmed) {
                         return;
                     }
 
@@ -4920,11 +4917,8 @@ function renderScheduleSettings() {
 
             row.append(
                 icon,
-                " ",
                 name,
-                " ",
                 date,
-                " ",
                 deleteButton
             );
 
@@ -5021,145 +5015,176 @@ function updateSchedule() {
     );
 
 
-    patgsSchedule
-        .filter(
-            function (event) {
+    const upcoming =
+        patgsSchedule
+            .filter(
+                function (event) {
 
-                return !!event.date;
-            }
-        )
-        .map(
-            function (event) {
-
-                const target =
-                    new Date(
-                        event.date +
-                        "T00:00:00"
-                    );
-
-                target.setHours(
-                    0,
-                    0,
-                    0,
-                    0
-                );
-
-
-                const diff =
-                    Math.round(
-                        (
-                            target -
-                            today
-                        ) /
-                        (
-                            1000 *
-                            60 *
-                            60 *
-                            24
-                        )
-                    );
-
-
-                return {
-                    ...event,
-                    diff: diff
-                };
-            }
-        )
-        .filter(
-            function (event) {
-
-                return event.diff >= 0;
-            }
-        )
-        .sort(
-            function (a, b) {
-
-                return a.diff - b.diff;
-            }
-        )
-        .forEach(
-            function (event) {
-
-                const item =
-                    document.createElement(
-                        "div"
-                    );
-
-
-                item.className =
-                    "schedule-item";
-
-
-                const name =
-                    document.createElement(
-                        "div"
-                    );
-
-                name.className =
-                    "schedule-name";
-
-                name.textContent =
-                    (
-                        event.icon ||
-                        "📅"
-                    ) +
-                    " " +
-                    event.name;
-
-
-                const date =
-                    document.createElement(
-                        "div"
-                    );
-
-                date.className =
-                    "schedule-date";
-
-                date.textContent =
-                    event.date;
-
-
-                const days =
-                    document.createElement(
-                        "div"
-                    );
-
-                days.className =
-                    "schedule-days";
-
-
-                if (event.diff === 0) {
-
-                    days.textContent =
-                        "今日";
-
-                } else {
-
-                    days.textContent =
-                        "あと " +
-                        event.diff +
-                        " 日";
+                    return !!event.date;
                 }
+            )
+            .map(
+                function (event) {
+
+                    const target =
+                        new Date(
+                            event.date +
+                            "T00:00:00"
+                        );
+
+                    target.setHours(
+                        0,
+                        0,
+                        0,
+                        0
+                    );
 
 
-                item.append(
-                    name,
-                    date,
-                    days
-                );
+                    const diff =
+                        Math.round(
+                            (
+                                target -
+                                today
+                            ) /
+                            (
+                                1000 *
+                                60 *
+                                60 *
+                                24
+                            )
+                        );
 
 
-                container.appendChild(
-                    item
-                );
-            }
+                    return {
+                        ...event,
+                        diff: diff
+                    };
+                }
+            )
+            .filter(
+                function (event) {
+
+                    return event.diff >= 0;
+                }
+            )
+            .sort(
+                function (a, b) {
+
+                    return a.diff - b.diff;
+                }
+            );
+
+
+    // -----------------------------------------
+    // 予定がない場合
+    // -----------------------------------------
+
+    if (upcoming.length === 0) {
+
+        const empty =
+            document.createElement(
+                "p"
+            );
+
+        empty.textContent =
+            "今後の重要予定はありません。";
+
+        container.appendChild(
+            empty
         );
+
+        return;
+    }
+
+
+    // -----------------------------------------
+    // 表示
+    // -----------------------------------------
+
+    upcoming.forEach(
+        function (event) {
+
+            const item =
+                document.createElement(
+                    "div"
+                );
+
+            item.className =
+                "schedule-item";
+
+
+            const name =
+                document.createElement(
+                    "div"
+                );
+
+            name.className =
+                "schedule-name";
+
+            name.textContent =
+                (
+                    event.icon ||
+                    "📅"
+                ) +
+                " " +
+                (
+                    event.name ||
+                    "名称未設定"
+                );
+
+
+            const date =
+                document.createElement(
+                    "div"
+                );
+
+            date.className =
+                "schedule-date";
+
+            date.textContent =
+                event.date;
+
+
+            const days =
+                document.createElement(
+                    "div"
+                );
+
+            days.className =
+                "schedule-days";
+
+
+            if (event.diff === 0) {
+
+                days.textContent =
+                    "今日";
+
+            } else {
+
+                days.textContent =
+                    "あと " +
+                    event.diff +
+                    " 日";
+            }
+
+
+            item.append(
+                name,
+                date,
+                days
+            );
+
+
+            container.appendChild(
+                item
+            );
+        }
+    );
 }
 
 
 // =========================================
-// 初期化
+// 初期表示
 // =========================================
 
 renderScheduleSettings();
@@ -5167,3 +5192,19 @@ renderScheduleSettings();
 updatePATGSDashboard();
 
 updateSchedule();
+
+
+// =========================================
+// 定期的な日付更新
+// =========================================
+
+setInterval(
+    function () {
+
+        updatePATGSDashboard();
+
+        updateSchedule();
+
+    },
+    60 * 1000
+);
