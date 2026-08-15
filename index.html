@@ -9,10 +9,6 @@
 
 <body>
 
-<!-- =====================================================
-     ログイン
-===================================================== -->
-
 <div id="loginScreen">
 
     <h2>🔐 PATGS27</h2>
@@ -23,35 +19,104 @@
         Googleでログイン
     </button>
 
-    <p id="userName">未ログイン</p>
+    <p id="userName">
+        未ログイン
+    </p>
 
 </div>
 
 
-<!-- =====================================================
-     メインアプリ
-===================================================== -->
-
 <div id="mainApp">
 
-<header>
+    <!-- =========================================
+         PATGS27 ヘッダー
+         ========================================= -->
 
-    <h1>PATGS27</h1>
+    <header class="patgs-header">
 
-    <p>
-        <strong>令和8年（2026年）8月15日 施行</strong>
-    </p>
+        <div class="patgs-header-title">
+            <h1>PATGS27</h1>
 
-    <p>
-        ― PATGS監督下における最高規範 ―
-    </p>
+            <p>
+                令和8年（2026年）8月15日
+            </p>
 
-    <button id="logoutBtn">
-        ログアウト
-    </button>
+            <p class="patgs-subtitle">
+                ― PATGS27 40日間計画 ―
+            </p>
+        </div>
+
+        <button id="logoutBtn" class="logout-button">
+            ログアウト
+        </button>
+
+    </header>
+
+
+    <!-- =========================================
+         40日間計画・日付情報
+         ========================================= -->
+
+    <section class="date-dashboard">
+
+        <!-- 今日の日付 -->
+
+        <div class="date-card">
+
+            <h2>📅 今日の日付</h2>
+
+            <p id="todayDate" class="date-main">
+                2026/8/15
+            </p>
+
+        </div>
+
+
+        <!-- 40日間計画 -->
+
+        <div class="day-card">
+
+            <h2>🎯 PATGS27 40日間計画</h2>
+
+            <p class="period-text">
+                2026/7/18 ～ 2026/8/26
+            </p>
+
+            <p id="dayCount" class="day-main">
+                Day 29 / 40
+            </p>
+
+        </div>
+
+
+        <!-- 残り日数 -->
+
+        <div class="remain-card">
+
+            <h2>⏳ 計画終了まで</h2>
+
+            <p id="daysLeft" class="remain-main">
+                あと 11 日
+            </p>
+
+            <p class="remain-date">
+                2026/8/26 まで
+            </p>
+
+        </div>
+
+    </section>
+
+
+    <!-- 週次レビュー通知 -->
+
+    <div
+        id="weeklyReviewNotice"
+        class="weekly-notice">
+    </div>
+
 
     <hr>
-
     <h2>🎯 神奈川県立港北高等学校 合格へ</h2>
 
     <h3 id="daysLeft">あと ― 日</h3>
