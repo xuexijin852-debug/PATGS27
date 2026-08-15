@@ -1213,9 +1213,6 @@ function addPast(type) {
             date:
                 todayKey(),
 
-            school:
-                "",
-
             subject:
                 "",
 
@@ -1223,6 +1220,9 @@ function addPast(type) {
                 "",
 
             comparison:
+                "",
+
+            deviation:
                 "",
 
             note:
@@ -1286,21 +1286,6 @@ function renderPast(type) {
                 record.date || "";
 
 
-            const school =
-                document.createElement(
-                    "input"
-                );
-
-            school.type =
-                "text";
-
-            school.placeholder =
-                "高校名";
-
-            school.value =
-                record.school || "";
-
-
             const subject =
                 document.createElement(
                     "input"
@@ -1325,7 +1310,7 @@ function renderPast(type) {
                 "number";
 
             score.placeholder =
-                "得点";
+                "自分の得点";
 
             score.value =
                 record.score || "";
@@ -1350,6 +1335,27 @@ function renderPast(type) {
                 record.comparison || "";
 
 
+            let deviation = null;
+
+
+            if (type === "public") {
+
+                deviation =
+                    document.createElement(
+                        "input"
+                    );
+
+                deviation.type =
+                    "number";
+
+                deviation.placeholder =
+                    "偏差値";
+
+                deviation.value =
+                    record.deviation || "";
+            }
+
+
             const note =
                 document.createElement(
                     "textarea"
@@ -1370,9 +1376,6 @@ function renderPast(type) {
                 record.date =
                     date.value;
 
-                record.school =
-                    school.value;
-
                 record.subject =
                     subject.value;
 
@@ -1381,6 +1384,12 @@ function renderPast(type) {
 
                 record.comparison =
                     comparison.value;
+
+                if (deviation) {
+
+                    record.deviation =
+                        deviation.value;
+                }
 
                 record.note =
                     note.value;
@@ -1395,16 +1404,33 @@ function renderPast(type) {
 
 
                 renderPastChart(type);
+
+
+                if (type === "public") {
+
+                    renderPublicDeviationTrend();
+                }
             }
 
 
-            [
-                date,
-                school,
-                subject,
-                score,
-                comparison
-            ].forEach(
+            const watchInputs =
+                deviation
+                    ? [
+                        date,
+                        subject,
+                        score,
+                        comparison,
+                        deviation
+                    ]
+                    : [
+                        date,
+                        subject,
+                        score,
+                        comparison
+                    ];
+
+
+            watchInputs.forEach(
                 function (input) {
 
                     input.addEventListener(
@@ -1463,10 +1489,21 @@ function renderPast(type) {
 
             box.append(
                 date,
-                school,
                 subject,
                 score,
-                comparison,
+                comparison
+            );
+
+
+            if (deviation) {
+
+                box.append(
+                    deviation
+                );
+            }
+
+
+            box.append(
                 note,
                 deleteButton
             );
@@ -1480,6 +1517,12 @@ function renderPast(type) {
 
 
     renderPastChart(type);
+
+
+    if (type === "public") {
+
+        renderPublicDeviationTrend();
+    }
 }
 
 
@@ -3232,6 +3275,274 @@ if ($("addQuestionBtn")) {
    過去問 得点の推移グラフ
    ========================================================= */
 
+function renderPublicDeviationTrend() {
+
+    const canvas =
+        $("publicDeviationChart");
+
+
+    if (!canvas) {
+        return;
+    }
+
+
+    const ctx =
+        canvas.getContext(
+            "2d"
+        );
+
+
+    const width =
+        canvas.width;
+
+    const height =
+        canvas.height;
+
+
+    ctx.clearRect(
+        0,
+        0,
+        width,
+        height
+    );
+
+
+    const sorted =
+        publicPast
+            .filter(
+                function (record) {
+
+                    return (
+                        record.deviation !== "" &&
+                        record.deviation !== undefined
+                    );
+                }
+            )
+            .slice()
+            .sort(
+                function (a, b) {
+
+                    return (
+                        a.date || ""
+                    ).localeCompare(
+                        b.date || ""
+                    );
+                }
+            );
+
+
+    if (sorted.length === 0) {
+
+        ctx.fillStyle =
+            "#888";
+
+        ctx.font =
+            "14px sans-serif";
+
+        ctx.fillText(
+            "偏差値のデータがありません。",
+            10,
+            height / 2
+        );
+
+        return;
+    }
+
+
+    const padding = 40;
+
+
+    const values =
+        sorted.map(
+            function (record) {
+
+                return Number(record.deviation) || 0;
+            }
+        );
+
+
+    const maxValue =
+        Math.max(
+            70,
+            ...values
+        );
+
+    const minValue =
+        Math.min(
+            30,
+            ...values
+        );
+
+
+    const stepX =
+        sorted.length > 1
+            ? (
+                width -
+                padding * 2
+            ) /
+            (
+                sorted.length -
+                1
+            )
+            : 0;
+
+
+    function toX(i) {
+
+        return (
+            padding +
+            stepX * i
+        );
+    }
+
+
+    function toY(value) {
+
+        return (
+            height -
+            padding -
+            (
+                (value - minValue) /
+                (maxValue - minValue) *
+                (height - padding * 2)
+            )
+        );
+    }
+
+
+    /* 軸 */
+
+    ctx.strokeStyle =
+        "#ccc";
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+        padding,
+        padding
+    );
+
+    ctx.lineTo(
+        padding,
+        height - padding
+    );
+
+    ctx.lineTo(
+        width - padding,
+        height - padding
+    );
+
+    ctx.stroke();
+
+
+    /* 折れ線 */
+
+    ctx.strokeStyle =
+        "#6a1b9a";
+
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+
+
+    sorted.forEach(
+        function (record, i) {
+
+            const x =
+                toX(i);
+
+            const y =
+                toY(
+                    Number(record.deviation)
+                );
+
+
+            if (i === 0) {
+
+                ctx.moveTo(
+                    x,
+                    y
+                );
+
+            } else {
+
+                ctx.lineTo(
+                    x,
+                    y
+                );
+            }
+        }
+    );
+
+    ctx.stroke();
+
+
+    /* 点とラベル */
+
+    ctx.fillStyle =
+        "#6a1b9a";
+
+    ctx.font =
+        "11px sans-serif";
+
+
+    sorted.forEach(
+        function (record, i) {
+
+            const x =
+                toX(i);
+
+            const y =
+                toY(
+                    Number(record.deviation)
+                );
+
+
+            ctx.beginPath();
+
+            ctx.arc(
+                x,
+                y,
+                3,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.fill();
+
+
+            ctx.fillText(
+                String(record.deviation),
+                x - 8,
+                y - 8
+            );
+
+
+            ctx.save();
+
+            ctx.translate(
+                x,
+                height - padding + 14
+            );
+
+            ctx.rotate(
+                -Math.PI / 6
+            );
+
+            ctx.fillText(
+                (record.subject || "") +
+                " " +
+                (record.date || ""),
+                0,
+                0
+            );
+
+            ctx.restore();
+        }
+    );
+}
+
+
 function renderPastChart(type) {
 
     const canvas =
@@ -3319,28 +3630,109 @@ function renderPastChart(type) {
     const padding = 40;
 
 
-    const scoreValues =
-        sorted.map(
+    /*
+
+       つるふ（private）は「前回得点」が
+       直前の記録の得点そのものであることが多く、
+       別ラインとして重ねて描くと交差して見えて
+       分かりにくいため、1本の連続した折れ線として
+       つなげて描画する。
+
+       最初の記録にだけ「前回得点」が入っていれば、
+       それを一番先頭の点として追加する。
+
+       公立（public）は比較対象が「平均点」という
+       別の指標なので、従来どおり2本の線で描く。
+
+    */
+
+    let points = [];
+
+
+    if (type === "private") {
+
+        const first =
+            sorted[0];
+
+
+        if (
+            first.comparison !== "" &&
+            first.comparison !== undefined
+        ) {
+
+            points.push(
+                {
+                    label:
+                        "前回",
+
+                    value:
+                        Number(first.comparison)
+                }
+            );
+        }
+
+
+        sorted.forEach(
             function (record) {
 
-                return Number(record.score) || 0;
+                points.push(
+                    {
+                        label:
+                            (record.subject || "") +
+                            " " +
+                            (record.date || ""),
+
+                        value:
+                            Number(record.score) || 0
+                    }
+                );
+            }
+        );
+
+    } else {
+
+        points =
+            sorted.map(
+                function (record) {
+
+                    return {
+                        label:
+                            (record.subject || "") +
+                            " " +
+                            (record.date || ""),
+
+                        value:
+                            Number(record.score) || 0
+                    };
+                }
+            );
+    }
+
+
+    const scoreValues =
+        points.map(
+            function (point) {
+
+                return point.value;
             }
         );
 
     const compareValues =
-        sorted
-            .map(
-                function (record) {
+        type === "public"
+            ? sorted
+                .map(
+                    function (record) {
 
-                    return Number(record.comparison);
-                }
-            )
-            .filter(
-                function (value) {
+                        return Number(record.comparison);
+                    }
+                )
+                .filter(
+                    function (value) {
 
-                    return !Number.isNaN(value);
-                }
-            );
+                        return !Number.isNaN(value);
+                    }
+                )
+            : [];
 
     const allValues =
         scoreValues.concat(
@@ -3362,13 +3754,13 @@ function renderPastChart(type) {
 
 
     const stepX =
-        sorted.length > 1
+        points.length > 1
             ? (
                 width -
                 padding * 2
             ) /
             (
-                sorted.length -
+                points.length -
                 1
             )
             : 0;
@@ -3422,7 +3814,7 @@ function renderPastChart(type) {
     ctx.stroke();
 
 
-    /* 得点ライン */
+    /* 得点ライン（1本の連続した折れ線） */
 
     ctx.strokeStyle =
         "#1565c0";
@@ -3432,16 +3824,14 @@ function renderPastChart(type) {
     ctx.beginPath();
 
 
-    sorted.forEach(
-        function (record, i) {
+    points.forEach(
+        function (point, i) {
 
             const x =
                 toX(i);
 
             const y =
-                toY(
-                    Number(record.score) || 0
-                );
+                toY(point.value);
 
 
             if (i === 0) {
@@ -3464,65 +3854,68 @@ function renderPastChart(type) {
     ctx.stroke();
 
 
-    /* 比較ライン（平均点／前回得点） */
+    /* 公立のみ：平均点の比較ライン */
 
-    ctx.strokeStyle =
-        "#e65100";
+    if (type === "public") {
 
-    ctx.setLineDash(
-        [4, 3]
-    );
+        ctx.strokeStyle =
+            "#e65100";
 
-    ctx.beginPath();
+        ctx.setLineDash(
+            [4, 3]
+        );
+
+        ctx.beginPath();
 
 
-    let started = false;
+        let started = false;
 
 
-    sorted.forEach(
-        function (record, i) {
+        sorted.forEach(
+            function (record, i) {
 
-            if (
-                record.comparison === "" ||
-                record.comparison === undefined
-            ) {
-                return;
+                if (
+                    record.comparison === "" ||
+                    record.comparison === undefined
+                ) {
+                    return;
+                }
+
+
+                const x =
+                    toX(i);
+
+                const y =
+                    toY(
+                        Number(record.comparison)
+                    );
+
+
+                if (!started) {
+
+                    ctx.moveTo(
+                        x,
+                        y
+                    );
+
+                    started = true;
+
+                } else {
+
+                    ctx.lineTo(
+                        x,
+                        y
+                    );
+                }
             }
+        );
 
+        ctx.stroke();
 
-            const x =
-                toX(i);
-
-            const y =
-                toY(
-                    Number(record.comparison)
-                );
-
-
-            if (!started) {
-
-                ctx.moveTo(
-                    x,
-                    y
-                );
-
-                started = true;
-
-            } else {
-
-                ctx.lineTo(
-                    x,
-                    y
-                );
-            }
-        }
-    );
-
-    ctx.stroke();
-
-    ctx.setLineDash(
-        []
-    );
+        ctx.setLineDash(
+            []
+        );
+    }
 
 
     /* 点とラベル */
@@ -3531,16 +3924,14 @@ function renderPastChart(type) {
         "10px sans-serif";
 
 
-    sorted.forEach(
-        function (record, i) {
+    points.forEach(
+        function (point, i) {
 
             const x =
                 toX(i);
 
             const y =
-                toY(
-                    Number(record.score) || 0
-                );
+                toY(point.value);
 
 
             ctx.fillStyle =
@@ -3559,7 +3950,7 @@ function renderPastChart(type) {
             ctx.fill();
 
             ctx.fillText(
-                String(record.score),
+                String(point.value),
                 x - 8,
                 y - 8
             );
@@ -3577,9 +3968,7 @@ function renderPastChart(type) {
             );
 
             ctx.fillText(
-                (record.subject || "") +
-                " " +
-                (record.date || ""),
+                point.label,
                 0,
                 0
             );
@@ -3600,19 +3989,18 @@ function renderPastChart(type) {
         14
     );
 
-    ctx.fillStyle =
-        "#e65100";
 
-    ctx.fillText(
-        "- - " +
-        (
-            type === "public"
-                ? "平均点"
-                : "前回得点"
-        ),
-        padding + 90,
-        14
-    );
+    if (type === "public") {
+
+        ctx.fillStyle =
+            "#e65100";
+
+        ctx.fillText(
+            "- - 平均点",
+            padding + 90,
+            14
+        );
+    }
 }
 
 
