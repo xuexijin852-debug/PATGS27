@@ -3036,9 +3036,17 @@ function initializePATGS27() {
 
 initializePATGS27();
 
-// =========================================
-// PATGS27 日付・予定管理
-// =========================================
+// =========================================================
+// PATGS27 日付・予定管理システム
+// =========================================================
+// ・予定データをlocalStorageで保存
+// ・今日の日付を自動表示
+// ・夏休み終了 / 入試 / 合格発表を自動カウントダウン
+// ・重要予定を自動並び替え
+// ・予定の追加 / 編集 / 削除
+// ・日付変更時に即時反映
+// =========================================================
+
 
 const DEFAULT_PATGS_SCHEDULE = [
     {
@@ -3083,27 +3091,24 @@ const DEFAULT_PATGS_SCHEDULE = [
 ];
 
 
-// =========================================
+// =========================================================
 // 保存・読み込み
-// =========================================
+// =========================================================
 
 let patgsSchedule =
-    loadJSON(
-        "patgs27_schedule",
-        null
-    );
+    loadJSON("patgs27_schedule", null);
 
 
 if (!Array.isArray(patgsSchedule)) {
 
     patgsSchedule =
-        DEFAULT_PATGS_SCHEDULE.map(
-            function (item) {
-                return {
-                    ...item
-                };
-            }
-        );
+        DEFAULT_PATGS_SCHEDULE.map(function (item) {
+
+            return {
+                ...item
+            };
+
+        });
 
     saveJSON(
         "patgs27_schedule",
@@ -3112,18 +3117,13 @@ if (!Array.isArray(patgsSchedule)) {
 }
 
 
-// =========================================
-// 日付計算
-// =========================================
+// =========================================================
+// 日付ユーティリティ
+// =========================================================
 
-function getDaysUntil(targetDate) {
+function getPATGSToday() {
 
-    if (!targetDate) {
-        return null;
-    }
-
-    const today =
-        new Date();
+    const today = new Date();
 
     today.setHours(
         0,
@@ -3132,10 +3132,19 @@ function getDaysUntil(targetDate) {
         0
     );
 
+    return today;
+}
+
+
+function getPATGSTargetDate(dateString) {
+
+    if (!dateString) {
+        return null;
+    }
 
     const target =
         new Date(
-            targetDate + "T00:00:00"
+            dateString + "T00:00:00"
         );
 
     target.setHours(
@@ -3145,14 +3154,39 @@ function getDaysUntil(targetDate) {
         0
     );
 
+    return target;
+}
 
-    const difference =
-        target - today;
 
+function getDaysUntil(targetDate) {
+
+    if (!targetDate) {
+        return null;
+    }
+
+    const today =
+        getPATGSToday();
+
+    const target =
+        getPATGSTargetDate(
+            targetDate
+        );
+
+    if (!target) {
+        return null;
+    }
 
     return Math.round(
-        difference /
-        (1000 * 60 * 60 * 24)
+        (
+            target.getTime() -
+            today.getTime()
+        ) /
+        (
+            1000 *
+            60 *
+            60 *
+            24
+        )
     );
 }
 
@@ -3163,7 +3197,6 @@ function formatDays(days) {
         return "日付未設定";
     }
 
-
     if (days > 0) {
 
         return "あと " +
@@ -3171,17 +3204,698 @@ function formatDays(days) {
             " 日";
     }
 
-
     if (days === 0) {
 
         return "今日";
     }
 
-
     return Math.abs(days) +
         " 日経過";
 }
 
+
+function formatScheduleDate(dateString) {
+
+    if (!dateString) {
+        return "未設定";
+    }
+
+    const parts =
+        dateString.split("-");
+
+    if (parts.length !== 3) {
+        return dateString;
+    }
+
+    return (
+        Number(parts[0]) +
+        "/" +
+        Number(parts[1]) +
+        "/" +
+        Number(parts[2])
+    );
+}
+
+
+// =========================================================
+// 予定検索
+// =========================================================
+
+function findSchedule(id) {
+
+    return patgsSchedule.find(
+        function (item) {
+
+            return item.id === id;
+
+        }
+    );
+}
+
+
+// =========================================================
+// 今日の日付
+// =========================================================
+
+function updatePATGSTodayDate() {
+
+    const element =
+        document.getElementById(
+            "todayDate"
+        );
+
+    if (!element) {
+        return;
+    }
+
+    const today =
+        getPATGSToday();
+
+    element.textContent =
+        today.getFullYear() +
+        "/" +
+        (today.getMonth() + 1) +
+        "/" +
+        today.getDate();
+}
+
+
+// =========================================================
+// 上部カウントダウン
+// =========================================================
+
+function updatePATGSDashboard() {
+
+    updatePATGSTodayDate();
+
+
+    const summer =
+        findSchedule(
+            "summerVacationEnd"
+        );
+
+    const entrance =
+        findSchedule(
+            "entranceExam"
+        );
+
+    const result =
+        findSchedule(
+            "resultAnnouncement"
+        );
+
+
+    // -----------------------------------------------------
+    // 夏休み終了
+    // -----------------------------------------------------
+
+    const summerElement =
+        document.getElementById(
+            "summerVacationDays"
+        );
+
+    if (summerElement) {
+
+        summerElement.textContent =
+            formatDays(
+                getDaysUntil(
+                    summer?.date
+                )
+            );
+    }
+
+
+    // -----------------------------------------------------
+    // 入試
+    // -----------------------------------------------------
+
+    const entranceElement =
+        document.getElementById(
+            "entranceExamDays"
+        );
+
+    if (entranceElement) {
+
+        entranceElement.textContent =
+            formatDays(
+                getDaysUntil(
+                    entrance?.date
+                )
+            );
+    }
+
+
+    // -----------------------------------------------------
+    // 合格発表
+    // -----------------------------------------------------
+
+    const resultElement =
+        document.getElementById(
+            "resultDays"
+        );
+
+    if (resultElement) {
+
+        resultElement.textContent =
+            formatDays(
+                getDaysUntil(
+                    result?.date
+                )
+            );
+    }
+
+
+    // -----------------------------------------------------
+    // カードの日付
+    // -----------------------------------------------------
+
+    const dateCards =
+        document.querySelectorAll(
+            ".remain-date"
+        );
+
+
+    if (dateCards.length >= 3) {
+
+        dateCards[0].textContent =
+            formatScheduleDate(
+                summer?.date
+            );
+
+        dateCards[1].textContent =
+            formatScheduleDate(
+                entrance?.date
+            );
+
+        dateCards[2].textContent =
+            formatScheduleDate(
+                result?.date
+            );
+    }
+}
+
+
+// =========================================================
+// 予定設定画面
+// =========================================================
+
+function renderScheduleSettings() {
+
+    const container =
+        document.getElementById(
+            "patgsDateSettings"
+        );
+
+    if (!container) {
+        return;
+    }
+
+
+    container.innerHTML = "";
+
+
+    patgsSchedule.forEach(
+        function (event, index) {
+
+            const row =
+                document.createElement(
+                    "div"
+                );
+
+            row.className =
+                "schedule-setting-row";
+
+
+            // -------------------------------------------------
+            // アイコン
+            // -------------------------------------------------
+
+            const icon =
+                document.createElement(
+                    "input"
+                );
+
+            icon.type = "text";
+
+            icon.value =
+                event.icon || "📅";
+
+            icon.placeholder =
+                "アイコン";
+
+            icon.title =
+                "予定アイコン";
+
+
+            // -------------------------------------------------
+            // 予定名
+            // -------------------------------------------------
+
+            const name =
+                document.createElement(
+                    "input"
+                );
+
+            name.type = "text";
+
+            name.value =
+                event.name || "";
+
+            name.placeholder =
+                "予定名";
+
+
+            // -------------------------------------------------
+            // 日付
+            // -------------------------------------------------
+
+            const date =
+                document.createElement(
+                    "input"
+                );
+
+            date.type = "date";
+
+            date.value =
+                event.date || "";
+
+
+            // -------------------------------------------------
+            // 保存処理
+            // -------------------------------------------------
+
+            function saveScheduleItem() {
+
+                event.name =
+                    name.value.trim();
+
+                event.date =
+                    date.value;
+
+                event.icon =
+                    icon.value.trim() ||
+                    "📅";
+
+
+                saveJSON(
+                    "patgs27_schedule",
+                    patgsSchedule
+                );
+
+
+                updatePATGSDashboard();
+
+                updateSchedule();
+            }
+
+
+            name.addEventListener(
+                "input",
+                saveScheduleItem
+            );
+
+
+            date.addEventListener(
+                "change",
+                saveScheduleItem
+            );
+
+
+            icon.addEventListener(
+                "input",
+                saveScheduleItem
+            );
+
+
+            // -------------------------------------------------
+            // 削除ボタン
+            // -------------------------------------------------
+
+            const deleteButton =
+                document.createElement(
+                    "button"
+                );
+
+            deleteButton.type =
+                "button";
+
+            deleteButton.textContent =
+                "削除";
+
+
+            deleteButton.addEventListener(
+                "click",
+                function () {
+
+                    const title =
+                        event.name ||
+                        "この予定";
+
+
+                    if (
+                        !confirm(
+                            "「" +
+                            title +
+                            "」を削除しますか？"
+                        )
+                    ) {
+                        return;
+                    }
+
+
+                    patgsSchedule.splice(
+                        index,
+                        1
+                    );
+
+
+                    saveJSON(
+                        "patgs27_schedule",
+                        patgsSchedule
+                    );
+
+
+                    renderScheduleSettings();
+
+                    updatePATGSDashboard();
+
+                    updateSchedule();
+                }
+            );
+
+
+            // -------------------------------------------------
+            // 行に追加
+            // -------------------------------------------------
+
+            row.append(
+                icon,
+                name,
+                date,
+                deleteButton
+            );
+
+
+            container.appendChild(
+                row
+            );
+        }
+    );
+}
+
+
+// =========================================================
+// 予定追加
+// =========================================================
+
+function addPATGSSchedule() {
+
+    patgsSchedule.push({
+
+        id:
+            "schedule_" +
+            Date.now(),
+
+        name:
+            "新しい予定",
+
+        date:
+            "",
+
+        icon:
+            "📅",
+
+        fixed:
+            false
+    });
+
+
+    saveJSON(
+        "patgs27_schedule",
+        patgsSchedule
+    );
+
+
+    renderScheduleSettings();
+
+    updatePATGSDashboard();
+
+    updateSchedule();
+}
+
+
+// =========================================================
+// 今後の重要予定
+// =========================================================
+
+function updateSchedule() {
+
+    const container =
+        document.getElementById(
+            "upcomingScheduleList"
+        );
+
+    if (!container) {
+        return;
+    }
+
+
+    container.innerHTML = "";
+
+
+    const today =
+        getPATGSToday();
+
+
+    const upcoming =
+        patgsSchedule
+
+            .filter(
+                function (event) {
+
+                    return !!event.date;
+
+                }
+            )
+
+            .map(
+                function (event) {
+
+                    const target =
+                        getPATGSTargetDate(
+                            event.date
+                        );
+
+
+                    if (!target) {
+                        return null;
+                    }
+
+
+                    const diff =
+                        Math.round(
+                            (
+                                target.getTime() -
+                                today.getTime()
+                            ) /
+                            (
+                                1000 *
+                                60 *
+                                60 *
+                                24
+                            )
+                        );
+
+
+                    return {
+                        ...event,
+                        diff: diff
+                    };
+                }
+            )
+
+            .filter(
+                function (event) {
+
+                    return (
+                        event !== null &&
+                        event.diff >= 0
+                    );
+
+                }
+            )
+
+            .sort(
+                function (a, b) {
+
+                    return (
+                        a.diff -
+                        b.diff
+                    );
+
+                }
+            );
+
+
+    // =====================================================
+    // 予定がない場合
+    // =====================================================
+
+    if (upcoming.length === 0) {
+
+        const empty =
+            document.createElement(
+                "p"
+            );
+
+        empty.textContent =
+            "今後の重要予定はありません。";
+
+        container.appendChild(
+            empty
+        );
+
+        return;
+    }
+
+
+    // =====================================================
+    // 予定表示
+    // =====================================================
+
+    upcoming.forEach(
+        function (event) {
+
+            const item =
+                document.createElement(
+                    "div"
+                );
+
+            item.className =
+                "schedule-item";
+
+
+            const name =
+                document.createElement(
+                    "div"
+                );
+
+            name.className =
+                "schedule-name";
+
+            name.textContent =
+                (
+                    event.icon ||
+                    "📅"
+                ) +
+                " " +
+                (
+                    event.name ||
+                    "名称未設定"
+                );
+
+
+            const date =
+                document.createElement(
+                    "div"
+                );
+
+            date.className =
+                "schedule-date";
+
+            date.textContent =
+                formatScheduleDate(
+                    event.date
+                );
+
+
+            const days =
+                document.createElement(
+                    "div"
+                );
+
+            days.className =
+                "schedule-days";
+
+
+            if (event.diff === 0) {
+
+                days.textContent =
+                    "今日";
+
+            } else {
+
+                days.textContent =
+                    "あと " +
+                    event.diff +
+                    " 日";
+            }
+
+
+            item.append(
+                name,
+                date,
+                days
+            );
+
+
+            container.appendChild(
+                item
+            );
+        }
+    );
+}
+
+
+// =========================================================
+// 追加ボタン
+// =========================================================
+
+const addScheduleSettingBtn =
+    document.getElementById(
+        "addScheduleSettingBtn"
+    );
+
+
+if (addScheduleSettingBtn) {
+
+    addScheduleSettingBtn.addEventListener(
+        "click",
+        addPATGSSchedule
+    );
+}
+
+
+// =========================================================
+// 初期化
+// =========================================================
+
+renderScheduleSettings();
+
+updatePATGSDashboard();
+
+updateSchedule();
+
+
+// =========================================================
+// 日付は日付が変わった場合にも自動更新
+// =========================================================
+
+setInterval(
+    function () {
+
+        updatePATGSDashboard();
+
+        updateSchedule();
+
+    },
+    60 * 1000
+);
+
+
+// =========================================================
+// PATGS27 日付・予定管理システム END
+// =========================================================
 
 // =========================================
 // IDで予定を探す
