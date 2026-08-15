@@ -85,3 +85,235 @@ input[type="text"] {
     font-family: "BIZ UDPGothic";
     font-size: 18px;
 }
+
+/* =========================================================
+   PATGS27 STEP 5
+   トップ・40日間計画表示
+   ========================================================= */
+
+.patgs-header {
+    position: relative;
+
+    background: #287c35;
+    color: #ffffff;
+
+    padding: 22px 24px;
+    margin-bottom: 14px;
+
+    border-radius: 6px;
+
+    text-align: center;
+}
+
+.patgs-header h1 {
+    margin: 0 0 8px 0;
+
+    font-size: 28px;
+    letter-spacing: 1px;
+}
+
+.patgs-header p {
+    margin: 4px 0;
+}
+
+.patgs-subtitle {
+    font-size: 13px;
+    opacity: 0.95;
+}
+
+.logout-button {
+    position: absolute;
+
+    top: 18px;
+    right: 18px;
+
+    padding: 7px 13px;
+
+    border: none;
+    border-radius: 5px;
+
+    background: #ffffff;
+    color: #287c35;
+
+    font-weight: bold;
+
+    cursor: pointer;
+}
+
+.logout-button:hover {
+    opacity: 0.85;
+}
+
+
+/* =========================================
+   日付・40日計画・残り日数
+   ========================================= */
+
+.date-dashboard {
+    display: grid;
+
+    grid-template-columns:
+        1fr
+        1.4fr
+        1fr;
+
+    gap: 12px;
+
+    margin-bottom: 14px;
+}
+
+.date-card,
+.day-card,
+.remain-card {
+    background: #ffffff;
+
+    border: 1px solid #d7e5d9;
+    border-radius: 6px;
+
+    padding: 16px;
+
+    box-sizing: border-box;
+
+    min-height: 150px;
+}
+
+.date-card h2,
+.day-card h2,
+.remain-card h2 {
+    margin: 0 0 12px 0;
+
+    padding-bottom: 8px;
+
+    border-bottom: 2px solid #dff1df;
+
+    font-size: 16px;
+}
+
+
+/* 今日の日付 */
+
+.date-main {
+    margin: 25px 0 0 0;
+
+    text-align: center;
+
+    font-size: 24px;
+    font-weight: bold;
+
+    color: #173d20;
+}
+
+
+/* 40日計画 */
+
+.day-card {
+    text-align: center;
+}
+
+.period-text {
+    margin: 0;
+
+    font-size: 14px;
+    color: #285f32;
+    font-weight: bold;
+}
+
+.day-main {
+    margin: 12px 0 0 0;
+
+    font-size: 30px;
+    font-weight: bold;
+
+    color: #287c35;
+}
+
+
+/* 残り日数 */
+
+.remain-card {
+    text-align: center;
+
+    border: 2px solid #287c35;
+}
+
+.remain-main {
+    margin: 12px 0 4px 0;
+
+    font-size: 32px;
+    font-weight: bold;
+
+    color: #287c35;
+}
+
+.remain-date {
+    margin: 0;
+
+    color: #444444;
+    font-size: 13px;
+}
+
+
+/* =========================================
+   週次レビュー通知
+   ========================================= */
+
+.weekly-notice {
+    min-height: 0;
+
+    margin-bottom: 12px;
+
+    padding: 0;
+
+    color: #285f32;
+    font-weight: bold;
+
+    text-align: center;
+}
+
+.weekly-notice:not(:empty) {
+    padding: 10px;
+
+    background: #eef9ee;
+
+    border: 1px solid #c9e5ca;
+    border-radius: 6px;
+}
+
+
+/* =========================================
+   スマホ対応
+   ========================================= */
+
+@media (max-width: 700px) {
+
+    .date-dashboard {
+        grid-template-columns: 1fr;
+    }
+
+    .patgs-header {
+        padding: 18px 12px 20px 12px;
+    }
+
+    .patgs-header h1 {
+        font-size: 23px;
+    }
+
+    .logout-button {
+        position: static;
+
+        margin-top: 10px;
+    }
+
+    .date-main {
+        font-size: 21px;
+    }
+
+    .day-main {
+        font-size: 26px;
+    }
+
+    .remain-main {
+        font-size: 28px;
+    }
+
+}
