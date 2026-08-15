@@ -52,61 +52,93 @@
 
     </header>
 
+<!-- =========================================
+     PATGS27 日付・受験スケジュール
+     ========================================= -->
 
-    <!-- =========================================
-         40日間計画・日付情報
-         ========================================= -->
+<section class="date-dashboard">
 
-    <section class="date-dashboard">
+    <!-- 今日 -->
 
-        <!-- 今日の日付 -->
+    <div class="date-card">
 
-        <div class="date-card">
+        <h2>📅 今日</h2>
 
-            <h2>📅 今日の日付</h2>
+        <p id="todayDate" class="date-main">
+            -
+        </p>
 
-            <p id="todayDate" class="date-main">
-                2026/8/15
-            </p>
-
-        </div>
-
-
-        <!-- 40日間計画 -->
-
-        <div class="day-card">
-
-            <h2>🎯 PATGS27 40日間計画</h2>
-
-            <p class="period-text">
-                2026/7/18 ～ 2026/8/26
-            </p>
-
-            <p id="dayCount" class="day-main">
-                Day 29 / 40
-            </p>
-
-        </div>
+    </div>
 
 
-        <!-- 残り日数 -->
+    <!-- 夏休み終了 -->
 
-        <div class="remain-card">
+    <div class="remain-card">
 
-            <h2>⏳ 計画終了まで</h2>
+        <h2>🌻 夏休み終了まで</h2>
 
-            <p id="daysLeft" class="remain-main">
-                あと 11 日
-            </p>
+        <p id="summerVacationDays" class="remain-main">
+            -
+        </p>
 
-            <p class="remain-date">
-                2026/8/26 まで
-            </p>
+        <p class="remain-date">
+            2026/8/26
+        </p>
 
-        </div>
+    </div>
 
-    </section>
 
+    <!-- 入試 -->
+
+    <div class="remain-card">
+
+        <h2>🎓 入試まで</h2>
+
+        <p id="entranceExamDays" class="remain-main">
+            -
+        </p>
+
+        <p class="remain-date">
+            2027/2/16
+        </p>
+
+    </div>
+
+
+    <!-- 合格発表 -->
+
+    <div class="remain-card">
+
+        <h2>🏆 合格発表まで</h2>
+
+        <p id="resultDays" class="remain-main">
+            -
+        </p>
+
+        <p class="remain-date">
+            2027/2/26
+        </p>
+
+    </div>
+
+</section>
+
+
+<!-- =========================================
+     今後の予定
+     ========================================= -->
+
+<section class="schedule-dashboard">
+
+    <h2>📅 今後の重要予定</h2>
+
+    <div id="upcomingScheduleList">
+
+        <!-- JavaScriptで自動生成 -->
+
+    </div>
+
+</section>
 
     <!-- 週次レビュー通知 -->
 
