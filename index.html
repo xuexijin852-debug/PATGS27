@@ -408,6 +408,13 @@
 
             <div id="publicPastList"></div>
 
+            <canvas
+                id="publicPastChart"
+                width="600"
+                height="240"
+                style="max-width:100%; border:1px solid #ccc;"
+            ></canvas>
+
 
             <hr>
 
@@ -423,6 +430,13 @@
             </button>
 
             <div id="privatePastList"></div>
+
+            <canvas
+                id="privatePastChart"
+                width="600"
+                height="240"
+                style="max-width:100%; border:1px solid #ccc;"
+            ></canvas>
 
         </section>
 
@@ -654,9 +668,20 @@
 
                 <option value="">相手を選択</option>
                 <option value="Claude">Claude</option>
-                <option value="塾">塾</option>
-                <option value="学校">学校</option>
-                <option value="その他">その他</option>
+                <option value="Gemini">Gemini</option>
+                <option value="ChatGPT">ChatGPT</option>
+                <option value="Theta Wave">Theta Wave</option>
+                <option value="先生">先生</option>
+
+            </select>
+
+            <select id="questionCategory">
+
+                <option value="">内容を選択</option>
+                <option value="進路">進路</option>
+                <option value="学習">学習</option>
+                <option value="部活">部活</option>
+                <option value="委員会">委員会</option>
 
             </select>
 
