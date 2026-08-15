@@ -135,6 +135,42 @@
 
 
         <!-- =================================================
+             データのバックアップ
+        ================================================== -->
+
+        <section>
+
+            <h2>💾 データのバックアップ</h2>
+
+            <p>
+                全データをファイルに書き出したり、書き出したファイルから復元したりできます。
+                機種変更やブラウザのデータ消去に備えて、定期的に書き出しておくのがおすすめです。
+            </p>
+
+            <button id="exportDataBtn">
+                ⬇️ データを書き出す
+            </button>
+
+            <button id="importDataBtn">
+                ⬆️ データを読み込む
+            </button>
+
+            <input
+                type="file"
+                id="importDataInput"
+                accept="application/json"
+                style="display:none;"
+            >
+
+            <p id="backupStatus"></p>
+
+        </section>
+
+
+        <hr>
+
+
+        <!-- =================================================
              週次レビュー通知
         ================================================== -->
 
@@ -144,20 +180,6 @@
                 id="weeklyReviewNotice"
                 class="weekly-notice"
             ></div>
-
-        </section>
-
-
-        <!-- =================================================
-             40日管理
-        ================================================== -->
-
-        <section>
-
-            <h2>📆 40日管理</h2>
-
-            <p id="dayCount">-</p>
-            <p id="daysLeft">-</p>
 
         </section>
 
@@ -350,6 +372,15 @@
 
             <div id="mockExamList"></div>
 
+            <h3>📈 偏差値の推移</h3>
+
+            <canvas
+                id="scoreTrendChart"
+                width="600"
+                height="240"
+                style="max-width:100%; border:1px solid #ccc;"
+            ></canvas>
+
         </section>
 
 
@@ -392,6 +423,72 @@
             </button>
 
             <div id="privatePastList"></div>
+
+        </section>
+
+
+        <hr>
+
+
+        <!-- =================================================
+             内申点管理
+        ================================================== -->
+
+        <section>
+
+            <h2>📊 内申点管理</h2>
+
+            <p>
+                教科ごとに現在の評定と目標の評定を入力してください（1～5）。
+            </p>
+
+            <div id="naishinList"></div>
+
+            <p id="naishinTotal">
+                現在合計：- ／ 目標合計：-
+            </p>
+
+        </section>
+
+
+        <hr>
+
+
+        <!-- =================================================
+             弱点単元・要復習リスト
+        ================================================== -->
+
+        <section>
+
+            <h2>📌 弱点単元・要復習リスト</h2>
+
+            <select id="weakPointSubject">
+
+                <option value="">教科を選択</option>
+                <option value="国語">国語</option>
+                <option value="数学">数学</option>
+                <option value="理科">理科</option>
+                <option value="社会">社会</option>
+                <option value="英語">英語</option>
+                <option value="保健体育">保健体育</option>
+                <option value="音楽">音楽</option>
+                <option value="技術家庭">技術家庭</option>
+                <option value="美術">美術</option>
+                <option value="その他">その他</option>
+
+            </select>
+
+            <input
+                type="text"
+                id="weakPointText"
+                placeholder="内容を入力"
+            >
+
+            <button id="addWeakPointBtn">
+                ＋追加
+            </button>
+
+            <div id="weakPointList"></div>
 
         </section>
 
@@ -538,6 +635,42 @@
             <button id="addOtherScheduleBtn">
                 ＋予定を追加
             </button>
+
+        </section>
+
+
+        <hr>
+
+
+        <!-- =================================================
+             質問・確認事項メモ
+        ================================================== -->
+
+        <section>
+
+            <h2>❓ 質問・確認事項メモ</h2>
+
+            <select id="questionTarget">
+
+                <option value="">相手を選択</option>
+                <option value="Claude">Claude</option>
+                <option value="塾">塾</option>
+                <option value="学校">学校</option>
+                <option value="その他">その他</option>
+
+            </select>
+
+            <input
+                type="text"
+                id="questionText"
+                placeholder="聞きたいことを入力"
+            >
+
+            <button id="addQuestionBtn">
+                ＋追加
+            </button>
+
+            <div id="questionList"></div>
 
         </section>
 
