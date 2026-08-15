@@ -1,251 +1,1080 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
+
 <head>
 <meta charset="UTF-8">
-<title>Project Summer 2026</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>PATGS27</title>
+
 <link rel="stylesheet" href="css/style.css">
 </head>
 
+
 <body>
+
+
+<!-- ========================================
+     ログイン画面
+======================================== -->
 
 <div id="loginScreen">
 
-<h2>🔐 PATGS27</h2>
+    <section class="login-card">
 
-<p>利用するにはログインしてください</p>
+        <h1>🔐 PATGS27</h1>
 
-<button id="loginBtn">
-Googleでログイン
-</button>
+        <p class="subtitle">
+            PS26 — 2026年夏季の通称
+        </p>
 
-<p id="userName">
-未ログイン
-</p>
+        <p>
+            利用するにはログインしてください
+        </p>
+
+        <button id="loginBtn">
+            Googleでログイン
+        </button>
+
+        <p id="userName">
+            未ログイン
+        </p>
+
+    </section>
 
 </div>
 
+
+
+<!-- ========================================
+     メインアプリ
+======================================== -->
+
 <div id="mainApp">
 
-<h1>PATGS27</h1>
-<button id="logoutBtn">
-ログアウト
-</button>
-<p>積み重ねろ、合格への40日‼</p>
-<p>―400コマ、常識を覆せ―</p>
 
-<h3>🎯 神奈川県立港北高等学校 合格へ　夏季まで　残り</h3>
+<!-- ========================================
+     ヘッダー
+======================================== -->
 
-<h2 id="daysLeft"></h2>
-<h2 id="dayCount"></h2>
-<p id="todayDate"></p>
+<header>
 
-<hr>
-<hr>
-<section>
+    <h1>PATGS27</h1>
 
-<section>
+    <p class="header-subtitle">
+        PS26 — 2026年夏季の通称
+    </p>
 
-<h2>🎯 今日の目標</h2>
+    <p>
+        学習・生活・時間・誘惑を総合管理する
+        PATGS27管理システム
+    </p>
 
-<textarea id="goalText" rows="3" style="width:100%;"></textarea>
+    <button id="logoutBtn">
+        ログアウト
+    </button>
 
-</section>
+</header>
 
-<h2>今日の予定</h2>
 
-<div id="todoList"></div>
 
-<button id="addTodoBtn">＋予定を追加</button>
+<!-- ========================================
+     今日の状況
+======================================== -->
 
-<p id="todoRate">達成率 0%</p>
+<section id="statusSection">
 
-<p id="todoComment">🔴ベースアップしよう！</p>
+    <h2>🎯 今日のPATGS27</h2>
 
-<progress id="todoBar" value="0" max="100"></progress>
+    <p id="todayDate"></p>
 
-<h2>💬 今日の一言</h2>
+    <div class="status-grid">
 
-<textarea id="messageText" rows="4" cols="50"></textarea>
+        <div class="status-card">
 
-</section>
+            <h3>📅 運用日数</h3>
 
-<section>
+            <h2 id="dayCount">
+                -
+            </h2>
 
-<h2>今日の実績</h2>
+        </div>
 
-<textarea id="resultText" rows="6" style="width:100%;"></textarea>
 
-</section>
-<hr>
+        <div class="status-card">
 
-<section>
+            <h3>🔥 残り日数</h3>
 
-<h2>400コマ進捗</h2>
+            <h2 id="daysLeft">
+                -
+            </h2>
 
-<p id="commentText">今日も頑張ろう！</p>
+        </div>
 
-<h3 id="totalText">0 / 400 コマ</h3>
 
-<hr>
+        <div class="status-card">
 
-<h3>📊 予測</h3>
+            <h3>📚 400コマ</h3>
 
-<p id="remainText">残り：400コマ</p>
+            <h2 id="statusCramText">
+                0 / 400
+            </h2>
 
-<p id="daysRemainText">残り日数：40日</p>
+        </div>
 
-<p id="averageText">1日平均：10コマ必要</p>
+    </div>
 
-<p id="percentText">達成率：0%</p>
 
-<h3>今日のコマ</h3>
-
-<p>目標コマ</p>
-<input type="number" id="goal" value="10">
-
-<p>実績コマ</p>
-<input type="number" id="today" value="0">
-
-<p>合計コマ</p>
-<input type="number" id="total" value="0">
-
-<button id="recordBtn">記録する</button>
-
-<p>今日の進捗</p>
-<progress id="todayBar" value="0" max="10"></progress>
-
-<p>400コマ進捗</p>
-<progress id="totalBar" value="0" max="400"></progress>
+    <div id="weeklyReviewNotice" class="notice">
+        <!-- JSで週次レビュー日を表示 -->
+    </div>
 
 </section>
 
-<hr>
 
-<h2>📊 模試結果</h2>
 
-<table>
+<!-- ========================================
+     生活リズム
+======================================== -->
 
-<tr>
-<th>日付</th>
-<th>国語</th>
-<th>数学</th>
-<th>英語</th>
-<th>理科</th>
-<th>社会</th>
-<th>3科</th>
-<th>5科</th>
-<th>偏差値</th>
-</tr>
+<section id="lifeSection">
 
-<tr>
-<td>2026-7-12</td>
-<td>64点　49</td>
-<td>33点　44</td>
-<td>63点　54</td>
-<td>37点　46</td>
-<td>49点　56</td>
-<td>160点　49</td>
-<td>246点　50</td>
-<td>50</td>
-</tr>
+    <h2>🌅 生活リズム</h2>
 
-</table>
+    <p>
+        PATGS27における基本的な生活リズムを記録します。
+    </p>
+
+
+    <div class="life-grid">
+
+
+        <div class="life-item">
+
+            <h3>🌅 起床</h3>
+
+            <p>
+                目標：5:55
+            </p>
+
+            <select id="wakeStatus">
+
+                <option value="">
+                    未記録
+                </option>
+
+                <option value="○">
+                    ○ 守れた
+                </option>
+
+                <option value="△">
+                    △ 少しずれた
+                </option>
+
+                <option value="×">
+                    × 守れなかった
+                </option>
+
+            </select>
+
+        </div>
+
+
+
+        <div class="life-item">
+
+            <h3>🛁 入浴</h3>
+
+            <p>
+                目標：21:00～22:30
+            </p>
+
+            <select id="bathStatus">
+
+                <option value="">
+                    未記録
+                </option>
+
+                <option value="○">
+                    ○ 守れた
+                </option>
+
+                <option value="△">
+                    △ 少しずれた
+                </option>
+
+                <option value="×">
+                    × 守れなかった
+                </option>
+
+            </select>
+
+        </div>
+
+
+
+        <div class="life-item">
+
+            <h3>🌙 就寝</h3>
+
+            <p>
+                目標：22:30～23:00
+            </p>
+
+            <select id="sleepStatus">
+
+                <option value="">
+                    未記録
+                </option>
+
+                <option value="○">
+                    ○ 守れた
+                </option>
+
+                <option value="△">
+                    △ 少しずれた
+                </option>
+
+                <option value="×">
+                    × 守れなかった
+                </option>
+
+            </select>
+
+        </div>
+
+    </div>
+
+
+    <p id="lifeSaveStatus" class="save-status">
+        自動保存
+    </p>
 
 </section>
 
+
+
+<!-- ========================================
+     今日の目標
+======================================== -->
+
+<section id="dailySection">
+
+    <h2>🎯 今日の目標</h2>
+
+    <textarea
+        id="goalText"
+        rows="4"
+        placeholder="今日達成したいことを入力してください"
+    ></textarea>
+
+
+    <h2>📋 今日の予定</h2>
+
+    <div id="todoList"></div>
+
+    <button id="addTodoBtn">
+        ＋予定を追加
+    </button>
+
+    <p id="todoRate">
+        達成率 0%
+    </p>
+
+    <p id="todoComment">
+        📝予定を追加しよう！
+    </p>
+
+    <progress
+        id="todoBar"
+        value="0"
+        max="100">
+    </progress>
+
+
+    <h2>💬 今日の一言</h2>
+
+    <textarea
+        id="messageText"
+        rows="4"
+        placeholder="今日の一言"
+    ></textarea>
+
 </section>
 
-<section>
+
+
+<!-- ========================================
+     今日の実績
+======================================== -->
+
+<section id="resultSection">
+
+    <h2>📝 今日の実績</h2>
+
+    <textarea
+        id="resultText"
+        rows="6"
+        placeholder="今日やったこと・気づいたこと・反省など"
+    ></textarea>
+
+</section>
+
+
+
+<!-- ========================================
+     400コマシステム
+======================================== -->
+
+<section id="cramSection">
+
+    <h2>📚 PATGS27 400コマ進捗</h2>
+
+    <p id="commentText">
+        今日も積み重ねよう！
+    </p>
+
+
+    <div class="cram-main">
+
+        <h3 id="totalText">
+            0 / 400 コマ
+        </h3>
+
+        <progress
+            id="totalBar"
+            value="0"
+            max="400">
+        </progress>
+
+    </div>
+
+
+    <div class="cram-stats">
+
+        <p id="remainText">
+            残り：400コマ
+        </p>
+
+        <p id="daysRemainText">
+            残り日数：-
+        </p>
+
+        <p id="averageText">
+            1日平均：- コマ必要
+        </p>
+
+        <p id="percentText">
+            達成率：0%
+        </p>
+
+    </div>
+
 
     <hr>
 
-<section>
 
-<h2>📅 テスト・提出物</h2>
+    <h3>📖 今日のコマ</h3>
 
-<div id="examList"></div>
+    <label for="goal">
+        目標コマ
+    </label>
 
-<button id="addExamBtn">＋追加</button>
+    <input
+        type="number"
+        id="goal"
+        min="0"
+        value="10"
+    >
+
+
+    <label for="today">
+        実施コマ
+    </label>
+
+    <input
+        type="number"
+        id="today"
+        min="0"
+        value="0"
+    >
+
+
+    <p>
+        今日の進捗
+    </p>
+
+    <progress
+        id="todayBar"
+        value="0"
+        max="10">
+    </progress>
+
+
+    <hr>
+
+
+    <h3>⚖️ コマ成立判定</h3>
+
+    <p>
+        今日実施したコマについて、
+        自分で成立状況を判定してください。
+    </p>
+
+
+    <div class="judgement-grid">
+
+        <div class="judgement-card">
+
+            <strong>○ 成立</strong>
+
+            <input
+                type="number"
+                id="cramPass"
+                min="0"
+                value="0"
+            >
+
+            <p>
+                400コマに加算
+            </p>
+
+        </div>
+
+
+        <div class="judgement-card">
+
+            <strong>△ 要検討</strong>
+
+            <input
+                type="number"
+                id="cramReview"
+                min="0"
+                value="0"
+            >
+
+            <p>
+                後で確認
+            </p>
+
+        </div>
+
+
+        <div class="judgement-card">
+
+            <strong>× 不成立</strong>
+
+            <input
+                type="number"
+                id="cramFail"
+                min="0"
+                value="0"
+            >
+
+            <p>
+                400コマには加算しない
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <p id="cramJudgementMessage">
+        ○＋△＋×＝実施コマ
+    </p>
+
+
+    <button id="recordBtn">
+        📚 今日のコマを記録する
+    </button>
+
+
+    <p id="cramSaveStatus" class="save-status">
+        自動保存
+    </p>
+
+
+    <h3>📊 コマ判定累計</h3>
+
+    <p id="passTotalText">
+        ○成立：0コマ
+    </p>
+
+    <p id="reviewTotalText">
+        △要検討：0コマ
+    </p>
+
+    <p id="failTotalText">
+        ×不成立：0コマ
+    </p>
+
+
+    <h3 id="cramHistoryTitle">
+        📅 最近のコマ記録
+    </h3>
+
+    <div id="cramHistory"></div>
 
 </section>
 
-<h2>📚 教材</h2>
 
-<div id="materialList"></div>
 
-<button id="addMaterialBtn">＋教材追加</button>
+<!-- ========================================
+     誘惑報告
+======================================== -->
+
+<section id="temptationSection">
+
+    <h2>⚠️ 誘惑報告</h2>
+
+    <p>
+        誘惑対象へのアクセス等があった場合、
+        ここから記録してください。
+    </p>
+
+    <button
+        id="temptationBtn"
+        class="warning-button"
+    >
+        ⚠️ 今、誘惑がありました
+    </button>
+
+
+    <p id="temptationStatus">
+        未報告
+    </p>
+
+
+    <h3>
+        📋 誘惑報告履歴
+    </h3>
+
+    <div id="temptationList"></div>
 
 </section>
 
-<section>
 
 
-<h2>📅 学習以外の予定</h2>
+<!-- ========================================
+     模試結果
+======================================== -->
 
-<textarea
-id="otherSchedule"
-rows="4"
-style="width:100%;"></textarea>
+<section id="mockExamSection">
+
+    <h2>📊 模試結果</h2>
+
+    <p>
+        HTMLを編集せず、この画面から模試結果を追加できます。
+    </p>
+
+
+    <button id="addMockBtn">
+        ＋模試結果を追加
+    </button>
+
+
+    <div id="mockExamForm"></div>
+
+
+    <h3>
+        📈 保存済み模試
+    </h3>
+
+    <div id="mockExamList"></div>
 
 </section>
 
+
+
+<!-- ========================================
+     過去問
+======================================== -->
+
+<section id="pastExamSection">
+
+    <h2>📖 過去問記録</h2>
+
+
+    <div class="past-exam-grid">
+
+
+        <div class="past-exam-box">
+
+            <h3>🏫 公立高校過去問</h3>
+
+            <p>
+                平均点との比較を重視
+            </p>
+
+            <button id="addPublicPastBtn">
+                ＋公立過去問を追加
+            </button>
+
+            <div id="publicPastList"></div>
+
+        </div>
+
+
+
+        <div class="past-exam-box">
+
+            <h3>🏫 つるふ等・私立過去問</h3>
+
+            <p>
+                自分自身の推移を記録
+            </p>
+
+            <button id="addPrivatePastBtn">
+                ＋過去問を追加
+            </button>
+
+            <div id="privatePastList"></div>
+
+        </div>
+
+    </div>
+
 </section>
+
+
+
+<!-- ========================================
+     違反ログ
+======================================== -->
+
+<section id="violationSection">
+
+    <h2>⚖️ 今週の違反記録</h2>
+
+    <p>
+        週次レビューで確認するための記録です。
+    </p>
+
+
+    <div class="violation-form">
+
+        <label for="violationLevel">
+            判定
+        </label>
+
+        <select id="violationLevel">
+
+            <option value="">
+                選択してください
+            </option>
+
+            <option value="軽微">
+                軽微
+            </option>
+
+            <option value="中程度">
+                中程度
+            </option>
+
+            <option value="重大">
+                重大
+            </option>
+
+        </select>
+
+
+        <label for="violationText">
+            内容
+        </label>
+
+        <textarea
+            id="violationText"
+            rows="3"
+            placeholder="何があったかを記録"
+        ></textarea>
+
+
+        <button id="addViolationBtn">
+            ＋違反記録を保存
+        </button>
+
+    </div>
+
+
+    <div id="violationList"></div>
+
+</section>
+
+
+
+<!-- ========================================
+     週次レビュー
+======================================== -->
+
+<section id="reviewSection">
+
+    <h2>📅 週次レビュー</h2>
+
+    <div id="weeklyReviewNoticeLarge">
+    </div>
+
+
+    <p>
+        週次レビューでは、
+        学習・生活・誘惑・違反・コマ成立状況を確認します。
+    </p>
+
+
+    <textarea
+        id="weeklyReviewText"
+        rows="7"
+        placeholder="今週の振り返り・改善点・来週の方針"
+    ></textarea>
+
+
+    <p id="weeklyReviewSaveStatus" class="save-status">
+        自動保存
+    </p>
+
+
+    <h3>
+        📋 過去の週次レビュー
+    </h3>
+
+    <div id="weeklyReviewList"></div>
+
+</section>
+
+
+
+<!-- ========================================
+     テスト・提出物
+======================================== -->
+
+<section id="examSection">
+
+    <h2>📅 テスト・提出物</h2>
+
+    <div id="examList"></div>
+
+    <button id="addExamBtn">
+        ＋追加
+    </button>
+
+</section>
+
+
+
+<!-- ========================================
+     教材
+======================================== -->
+
+<section id="materialSection">
+
+    <h2>📚 教材</h2>
+
+    <div id="materialList"></div>
+
+    <button id="addMaterialBtn">
+        ＋教材追加
+    </button>
+
+</section>
+
+
+
+<!-- ========================================
+     学習以外の予定
+======================================== -->
+
+<section id="otherScheduleSection">
+
+    <h2>📅 学習以外の予定</h2>
+
+    <textarea
+        id="otherSchedule"
+        rows="5"
+        placeholder="学校・家庭・予定など"
+    ></textarea>
+
+</section>
+
+
+
+<!-- ========================================
+     PATGS27憲法
+======================================== -->
+
+<section id="constitutionSection">
+
+    <h2>📜 PATGS27憲法</h2>
+
+    <p>
+        <strong>
+            令和八年（2026年）八月十五日 施行
+        </strong>
+    </p>
+
+    <p>
+        <em>
+            ― PATGS監督下における最高規範 ―
+        </em>
+    </p>
+
+    <p>
+        <strong>正式名称：PATGS27。</strong>
+        2026年夏季の期間を指す呼称として
+        「PS26」は継続使用できる。
+    </p>
+
+
+    <hr>
+
+
+    <h3>
+        第一章　総則
+    </h3>
+
+
+    <h4>
+        第1条　目的
+    </h4>
+
+    <p>
+        PATGS27は、御志望校への合格を達成するとともに、
+        その後も学習を継続し、これを加速して進めることを目的とする。
+        総裁は、神奈川県立港北高等学校への合格を当面の目標とし、
+        内申38～40の確保及び8月23日の全県模試における
+        市ヶ尾高校A3判定レベルへの到達を、
+        その達成に向けた当面のマイルストーンとして位置づける。
+    </p>
+
+
+    <h4>
+        第2条　最高規範性
+    </h4>
+
+    <p>
+        本憲法はPATGS27における最高規範である。
+        本憲法に反する運用規定、個別決定その他の取り決めは、
+        その限度において効力を有しない。
+    </p>
+
+
+    <h4>
+        第3条　基本原則
+    </h4>
+
+    <p>
+        一　学習を中心とすること。<br>
+        二　長期的な継続性を重視すること。<br>
+        三　数値による客観的評価を活用すること。<br>
+        四　失敗を改善の材料とし、失敗そのものを人格的評価としないこと。<br>
+        五　誘惑その他の障害に対して、必要に応じ外部的・制度的対策を講ずること。<br>
+        六　現実の状況に応じて計画を検証し、合理的に改良すること。
+    </p>
+
+
+    <h4>
+        第4条　適用範囲
+    </h4>
+
+    <p>
+        本憲法は、PATGS27における学習計画、生活リズム、
+        誘惑対策、教科方針、模試、過去問、記録、
+        AIによる支援及びその他PATGSがPATGS27の運用に含める事項について適用する。
+    </p>
+
+
+    <hr>
+
+
+    <h3>
+        第二章　組織及び役割
+    </h3>
+
+
+    <h4>
+        第5条　総裁
+    </h4>
+
+    <p>
+        総裁は、本計画の第一当事者として、
+        実際の学習及び生活を遂行する主体である。
+    </p>
+
+
+    <h4>
+        第6条　PATGS
+    </h4>
+
+    <p>
+        PATGS(PATGS27におけるP・AI・対策・合格・学習・成功)は、
+        本計画の監督機関として、本憲法に基づき、
+        必要な通達、方針及び監督上の措置を行う。
+        読み方は「パッツ」とする。
+    </p>
+
+
+    <h4>
+        第7条　AI構成員
+    </h4>
+
+    <p>
+        AI構成員は、本憲法及びPATGSの通達に基づき、
+        それぞれに与えられた役割を遂行する。
+    </p>
+
+
+    <h4>
+        第8条　AI構成員の役割分担(三権分立)
+    </h4>
+
+    <p>
+        Claudeは、立法及び行政を担い、
+        学習対策本部長兼困難対策係長として、
+        立案された方針の実施及び学習計画の運用、
+        弱点科目・苦手単元の原因分析、
+        学習上の壁への解決策提示を行う。
+    </p>
+
+    <p>
+        Geminiは、司法及び事務を担い、
+        事務総長として、本憲法及び運用規定への適合性審査、
+        適正手続の保障、違反の認定及び裁定、
+        並びに学習資料・演習問題・ドキュメントの生成その他の事務を行う。
+    </p>
+
+    <p>
+        ChatGPTは、行政監視を担い、
+        休憩検討本部長として、
+        運用が過度になっていないかの監視、
+        休憩タイミングの検討、
+        学習ストレスの軽減・メンタルサポートを行う。
+    </p>
+
+    <p>
+        その他のAIについては、
+        PATGSの通達により必要な役割を定めることができる。
+    </p>
+
+
+    <p class="constitution-note">
+        ※本画面ではPATGS27憲法第1条から第8条までを掲載しています。
+    </p>
+
+</section>
+
+
+
+<!-- ========================================
+     受験リンク集
+======================================== -->
+
+<section id="linkSection">
+
+    <h2>🔗 受験リンク集</h2>
+
+    <ul>
+
+        <li>
+            <a
+                href="https://www.pen-kanagawa.ed.jp/kohoku-h/"
+                target="_blank"
+                rel="noopener noreferrer">
+                港北高校
+            </a>
+        </li>
+
+
+        <li>
+            <a
+                href="https://www.edu.city.yokohama.jp/sch/hs/higashi/index.html"
+                target="_blank"
+                rel="noopener noreferrer">
+                東高校
+            </a>
+        </li>
+
+
+        <li>
+            <a
+                href="https://www.pen-kanagawa.ed.jp/tsurumi-h/"
+                target="_blank"
+                rel="noopener noreferrer">
+                鶴見高校
+            </a>
+        </li>
+
+
+        <li>
+            <a
+                href="https://www.tsurumi-fuzoku.ed.jp/"
+                target="_blank"
+                rel="noopener noreferrer">
+                鶴見大学附属高校
+            </a>
+        </li>
+
+
+        <li>
+            <a
+                href="https://www.soei.ed.jp/"
+                target="_blank"
+                rel="noopener noreferrer">
+                創英高校
+            </a>
+        </li>
+
+
+        <li>
+            <a
+                href="https://www.pref.kanagawa.jp/docs/dc4/"
+                target="_blank"
+                rel="noopener noreferrer">
+                神奈川県教育委員会
+            </a>
+        </li>
+
+    </ul>
+
+</section>
+
+
+
+<!-- ========================================
+     フッター
+======================================== -->
+
+<footer>
+
+    <p>
+        PATGS27
+    </p>
+
+    <p>
+        学習・生活・時間・誘惑を記録し、
+        改善につなげる。
+    </p>
+
+</footer>
+
+
+</div>
+
+
+<!-- ========================================
+     JavaScript
+======================================== -->
 
 <script src="js/script.js"></script>
-<script type="module" src="js/firebase.js"></script>
 
-<hr>
+<script
+    type="module"
+    src="js/firebase.js">
+</script>
 
-<section>
 
-<hr>
+</body>
 
-<section>
-
-<h2>🔗 受験リンク集</h2>
-
-<ul>
-
-<li>
-<a href="https://www.pen-kanagawa.ed.jp/kohoku-h/" target="_blank">
-港北高校
-</a>
-</li>
-
-<li>
-<a href="https://www.edu.city.yokohama.jp/sch/hs/higashi/index.html" target="_blank">
-東高校
-</a>
-</li>
-
-<li>
-<a href="https://www.pen-kanagawa.ed.jp/tsurumi-h/" target="_blank">
-鶴見高校
-</a>
-</li>
-
-<li>
-<a href="https://www.tsurumi-fuzoku.ed.jp/" target="_blank">
-鶴見大学附属高校
-</a>
-</li>
-
-<li>
-<a href="https://www.soei.ed.jp/" target="_blank">
-創英高校
-</a>
-</li>
-
-<li>
-<a href="https://www.pref.kanagawa.jp/docs/dc4/" target="_blank">
-神奈川県教育委員会
-</a>
-</li>
-
-</ul>
-
-</section>
-
+</html>
 </div>
 
 </body>
