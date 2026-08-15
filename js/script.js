@@ -2368,22 +2368,162 @@ if ($("addMaterialBtn")) {
    学習以外の予定
    ========================================================= */
 
-if ($("otherSchedule")) {
+let otherSchedules =
+    loadJSON(
+        "patgs27_other_schedule",
+        []
+    );
 
-    $("otherSchedule").value =
-        localStorage.getItem(
-            "otherSchedule"
-        ) || "";
+
+function saveOtherSchedules() {
+
+    saveJSON(
+        "patgs27_other_schedule",
+        otherSchedules
+    );
+}
 
 
-    $("otherSchedule").addEventListener(
-        "input",
+function renderOtherSchedules() {
+
+    const list =
+        $("otherScheduleList");
+
+
+    if (!list) {
+        return;
+    }
+
+
+    list.innerHTML = "";
+
+
+    otherSchedules.forEach(
+        function (item, index) {
+
+            const row =
+                document.createElement(
+                    "div"
+                );
+
+
+            const check =
+                document.createElement(
+                    "input"
+                );
+
+            check.type =
+                "checkbox";
+
+            check.checked =
+                !!item.checked;
+
+
+            const text =
+                document.createElement(
+                    "input"
+                );
+
+            text.type =
+                "text";
+
+            text.value =
+                item.text ||
+                "";
+
+            text.placeholder =
+                "予定を入力";
+
+
+            const deleteButton =
+                document.createElement(
+                    "button"
+                );
+
+            deleteButton.type =
+                "button";
+
+            deleteButton.textContent =
+                "削除";
+
+
+            check.addEventListener(
+                "change",
+                function () {
+
+                    otherSchedules[index].checked =
+                        check.checked;
+
+                    saveOtherSchedules();
+                }
+            );
+
+
+            text.addEventListener(
+                "input",
+                function () {
+
+                    otherSchedules[index].text =
+                        text.value;
+
+                    saveOtherSchedules();
+                }
+            );
+
+
+            deleteButton.addEventListener(
+                "click",
+                function () {
+
+                    otherSchedules.splice(
+                        index,
+                        1
+                    );
+
+                    saveOtherSchedules();
+
+                    renderOtherSchedules();
+                }
+            );
+
+
+            row.append(
+                check,
+                " ",
+                text,
+                " ",
+                deleteButton
+            );
+
+
+            list.appendChild(
+                row
+            );
+        }
+    );
+}
+
+
+if ($("addOtherScheduleBtn")) {
+
+    $("addOtherScheduleBtn").addEventListener(
+        "click",
         function () {
 
-            localStorage.setItem(
-                "otherSchedule",
-                $("otherSchedule").value
+            otherSchedules.push(
+                {
+                    text:
+                        "",
+
+                    checked:
+                        false
+                }
             );
+
+
+            saveOtherSchedules();
+
+            renderOtherSchedules();
         }
     );
 }
@@ -2426,6 +2566,8 @@ function initializePATGS27() {
     renderExams();
 
     renderMaterials();
+
+    renderOtherSchedules();
 
 
     console.log(
@@ -3291,7 +3433,6 @@ setInterval(
     },
     60 * 1000
 );
-
 
 
 // =========================================================
