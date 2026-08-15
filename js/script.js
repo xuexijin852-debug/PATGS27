@@ -1392,6 +1392,9 @@ function renderPast(type) {
                         : "patgs27_private_past",
                     list
                 );
+
+
+                renderPastChart(type);
             }
 
 
@@ -1474,6 +1477,9 @@ function renderPast(type) {
             );
         }
     );
+
+
+    renderPastChart(type);
 }
 
 
@@ -3076,10 +3082,15 @@ function renderQuestionNotes() {
                 label.textContent =
                     "【" +
                     (
+                        item.category ||
+                        "未分類"
+                    ) +
+                    "】(" +
+                    (
                         item.target ||
                         "未指定"
                     ) +
-                    "】" +
+                    ") " +
                     item.text;
 
 
@@ -3159,6 +3170,10 @@ if ($("addQuestionBtn")) {
                 $("questionTarget")?.value ||
                 "";
 
+            const category =
+                $("questionCategory")?.value ||
+                "";
+
             const text =
                 $("questionText")?.value.trim() ||
                 "";
@@ -3178,6 +3193,9 @@ if ($("addQuestionBtn")) {
                 {
                     target:
                         target,
+
+                    category:
+                        category,
 
                     text:
                         text,
@@ -3200,9 +3218,400 @@ if ($("addQuestionBtn")) {
             $("questionTarget").value =
                 "";
 
+            $("questionCategory").value =
+                "";
+
 
             renderQuestionNotes();
         }
+    );
+}
+
+
+/* =========================================================
+   過去問 得点の推移グラフ
+   ========================================================= */
+
+function renderPastChart(type) {
+
+    const canvas =
+        $(
+            type === "public"
+                ? "publicPastChart"
+                : "privatePastChart"
+        );
+
+
+    if (!canvas) {
+        return;
+    }
+
+
+    const ctx =
+        canvas.getContext(
+            "2d"
+        );
+
+
+    const width =
+        canvas.width;
+
+    const height =
+        canvas.height;
+
+
+    ctx.clearRect(
+        0,
+        0,
+        width,
+        height
+    );
+
+
+    const list =
+        type === "public"
+            ? publicPast
+            : privatePast;
+
+
+    const sorted =
+        list
+            .filter(
+                function (record) {
+
+                    return (
+                        record.score !== "" &&
+                        record.score !== undefined
+                    );
+                }
+            )
+            .slice()
+            .sort(
+                function (a, b) {
+
+                    return (
+                        a.date || ""
+                    ).localeCompare(
+                        b.date || ""
+                    );
+                }
+            );
+
+
+    if (sorted.length === 0) {
+
+        ctx.fillStyle =
+            "#888";
+
+        ctx.font =
+            "14px sans-serif";
+
+        ctx.fillText(
+            "記録がありません。",
+            10,
+            height / 2
+        );
+
+        return;
+    }
+
+
+    const padding = 40;
+
+
+    const scoreValues =
+        sorted.map(
+            function (record) {
+
+                return Number(record.score) || 0;
+            }
+        );
+
+    const compareValues =
+        sorted
+            .map(
+                function (record) {
+
+                    return Number(record.comparison);
+                }
+            )
+            .filter(
+                function (value) {
+
+                    return !Number.isNaN(value);
+                }
+            );
+
+    const allValues =
+        scoreValues.concat(
+            compareValues
+        );
+
+
+    const maxValue =
+        Math.max(
+            100,
+            ...allValues
+        );
+
+    const minValue =
+        Math.min(
+            0,
+            ...allValues
+        );
+
+
+    const stepX =
+        sorted.length > 1
+            ? (
+                width -
+                padding * 2
+            ) /
+            (
+                sorted.length -
+                1
+            )
+            : 0;
+
+
+    function toX(i) {
+
+        return (
+            padding +
+            stepX * i
+        );
+    }
+
+
+    function toY(value) {
+
+        return (
+            height -
+            padding -
+            (
+                (value - minValue) /
+                (maxValue - minValue) *
+                (height - padding * 2)
+            )
+        );
+    }
+
+
+    /* 軸 */
+
+    ctx.strokeStyle =
+        "#ccc";
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+        padding,
+        padding
+    );
+
+    ctx.lineTo(
+        padding,
+        height - padding
+    );
+
+    ctx.lineTo(
+        width - padding,
+        height - padding
+    );
+
+    ctx.stroke();
+
+
+    /* 得点ライン */
+
+    ctx.strokeStyle =
+        "#1565c0";
+
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+
+
+    sorted.forEach(
+        function (record, i) {
+
+            const x =
+                toX(i);
+
+            const y =
+                toY(
+                    Number(record.score) || 0
+                );
+
+
+            if (i === 0) {
+
+                ctx.moveTo(
+                    x,
+                    y
+                );
+
+            } else {
+
+                ctx.lineTo(
+                    x,
+                    y
+                );
+            }
+        }
+    );
+
+    ctx.stroke();
+
+
+    /* 比較ライン（平均点／前回得点） */
+
+    ctx.strokeStyle =
+        "#e65100";
+
+    ctx.setLineDash(
+        [4, 3]
+    );
+
+    ctx.beginPath();
+
+
+    let started = false;
+
+
+    sorted.forEach(
+        function (record, i) {
+
+            if (
+                record.comparison === "" ||
+                record.comparison === undefined
+            ) {
+                return;
+            }
+
+
+            const x =
+                toX(i);
+
+            const y =
+                toY(
+                    Number(record.comparison)
+                );
+
+
+            if (!started) {
+
+                ctx.moveTo(
+                    x,
+                    y
+                );
+
+                started = true;
+
+            } else {
+
+                ctx.lineTo(
+                    x,
+                    y
+                );
+            }
+        }
+    );
+
+    ctx.stroke();
+
+    ctx.setLineDash(
+        []
+    );
+
+
+    /* 点とラベル */
+
+    ctx.font =
+        "10px sans-serif";
+
+
+    sorted.forEach(
+        function (record, i) {
+
+            const x =
+                toX(i);
+
+            const y =
+                toY(
+                    Number(record.score) || 0
+                );
+
+
+            ctx.fillStyle =
+                "#1565c0";
+
+            ctx.beginPath();
+
+            ctx.arc(
+                x,
+                y,
+                3,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.fill();
+
+            ctx.fillText(
+                String(record.score),
+                x - 8,
+                y - 8
+            );
+
+
+            ctx.save();
+
+            ctx.translate(
+                x,
+                height - padding + 14
+            );
+
+            ctx.rotate(
+                -Math.PI / 6
+            );
+
+            ctx.fillText(
+                (record.subject || "") +
+                " " +
+                (record.date || ""),
+                0,
+                0
+            );
+
+            ctx.restore();
+        }
+    );
+
+
+    /* 凡例 */
+
+    ctx.fillStyle =
+        "#1565c0";
+
+    ctx.fillText(
+        "● 自分の得点",
+        padding,
+        14
+    );
+
+    ctx.fillStyle =
+        "#e65100";
+
+    ctx.fillText(
+        "- - " +
+        (
+            type === "public"
+                ? "平均点"
+                : "前回得点"
+        ),
+        padding + 90,
+        14
     );
 }
 
