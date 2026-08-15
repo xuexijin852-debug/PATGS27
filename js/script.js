@@ -1,832 +1,3037 @@
-// ===== Project Summer 2026 =====
+"use strict";
 
-// ===============================
-// 400コマ進捗
-// ===============================
+/* =========================================================
+   PATGS27
+   script.js
+   =========================================================
+   ・日付表示
+   ・40日管理
+   ・生活リズム自動保存
+   ・今日の目標/一言/実績 自動保存
+   ・今日の予定
+   ・400コマ
+   ・コマ成立判定 ○△×
+   ・誘惑報告
+   ・模試結果
+   ・過去問
+   ・違反ログ
+   ・週次レビュー
+   ・テスト・提出物
+   ・教材
+   ・学習以外の予定
+   ========================================================= */
 
-const commentText =
-document.getElementById("commentText");
-const goal = document.getElementById("goal");
-const today = document.getElementById("today");
-const total = document.getElementById("total");
 
-const todayBar = document.getElementById("todayBar");
-const totalBar = document.getElementById("totalBar");
+/* =========================================================
+   共通関数
+   ========================================================= */
 
-const totalText = document.getElementById("totalText");
-
-const remainText = document.getElementById("remainText");
-const daysRemainText = document.getElementById("daysRemainText");
-const averageText = document.getElementById("averageText");
-const percentText = document.getElementById("percentText");
-const recordBtn = document.getElementById("recordBtn");
-
-
-
-// ------------------------------
-// 保存データ
-// ------------------------------
-
-const savedTotal = localStorage.getItem("total");
-
-if(savedTotal !== null){
-
-    total.value = savedTotal;
-
+function $(id) {
+    return document.getElementById(id);
 }
 
+function todayKey() {
+    const d = new Date();
 
-
-// ------------------------------
-// 日付
-// ------------------------------
-
-const startDate = new Date("2026-07-18");
-startDate.setHours(0,0,0,0);
-
-const endDate = new Date("2026-08-27");
-endDate.setHours(0,0,0,0);
-
-const now = new Date();
-now.setHours(0,0,0,0);
-
-const oneDay = 1000 * 60 * 60 * 24;
-
-const passedDays =
-Math.floor((now - startDate) / oneDay) + 1;
-
-const remainingDays =
-Math.ceil((endDate - now) / oneDay);
-
-document.getElementById("daysLeft").textContent =
-"🔥 あと"+remainingDays+"日";
-
-document.getElementById("dayCount").textContent =
-"Day "+passedDays+" / 40";
-
-document.getElementById("todayDate").textContent =
-now.getFullYear()+"/"+
-(now.getMonth()+1)+"/"+
-now.getDate();
-
-
-
-// ------------------------------
-// バー更新
-// ------------------------------
-
-function updateBars(){
-
-    todayBar.max = Number(goal.value);
-
-    todayBar.value = Number(today.value);
-
-    totalBar.value = Number(total.value);
-
-    totalText.textContent =
-    total.value + " / 400 コマ";
-
-    updateForecast();
-
+    return (
+        d.getFullYear() +
+        "-" +
+        String(d.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(d.getDate()).padStart(2, "0")
+    );
 }
 
+function nowText() {
+    const d = new Date();
 
+    return (
+        d.getFullYear() +
+        "/" +
+        String(d.getMonth() + 1).padStart(2, "0") +
+        "/" +
+        String(d.getDate()).padStart(2, "0") +
+        " " +
+        String(d.getHours()).padStart(2, "0") +
+        ":" +
+        String(d.getMinutes()).padStart(2, "0")
+    );
+}
 
-// ------------------------------
-// 学習予測
-// ------------------------------
+function loadJSON(key, fallback) {
+    try {
+        const data = localStorage.getItem(key);
 
-function updateForecast(){
+        if (data === null) {
+            return fallback;
+        }
 
-    const remain =
-    400 - Number(total.value);
+        return JSON.parse(data);
 
-    remainText.textContent =
-    "残り："+remain+"コマ";
+    } catch (error) {
 
-    daysRemainText.textContent =
-    "残り日数："+remainingDays+"日";
+        console.error("保存データ読み込みエラー:", key, error);
 
-    let average = 0;
+        return fallback;
+    }
+}
 
-    if(remainingDays>0){
+function saveJSON(key, data) {
+    try {
 
-        average =
-        (remain/remainingDays).toFixed(1);
+        localStorage.setItem(
+            key,
+            JSON.stringify(data)
+        );
 
+    } catch (error) {
+
+        console.error("保存エラー:", key, error);
+    }
+}
+
+function showSave(id, text = "✓ 自動保存") {
+
+    const element = $(id);
+
+    if (!element) {
+        return;
     }
 
-    averageText.textContent =
-    "1日平均："+average+"コマ必要";
+    element.textContent = text;
 
-    const percent =
-    Math.round(Number(total.value)/400*100);
+    clearTimeout(element._saveTimer);
 
-    percentText.textContent =
-    "達成率："+percent+"%";
-
-
-
-   if(Number(total.value) >= 400){
-
-    commentText.textContent =
-    "🏆400コマ達成！";
-
-}
-else if(average <= 8){
-
-    commentText.textContent =
-    "🟢順調です！";
-
-}
-else if(average <= 10){
-
-    commentText.textContent =
-    "🟡あと少し頑張ろう！";
-
-}
-else{
-
-    commentText.textContent =
-    "🔴ペースアップしよう！";
-
-}
-
+    element._saveTimer = setTimeout(
+        function () {
+            element.textContent = "自動保存";
+        },
+        1500
+    );
 }
 
 
+/* =========================================================
+   PATGS27 40日管理
+   =========================================================
 
-// ------------------------------
-// 入力
-// ------------------------------
+   40日目標
+   2026/7/18 ～ 2026/8/26
 
-goal.addEventListener("input",updateBars);
+   ※ここを変更すれば運用期間を変更できます。
+   ========================================================= */
 
-today.addEventListener("input",updateBars);
+const PATGS_START = "2026-07-18";
+const PATGS_END = "2026-08-26";
+
+const TOTAL_CRAM = 400;
 
 
+function dateOnly(date) {
 
-// ------------------------------
-// 記録
-// ------------------------------
+    return new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate()
+    );
+}
 
-recordBtn.addEventListener("click",function(){
 
-    total.value =
-    Number(total.value)+
-    Number(today.value);
+function updateDateDisplay() {
 
-    localStorage.setItem(
-        "total",
-        total.value
+    const today = dateOnly(new Date());
+
+    const start = dateOnly(
+        new Date(PATGS_START + "T00:00:00")
     );
 
-    today.value = 0;
-
-    updateBars();
-
-});
-
-
-
-// ------------------------------
-// 初回表示
-// ------------------------------
-
-updateBars();
-
-/// ===============================
-// ToDo機能
-// ===============================
-
-const addTodoBtn =
-document.getElementById("addTodoBtn");
-
-const todoList =
-document.getElementById("todoList");
-
-const todoBar =
-document.getElementById("todoBar");
-
-const todoRate =
-document.getElementById("todoRate");
-
-const todoComment =
-document.getElementById("todoComment");
-
-let todos =
-JSON.parse(localStorage.getItem("todos"));
-
-if(!todos){
-
-    todos = [];
-
-}
-
-function saveTodos(){
-
-    localStorage.setItem(
-        "todos",
-        JSON.stringify(todos)
+    const end = dateOnly(
+        new Date(PATGS_END + "T00:00:00")
     );
 
+    const dayMs =
+        24 * 60 * 60 * 1000;
+
+
+    const elapsed =
+        Math.floor(
+            (today - start) / dayMs
+        ) + 1;
+
+
+    const remaining =
+        Math.max(
+            0,
+            Math.ceil(
+                (end - today) / dayMs
+            )
+        );
+
+
+    if ($("todayDate")) {
+
+        $("todayDate").textContent =
+            today.getFullYear() +
+            "/" +
+            (today.getMonth() + 1) +
+            "/" +
+            today.getDate();
+    }
+
+
+    if ($("dayCount")) {
+
+        if (today < start) {
+
+            $("dayCount").textContent =
+                "開始前";
+
+        } else if (today > end) {
+
+            $("dayCount").textContent =
+                "40日運用終了";
+
+        } else {
+
+            $("dayCount").textContent =
+                "Day " +
+                Math.min(40, elapsed) +
+                " / 40";
+        }
+    }
+
+
+    if ($("daysLeft")) {
+
+        if (today < start) {
+
+            $("daysLeft").textContent =
+                "開始まで";
+
+        } else if (today > end) {
+
+            $("daysLeft").textContent =
+                "終了";
+
+        } else {
+
+            $("daysLeft").textContent =
+                "あと " +
+                remaining +
+                " 日";
+        }
+    }
+
+
+    return {
+        today: today,
+        remaining: remaining,
+        elapsed: elapsed
+    };
 }
 
-function updateTodoRate(){
 
-    const totalCount =
-    todos.length;
+/* =========================================================
+   週次レビュー日
+   ========================================================= */
 
-    const doneCount =
-    todos.filter(function(todo){
-
-        return todo.checked;
-
-    }).length;
-
-    const percent =
-    totalCount === 0
-    ? 0
-    : Math.round(
-        doneCount / totalCount * 100
-    );
-
-    todoRate.textContent =
-    "達成率 " + percent + "%";
-
-    todoBar.value = percent;
+const WEEKLY_REVIEW_DATES = [
+    "2026-08-15",
+    "2026-08-22",
+    "2026-08-29"
+];
 
 
-    if(totalCount === 0){
+function updateWeeklyNotice() {
 
-        todoComment.textContent =
-        "📝予定を追加しよう！";
+    const key = todayKey();
 
-    }
-    else if(percent === 100){
+    const isReviewDay =
+        WEEKLY_REVIEW_DATES.includes(key);
 
-        todoComment.textContent =
-        "🏆今日の予定達成！";
 
-    }
-    else if(percent >= 70){
+    let message = "";
 
-        todoComment.textContent =
-        "🟢順調！";
+    if (isReviewDay) {
 
-    }
-    else if(percent >= 40){
-
-        todoComment.textContent =
-        "🟡あと少し！";
-
-    }
-    else{
-
-        todoComment.textContent =
-        "🔴ベースアップしよう！";
-
+        message =
+            "🔔 本日は週次レビュー日です。";
     }
 
+
+    if ($("weeklyReviewNotice")) {
+
+        $("weeklyReviewNotice").textContent =
+            message;
+    }
+
+
+    if ($("weeklyReviewNoticeLarge")) {
+
+        $("weeklyReviewNoticeLarge").textContent =
+            message;
+    }
 }
 
-function renderTodos(){
 
-    todoList.innerHTML = "";
+/* =========================================================
+   生活リズム
+   ========================================================= */
 
-    todos.forEach(function(todo,index){
+function lifeKey() {
 
-        const item =
-        document.createElement("p");
+    return "patgs27_life_" + todayKey();
+}
 
-        item.innerHTML =
-        '<input type="checkbox" class="todoCheck"> '+
-        '<input type="text" class="todoText"> '+
-        '<button class="deleteTodo">✖</button>';
 
-        const check =
-        item.querySelector(".todoCheck");
+function loadLife() {
 
-        const text =
-        item.querySelector(".todoText");
-
-        const del =
-        item.querySelector(".deleteTodo");
-
-        check.checked =
-        todo.checked;
-
-        text.value =
-        todo.text;
-
-        check.addEventListener(
-            "change",
-            function(){
-
-                todos[index].checked =
-                check.checked;
-
-                saveTodos();
-
-                updateTodoRate();
-
+    const data =
+        loadJSON(
+            lifeKey(),
+            {
+                wake: "",
+                bath: "",
+                sleep: ""
             }
         );
 
-        text.addEventListener(
-            "input",
-            function(){
 
-                todos[index].text =
-                text.value;
+    if ($("wakeStatus")) {
 
-                saveTodos();
+        $("wakeStatus").value =
+            data.wake || "";
+    }
 
-            }
-        );
 
-        del.addEventListener(
-            "click",
-            function(){
+    if ($("bathStatus")) {
 
-                todos.splice(index,1);
+        $("bathStatus").value =
+            data.bath || "";
+    }
 
-                saveTodos();
 
-                renderTodos();
+    if ($("sleepStatus")) {
 
-            }
-        );
-
-        todoList.appendChild(item);
-
-    });
-
-    updateTodoRate();
-
+        $("sleepStatus").value =
+            data.sleep || "";
+    }
 }
 
-addTodoBtn.addEventListener(
-    "click",
-    function(){
 
-        todos.push({
+function saveLife() {
 
-            text:"新しい予定",
+    saveJSON(
+        lifeKey(),
+        {
+            wake:
+                $("wakeStatus")?.value || "",
 
-            checked:false
+            bath:
+                $("bathStatus")?.value || "",
 
-        });
+            sleep:
+                $("sleepStatus")?.value || ""
+        }
+    );
 
-        saveTodos();
 
-        renderTodos();
+    showSave("lifeSaveStatus");
+}
 
+
+[
+    "wakeStatus",
+    "bathStatus",
+    "sleepStatus"
+].forEach(
+    function (id) {
+
+        if ($(id)) {
+
+            $(id).addEventListener(
+                "change",
+                saveLife
+            );
+        }
     }
 );
 
-renderTodos();
 
-// ===============================
-// Part C
-// 提出物・テスト・模試
-// ===============================
+/* =========================================================
+   今日の目標・一言・実績
+   ========================================================= */
 
-const addExamBtn =
-document.getElementById("addExamBtn");
+function dailyKey() {
 
-const examList =
-document.getElementById("examList");
-
-let exams =
-JSON.parse(localStorage.getItem("exams"));
-
-if(!exams){
-
-    exams = [];
-
+    return "patgs27_daily_" + todayKey();
 }
 
-function saveExams(){
 
-    localStorage.setItem(
-        "exams",
-        JSON.stringify(exams)
+function loadDaily() {
+
+    const oldData = {
+
+        goal:
+            localStorage.getItem(
+                "goalText"
+            ) || "",
+
+        message:
+            localStorage.getItem(
+                "messageText"
+            ) || "",
+
+        result:
+            localStorage.getItem(
+                "resultText"
+            ) || ""
+    };
+
+
+    const data =
+        loadJSON(
+            dailyKey(),
+            oldData
+        );
+
+
+    if ($("goalText")) {
+
+        $("goalText").value =
+            data.goal || "";
+    }
+
+
+    if ($("messageText")) {
+
+        $("messageText").value =
+            data.message || "";
+    }
+
+
+    if ($("resultText")) {
+
+        $("resultText").value =
+            data.result || "";
+    }
+}
+
+
+function saveDaily() {
+
+    const data = {
+
+        goal:
+            $("goalText")?.value || "",
+
+        message:
+            $("messageText")?.value || "",
+
+        result:
+            $("resultText")?.value || ""
+    };
+
+
+    saveJSON(
+        dailyKey(),
+        data
     );
 
+
+    /* 旧版データとの互換 */
+
+    localStorage.setItem(
+        "goalText",
+        data.goal
+    );
+
+    localStorage.setItem(
+        "messageText",
+        data.message
+    );
+
+    localStorage.setItem(
+        "resultText",
+        data.result
+    );
 }
 
-function renderExams(){
 
-    examList.innerHTML = "";
+[
+    "goalText",
+    "messageText",
+    "resultText"
+].forEach(
+    function (id) {
 
-    exams.sort(function(a,b){
+        if ($(id)) {
 
-        if(a.date==="" && b.date==="") return 0;
-        if(a.date==="") return 1;
-        if(b.date==="") return -1;
-
-        return new Date(a.date)-new Date(b.date);
-
-    });
-
-    exams.forEach(function(exam,index){
-
-        const item =
-        document.createElement("p");
-
-        item.innerHTML =
-
-        '<select class="examType">'+
-        '<option value="提出物">📄提出物</option>'+
-        '<option value="テスト">📝テスト</option>'+
-        '<option value="模試">📊模試</option>'+
-        '</select> '+
-
-        '<input type="date" class="examDate"> '+
-
-        '<input type="text" class="examText" placeholder="内容"> '+
-
-        '<input type="checkbox" class="examDone"> 完了 '+
-
-        '<span class="examRemain"></span> '+
-
-        '<button class="deleteExam">✖</button>';
+            $(id).addEventListener(
+                "input",
+                saveDaily
+            );
+        }
+    }
+);
 
 
+/* =========================================================
+   今日の予定
+   ========================================================= */
 
-        const type =
-        item.querySelector(".examType");
+function todoKey() {
 
-        const date =
-        item.querySelector(".examDate");
-
-        const text =
-        item.querySelector(".examText");
-
-        const done =
-        item.querySelector(".examDone");
-
-        const remain =
-        item.querySelector(".examRemain");
-
-        const del =
-        item.querySelector(".deleteExam");
+    return "patgs27_todos_" + todayKey();
+}
 
 
-
-        type.value =
-        exam.type;
-
-        date.value =
-        exam.date;
-
-        text.value =
-        exam.text;
-
-        done.checked =
-        exam.done;
+let todos =
+    loadJSON(
+        todoKey(),
+        null
+    );
 
 
+if (!Array.isArray(todos)) {
 
-        if(exam.date){
+    todos =
+        loadJSON(
+            "todos",
+            []
+        );
+}
 
-            const today =
-            new Date();
 
-            today.setHours(0,0,0,0);
+function saveTodos() {
 
-            const examDate =
-            new Date(exam.date);
+    saveJSON(
+        todoKey(),
+        todos
+    );
 
-            const diff =
-            Math.ceil(
-                (examDate-today)/
-                (1000*60*60*24)
+    /* 旧版との互換 */
+
+    saveJSON(
+        "todos",
+        todos
+    );
+}
+
+
+function updateTodoRate() {
+
+    const total =
+        todos.length;
+
+
+    const done =
+        todos.filter(
+            function (todo) {
+                return todo.checked;
+            }
+        ).length;
+
+
+    const rate =
+        total === 0
+            ? 0
+            : Math.round(
+                done / total * 100
             );
 
-            if(diff>0){
 
-                remain.textContent =
-                " あと"+diff+"日";
+    if ($("todoRate")) {
 
-            }
+        $("todoRate").textContent =
+            "達成率 " +
+            rate +
+            "%";
+    }
 
-            else if(diff===0){
 
-                remain.textContent =
-                " 今日";
+    if ($("todoBar")) {
 
-            }
+        $("todoBar").value =
+            rate;
+    }
 
-            else{
 
-                remain.textContent =
-                " 終了";
+    if ($("todoComment")) {
 
-            }
+        if (total === 0) {
 
+            $("todoComment").textContent =
+                "📝予定を追加しよう！";
+
+        } else if (rate === 100) {
+
+            $("todoComment").textContent =
+                "🏆今日の予定達成！";
+
+        } else if (rate >= 70) {
+
+            $("todoComment").textContent =
+                "🟢順調！";
+
+        } else if (rate >= 40) {
+
+            $("todoComment").textContent =
+                "🟡あと少し！";
+
+        } else {
+
+            $("todoComment").textContent =
+                "🔴ベースアップしよう！";
         }
-
-
-
-        type.addEventListener("change",function(){
-
-            exams[index].type =
-            type.value;
-
-            saveExams();
-
-        });
-
-
-
-        date.addEventListener("change",function(){
-
-            exams[index].date =
-            date.value;
-
-            saveExams();
-
-            renderExams();
-
-        });
-
-
-
-        text.addEventListener("input",function(){
-
-            exams[index].text =
-            text.value;
-
-            saveExams();
-
-        });
-
-
-
-        done.addEventListener("change",function(){
-
-            exams[index].done =
-            done.checked;
-
-            saveExams();
-
-        });
-
-
-
-        del.addEventListener("click",function(){
-
-            exams.splice(index,1);
-
-            saveExams();
-
-            renderExams();
-
-        });
-
-        examList.appendChild(item);
-
-    });
-
+    }
 }
 
 
+function renderTodos() {
 
-addExamBtn.addEventListener("click",function(){
+    const list =
+        $("todoList");
 
-    exams.push({
 
-        type:"提出物",
+    if (!list) {
+        return;
+    }
 
-        date:"",
 
-        text:"",
+    list.innerHTML = "";
 
-        done:false
 
-    });
+    todos.forEach(
+        function (todo, index) {
 
-    saveExams();
+            const row =
+                document.createElement(
+                    "div"
+                );
 
-    renderExams();
 
-});
+            const check =
+                document.createElement(
+                    "input"
+                );
 
-renderExams();
+            check.type =
+                "checkbox";
 
-// ===============================
-// Part D
-// 教材管理
-// ===============================
+            check.checked =
+                !!todo.checked;
 
-const addMaterialBtn =
-document.getElementById("addMaterialBtn");
 
-const materialList =
-document.getElementById("materialList");
+            const text =
+                document.createElement(
+                    "input"
+                );
 
-let materials =
-JSON.parse(localStorage.getItem("materials"));
+            text.type =
+                "text";
 
-if(!materials){
+            text.value =
+                todo.text || "";
 
-    materials = [
-        {
-            text:"新ワーク",
-            checked:false
-        },
-        {
-            text:"整理と対策",
-            checked:false
-        },
-        {
-            text:"教科書",
-            checked:false
+            text.placeholder =
+                "予定を入力";
+
+
+            const deleteButton =
+                document.createElement(
+                    "button"
+                );
+
+            deleteButton.type =
+                "button";
+
+            deleteButton.textContent =
+                "削除";
+
+
+            check.addEventListener(
+                "change",
+                function () {
+
+                    todos[index].checked =
+                        check.checked;
+
+                    saveTodos();
+
+                    updateTodoRate();
+                }
+            );
+
+
+            text.addEventListener(
+                "input",
+                function () {
+
+                    todos[index].text =
+                        text.value;
+
+                    saveTodos();
+                }
+            );
+
+
+            deleteButton.addEventListener(
+                "click",
+                function () {
+
+                    todos.splice(
+                        index,
+                        1
+                    );
+
+                    saveTodos();
+
+                    renderTodos();
+                }
+            );
+
+
+            row.append(
+                check,
+                " ",
+                text,
+                " ",
+                deleteButton
+            );
+
+
+            list.appendChild(
+                row
+            );
         }
-    ];
-
-}
-
-function saveMaterials(){
-
-    localStorage.setItem(
-        "materials",
-        JSON.stringify(materials)
     );
 
+
+    updateTodoRate();
 }
 
-function renderMaterials(){
 
-    materialList.innerHTML = "";
+if ($("addTodoBtn")) {
 
-    materials.forEach(function(material,index){
+    $("addTodoBtn").addEventListener(
+        "click",
+        function () {
 
-        const item =
-        document.createElement("p");
+            todos.push(
+                {
+                    text: "",
+                    checked: false
+                }
+            );
 
-        item.innerHTML =
-        '<input type="checkbox" class="materialCheck"> '+
-        '<input type="text" class="materialText"> '+
-        '<button class="deleteMaterial">✖</button>';
+            saveTodos();
 
-        const check =
-        item.querySelector(".materialCheck");
-
-        const text =
-        item.querySelector(".materialText");
-
-        const del =
-        item.querySelector(".deleteMaterial");
-
-        check.checked =
-        material.checked;
-
-        text.value =
-        material.text;
+            renderTodos();
+        }
+    );
+}
 
 
+/* =========================================================
+   400コマ
+   ========================================================= */
 
-        check.addEventListener("change",function(){
-
-            materials[index].checked =
-            check.checked;
-
-            saveMaterials();
-
-        });
-
-
-
-        text.addEventListener("input",function(){
-
-            materials[index].text =
-            text.value;
-
-            saveMaterials();
-
-        });
+let cramTotal =
+    Number(
+        localStorage.getItem(
+            "patgs27_cram_total"
+        )
+    );
 
 
+if (!Number.isFinite(cramTotal)) {
 
-        del.addEventListener("click",function(){
+    cramTotal =
+        Number(
+            localStorage.getItem(
+                "total"
+            )
+        ) || 0;
+}
 
-            materials.splice(index,1);
+
+let cramHistory =
+    loadJSON(
+        "patgs27_cram_history",
+        []
+    );
+
+
+let judgementTotals =
+    loadJSON(
+        "patgs27_judgement_totals",
+        {
+            pass: 0,
+            review: 0,
+            fail: 0
+        }
+    );
+
+
+function saveCram() {
+
+    localStorage.setItem(
+        "patgs27_cram_total",
+        String(cramTotal)
+    );
+
+
+    /* 旧版との互換 */
+
+    localStorage.setItem(
+        "total",
+        String(cramTotal)
+    );
+
+
+    saveJSON(
+        "patgs27_cram_history",
+        cramHistory
+    );
+
+
+    saveJSON(
+        "patgs27_judgement_totals",
+        judgementTotals
+    );
+}
+
+
+function cramDraftKey() {
+
+    return (
+        "patgs27_cram_draft_" +
+        todayKey()
+    );
+}
+
+
+function loadCramDraft() {
+
+    const data =
+        loadJSON(
+            cramDraftKey(),
+            {
+                goal: 10,
+                today: 0,
+                pass: 0,
+                review: 0,
+                fail: 0
+            }
+        );
+
+
+    if ($("goal")) {
+
+        $("goal").value =
+            data.goal ?? 10;
+    }
+
+
+    if ($("today")) {
+
+        $("today").value =
+            data.today ?? 0;
+    }
+
+
+    if ($("cramPass")) {
+
+        $("cramPass").value =
+            data.pass ?? 0;
+    }
+
+
+    if ($("cramReview")) {
+
+        $("cramReview").value =
+            data.review ?? 0;
+    }
+
+
+    if ($("cramFail")) {
+
+        $("cramFail").value =
+            data.fail ?? 0;
+    }
+}
+
+
+function saveCramDraft() {
+
+    saveJSON(
+        cramDraftKey(),
+        {
+            goal:
+                Number($("goal")?.value) || 0,
+
+            today:
+                Number($("today")?.value) || 0,
+
+            pass:
+                Number($("cramPass")?.value) || 0,
+
+            review:
+                Number($("cramReview")?.value) || 0,
+
+            fail:
+                Number($("cramFail")?.value) || 0
+        }
+    );
+
+
+    showSave(
+        "cramSaveStatus"
+    );
+}
+
+
+function updateCramJudgement() {
+
+    const today =
+        Number($("today")?.value) || 0;
+
+    const pass =
+        Number($("cramPass")?.value) || 0;
+
+    const review =
+        Number($("cramReview")?.value) || 0;
+
+    const fail =
+        Number($("cramFail")?.value) || 0;
+
+
+    const sum =
+        pass +
+        review +
+        fail;
+
+
+    if ($("cramJudgementMessage")) {
+
+        $("cramJudgementMessage").textContent =
+            "○＋△＋×＝" +
+            sum +
+            "コマ / 実施コマ " +
+            today +
+            "コマ";
+    }
+}
+
+
+function updateCramDisplay() {
+
+    const dateInfo =
+        updateDateDisplay();
+
+
+    const goal =
+        Number($("goal")?.value) || 0;
+
+
+    const today =
+        Number($("today")?.value) || 0;
+
+
+    if ($("statusCramText")) {
+
+        $("statusCramText").textContent =
+            cramTotal +
+            " / " +
+            TOTAL_CRAM;
+    }
+
+
+    if ($("totalText")) {
+
+        $("totalText").textContent =
+            cramTotal +
+            " / " +
+            TOTAL_CRAM +
+            " コマ";
+    }
+
+
+    if ($("totalBar")) {
+
+        $("totalBar").max =
+            TOTAL_CRAM;
+
+        $("totalBar").value =
+            Math.min(
+                cramTotal,
+                TOTAL_CRAM
+            );
+    }
+
+
+    if ($("todayBar")) {
+
+        $("todayBar").max =
+            Math.max(
+                1,
+                goal
+            );
+
+        $("todayBar").value =
+            Math.min(
+                today,
+                goal
+            );
+    }
+
+
+    const remain =
+        Math.max(
+            0,
+            TOTAL_CRAM - cramTotal
+        );
+
+
+    const remainingDays =
+        dateInfo.remaining;
+
+
+    const average =
+        remainingDays > 0
+            ? (
+                remain /
+                remainingDays
+            ).toFixed(1)
+            : "0.0";
+
+
+    const percent =
+        Math.round(
+            cramTotal /
+            TOTAL_CRAM *
+            100
+        );
+
+
+    if ($("remainText")) {
+
+        $("remainText").textContent =
+            "残り：" +
+            remain +
+            "コマ";
+    }
+
+
+    if ($("daysRemainText")) {
+
+        $("daysRemainText").textContent =
+            "残り日数：" +
+            remainingDays +
+            "日";
+    }
+
+
+    if ($("averageText")) {
+
+        $("averageText").textContent =
+            "1日平均：" +
+            average +
+            "コマ必要";
+    }
+
+
+    if ($("percentText")) {
+
+        $("percentText").textContent =
+            "達成率：" +
+            percent +
+            "%";
+    }
+
+
+    if ($("passTotalText")) {
+
+        $("passTotalText").textContent =
+            "○成立：" +
+            judgementTotals.pass +
+            "コマ";
+    }
+
+
+    if ($("reviewTotalText")) {
+
+        $("reviewTotalText").textContent =
+            "△要検討：" +
+            judgementTotals.review +
+            "コマ";
+    }
+
+
+    if ($("failTotalText")) {
+
+        $("failTotalText").textContent =
+            "×不成立：" +
+            judgementTotals.fail +
+            "コマ";
+    }
+
+
+    if ($("commentText")) {
+
+        if (cramTotal >= TOTAL_CRAM) {
+
+            $("commentText").textContent =
+                "🏆400コマ達成！";
+
+        } else if (average <= 8) {
+
+            $("commentText").textContent =
+                "🟢順調です！";
+
+        } else if (average <= 10) {
+
+            $("commentText").textContent =
+                "🟡このペースを維持しよう！";
+
+        } else {
+
+            $("commentText").textContent =
+                "🔴残り日数を意識して調整しよう！";
+        }
+    }
+
+
+    updateCramJudgement();
+}
+
+
+[
+    "goal",
+    "today",
+    "cramPass",
+    "cramReview",
+    "cramFail"
+].forEach(
+    function (id) {
+
+        if ($(id)) {
+
+            $(id).addEventListener(
+                "input",
+                function () {
+
+                    saveCramDraft();
+
+                    updateCramDisplay();
+                }
+            );
+        }
+    }
+);
+
+
+function renderCramHistory() {
+
+    const list =
+        $("cramHistory");
+
+
+    if (!list) {
+        return;
+    }
+
+
+    list.innerHTML = "";
+
+
+    cramHistory
+        .slice()
+        .reverse()
+        .slice(0, 30)
+        .forEach(
+            function (item) {
+
+                const row =
+                    document.createElement(
+                        "p"
+                    );
+
+
+                row.textContent =
+                    item.dateTime +
+                    "｜実施 " +
+                    item.total +
+                    "｜○ " +
+                    item.pass +
+                    "｜△ " +
+                    item.review +
+                    "｜× " +
+                    item.fail +
+                    "｜400コマ +" +
+                    item.addedTo400;
+
+
+                list.appendChild(
+                    row
+                );
+            }
+        );
+}
+
+
+if ($("recordBtn")) {
+
+    $("recordBtn").addEventListener(
+        "click",
+        function () {
+
+            const today =
+                Number($("today")?.value) || 0;
+
+            const pass =
+                Number($("cramPass")?.value) || 0;
+
+            const review =
+                Number($("cramReview")?.value) || 0;
+
+            const fail =
+                Number($("cramFail")?.value) || 0;
+
+
+            if (today <= 0) {
+
+                alert(
+                    "実施コマを入力してください。"
+                );
+
+                return;
+            }
+
+
+            if (
+                pass +
+                review +
+                fail !==
+                today
+            ) {
+
+                alert(
+                    "○成立＋△要検討＋×不成立の合計を、実施コマと同じにしてください。"
+                );
+
+                return;
+            }
+
+
+            /*
+
+               PATGS27では
+               ○成立したコマだけを
+               400コマへ加算する。
+
+            */
+
+            cramTotal +=
+                pass;
+
+
+            judgementTotals.pass +=
+                pass;
+
+            judgementTotals.review +=
+                review;
+
+            judgementTotals.fail +=
+                fail;
+
+
+            cramHistory.push(
+                {
+                    date:
+                        todayKey(),
+
+                    dateTime:
+                        nowText(),
+
+                    total:
+                        today,
+
+                    pass:
+                        pass,
+
+                    review:
+                        review,
+
+                    fail:
+                        fail,
+
+                    addedTo400:
+                        pass
+                }
+            );
+
+
+            saveCram();
+
+
+            if ($("today")) {
+
+                $("today").value =
+                    0;
+            }
+
+
+            if ($("cramPass")) {
+
+                $("cramPass").value =
+                    0;
+            }
+
+
+            if ($("cramReview")) {
+
+                $("cramReview").value =
+                    0;
+            }
+
+
+            if ($("cramFail")) {
+
+                $("cramFail").value =
+                    0;
+            }
+
+
+            localStorage.removeItem(
+                cramDraftKey()
+            );
+
+
+            updateCramDisplay();
+
+            renderCramHistory();
+
+
+            showSave(
+                "cramSaveStatus",
+                "✓ コマ記録を保存しました"
+            );
+        }
+    );
+}
+
+
+/* =========================================================
+   誘惑報告
+   ========================================================= */
+
+let temptations =
+    loadJSON(
+        "patgs27_temptations",
+        []
+    );
+
+
+function saveTemptations() {
+
+    saveJSON(
+        "patgs27_temptations",
+        temptations
+    );
+}
+
+
+function renderTemptations() {
+
+    const list =
+        $("temptationList");
+
+
+    if (!list) {
+        return;
+    }
+
+
+    list.innerHTML = "";
+
+
+    temptations
+        .slice()
+        .reverse()
+        .forEach(
+            function (item, reverseIndex) {
+
+                const row =
+                    document.createElement(
+                        "p"
+                    );
+
+
+                row.textContent =
+                    "⚠️ " +
+                    item.dateTime;
+
+
+                const button =
+                    document.createElement(
+                        "button"
+                    );
+
+
+                button.type =
+                    "button";
+
+                button.textContent =
+                    "削除";
+
+
+                button.addEventListener(
+                    "click",
+                    function () {
+
+                        const index =
+                            temptations.length -
+                            1 -
+                            reverseIndex;
+
+
+                        temptations.splice(
+                            index,
+                            1
+                        );
+
+
+                        saveTemptations();
+
+                        renderTemptations();
+                    }
+                );
+
+
+                row.append(
+                    " ",
+                    button
+                );
+
+
+                list.appendChild(
+                    row
+                );
+            }
+        );
+
+
+    if ($("temptationStatus")) {
+
+        $("temptationStatus").textContent =
+            temptations.length > 0
+                ? "累計 " +
+                  temptations.length +
+                  " 件"
+                : "未報告";
+    }
+}
+
+
+if ($("temptationBtn")) {
+
+    $("temptationBtn").addEventListener(
+        "click",
+        function () {
+
+            const record =
+                {
+                    date:
+                        todayKey(),
+
+                    dateTime:
+                        nowText()
+                };
+
+
+            temptations.push(
+                record
+            );
+
+
+            saveTemptations();
+
+            renderTemptations();
+
+
+            if ($("temptationStatus")) {
+
+                $("temptationStatus").textContent =
+                    "✓ " +
+                    record.dateTime +
+                    " に記録しました";
+            }
+        }
+    );
+}
+
+
+/* =========================================================
+   模試結果
+   ========================================================= */
+
+let mockExams =
+    loadJSON(
+        "patgs27_mock_exams",
+        []
+    );
+
+
+const MOCK_FIELDS = [
+    ["国語", "japanese"],
+    ["数学", "math"],
+    ["英語", "english"],
+    ["理科", "science"],
+    ["社会", "social"],
+    ["3科", "three"],
+    ["5科", "five"],
+    ["偏差値", "henshenshi"]
+];
+
+
+function renderMockForm() {
+
+    const form =
+        $("mockExamForm");
+
+
+    if (!form) {
+        return;
+    }
+
+
+    form.innerHTML = "";
+
+
+    const box =
+        document.createElement(
+            "div"
+        );
+
+
+    const name =
+        document.createElement(
+            "input"
+        );
+
+    name.type =
+        "text";
+
+    name.placeholder =
+        "模試名（例：全県模試）";
+
+
+    const date =
+        document.createElement(
+            "input"
+        );
+
+    date.type =
+        "date";
+
+    date.value =
+        todayKey();
+
+
+    box.append(
+        document.createTextNode(
+            "模試名："
+        ),
+        name,
+        document.createTextNode(
+            " 日付："
+        ),
+        date
+    );
+
+
+    box.appendChild(
+        document.createElement(
+            "br"
+        )
+    );
+
+
+    const inputs = {};
+
+
+    MOCK_FIELDS.forEach(
+        function (field) {
+
+            const label =
+                document.createElement(
+                    "label"
+                );
+
+            label.textContent =
+                field[0] +
+                "：";
+
+
+            const input =
+                document.createElement(
+                    "input"
+                );
+
+            input.type =
+                "number";
+
+            input.min =
+                "0";
+
+            input.step =
+                "0.1";
+
+
+            label.appendChild(
+                input
+            );
+
+
+            box.append(
+                label,
+                " "
+            );
+
+
+            inputs[field[1]] =
+                input;
+        }
+    );
+
+
+    const memo =
+        document.createElement(
+            "textarea"
+        );
+
+    memo.rows =
+        3;
+
+    memo.placeholder =
+        "メモ";
+
+
+    box.appendChild(
+        memo
+    );
+
+
+    const save =
+        document.createElement(
+            "button"
+        );
+
+    save.type =
+        "button";
+
+    save.textContent =
+        "模試結果を保存";
+
+
+    const cancel =
+        document.createElement(
+            "button"
+        );
+
+    cancel.type =
+        "button";
+
+    cancel.textContent =
+        "キャンセル";
+
+
+    save.addEventListener(
+        "click",
+        function () {
+
+            const exam =
+                {
+                    id:
+                        Date.now(),
+
+                    name:
+                        name.value.trim() ||
+                        "模試",
+
+                    date:
+                        date.value ||
+                        todayKey(),
+
+                    scores:
+                        {},
+
+                    memo:
+                        memo.value
+                };
+
+
+            MOCK_FIELDS.forEach(
+                function (field) {
+
+                    exam.scores[
+                        field[1]
+                    ] =
+                        inputs[
+                            field[1]
+                        ].value;
+                }
+            );
+
+
+            mockExams.push(
+                exam
+            );
+
+
+            saveJSON(
+                "patgs27_mock_exams",
+                mockExams
+            );
+
+
+            form.innerHTML = "";
+
+
+            renderMockExams();
+        }
+    );
+
+
+    cancel.addEventListener(
+        "click",
+        function () {
+
+            form.innerHTML = "";
+        }
+    );
+
+
+    box.append(
+        document.createElement(
+            "br"
+        ),
+        save,
+        cancel
+    );
+
+
+    form.appendChild(
+        box
+    );
+}
+
+
+function renderMockExams() {
+
+    const list =
+        $("mockExamList");
+
+
+    if (!list) {
+        return;
+    }
+
+
+    list.innerHTML = "";
+
+
+    mockExams
+        .slice()
+        .sort(
+            function (a, b) {
+
+                return (
+                    a.date || ""
+                ).localeCompare(
+                    b.date || ""
+                );
+            }
+        )
+        .forEach(
+            function (exam, index) {
+
+                const box =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                const title =
+                    document.createElement(
+                        "h4"
+                    );
+
+
+                title.textContent =
+                    exam.date +
+                    "｜" +
+                    exam.name;
+
+
+                const scores =
+                    document.createElement(
+                        "p"
+                    );
+
+
+                scores.textContent =
+                    MOCK_FIELDS
+                        .map(
+                            function (field) {
+
+                                return (
+                                    field[0] +
+                                    ": " +
+                                    (
+                                        exam.scores?.[
+                                            field[1]
+                                        ] ?? ""
+                                    )
+                                );
+                            }
+                        )
+                        .join("　");
+
+
+                box.append(
+                    title,
+                    scores
+                );
+
+
+                if (exam.memo) {
+
+                    const memo =
+                        document.createElement(
+                            "p"
+                        );
+
+                    memo.textContent =
+                        "メモ：" +
+                        exam.memo;
+
+                    box.appendChild(
+                        memo
+                    );
+                }
+
+
+                const deleteButton =
+                    document.createElement(
+                        "button"
+                    );
+
+                deleteButton.type =
+                    "button";
+
+                deleteButton.textContent =
+                    "削除";
+
+
+                deleteButton.addEventListener(
+                    "click",
+                    function () {
+
+                        if (
+                            !confirm(
+                                "この模試結果を削除しますか？"
+                            )
+                        ) {
+                            return;
+                        }
+
+
+                        mockExams.splice(
+                            index,
+                            1
+                        );
+
+
+                        saveJSON(
+                            "patgs27_mock_exams",
+                            mockExams
+                        );
+
+
+                        renderMockExams();
+                    }
+                );
+
+
+                box.appendChild(
+                    deleteButton
+                );
+
+
+                list.appendChild(
+                    box
+                );
+            }
+        );
+}
+
+
+if ($("addMockBtn")) {
+
+    $("addMockBtn").addEventListener(
+        "click",
+        renderMockForm
+    );
+}
+
+
+/* =========================================================
+   過去問
+   ========================================================= */
+
+let publicPast =
+    loadJSON(
+        "patgs27_public_past",
+        []
+    );
+
+
+let privatePast =
+    loadJSON(
+        "patgs27_private_past",
+        []
+    );
+
+
+function addPast(type) {
+
+    const list =
+        type === "public"
+            ? publicPast
+            : privatePast;
+
+
+    list.push(
+        {
+            id:
+                Date.now(),
+
+            date:
+                todayKey(),
+
+            school:
+                "",
+
+            subject:
+                "",
+
+            score:
+                "",
+
+            comparison:
+                "",
+
+            note:
+                ""
+        }
+    );
+
+
+    saveJSON(
+        type === "public"
+            ? "patgs27_public_past"
+            : "patgs27_private_past",
+        list
+    );
+
+
+    renderPast(type);
+}
+
+
+function renderPast(type) {
+
+    const container =
+        type === "public"
+            ? $("publicPastList")
+            : $("privatePastList");
+
+
+    if (!container) {
+        return;
+    }
+
+
+    const list =
+        type === "public"
+            ? publicPast
+            : privatePast;
+
+
+    container.innerHTML = "";
+
+
+    list.forEach(
+        function (record, index) {
+
+            const box =
+                document.createElement(
+                    "div"
+                );
+
+
+            const date =
+                document.createElement(
+                    "input"
+                );
+
+            date.type =
+                "date";
+
+            date.value =
+                record.date || "";
+
+
+            const school =
+                document.createElement(
+                    "input"
+                );
+
+            school.type =
+                "text";
+
+            school.placeholder =
+                "高校名";
+
+            school.value =
+                record.school || "";
+
+
+            const subject =
+                document.createElement(
+                    "input"
+                );
+
+            subject.type =
+                "text";
+
+            subject.placeholder =
+                "教科";
+
+            subject.value =
+                record.subject || "";
+
+
+            const score =
+                document.createElement(
+                    "input"
+                );
+
+            score.type =
+                "number";
+
+            score.placeholder =
+                "得点";
+
+            score.value =
+                record.score || "";
+
+
+            const comparison =
+                document.createElement(
+                    "input"
+                );
+
+            comparison.type =
+                "number";
+
+
+            comparison.placeholder =
+                type === "public"
+                    ? "平均点"
+                    : "前回得点";
+
+
+            comparison.value =
+                record.comparison || "";
+
+
+            const note =
+                document.createElement(
+                    "textarea"
+                );
+
+            note.rows =
+                2;
+
+            note.placeholder =
+                "メモ";
+
+            note.value =
+                record.note || "";
+
+
+            function save() {
+
+                record.date =
+                    date.value;
+
+                record.school =
+                    school.value;
+
+                record.subject =
+                    subject.value;
+
+                record.score =
+                    score.value;
+
+                record.comparison =
+                    comparison.value;
+
+                record.note =
+                    note.value;
+
+
+                saveJSON(
+                    type === "public"
+                        ? "patgs27_public_past"
+                        : "patgs27_private_past",
+                    list
+                );
+            }
+
+
+            [
+                date,
+                school,
+                subject,
+                score,
+                comparison
+            ].forEach(
+                function (input) {
+
+                    input.addEventListener(
+                        "input",
+                        save
+                    );
+
+                    input.addEventListener(
+                        "change",
+                        save
+                    );
+                }
+            );
+
+
+            note.addEventListener(
+                "input",
+                save
+            );
+
+
+            const deleteButton =
+                document.createElement(
+                    "button"
+                );
+
+            deleteButton.type =
+                "button";
+
+            deleteButton.textContent =
+                "削除";
+
+
+            deleteButton.addEventListener(
+                "click",
+                function () {
+
+                    list.splice(
+                        index,
+                        1
+                    );
+
+
+                    saveJSON(
+                        type === "public"
+                            ? "patgs27_public_past"
+                            : "patgs27_private_past",
+                        list
+                    );
+
+
+                    renderPast(type);
+                }
+            );
+
+
+            box.append(
+                date,
+                school,
+                subject,
+                score,
+                comparison,
+                note,
+                deleteButton
+            );
+
+
+            container.appendChild(
+                box
+            );
+        }
+    );
+}
+
+
+if ($("addPublicPastBtn")) {
+
+    $("addPublicPastBtn").addEventListener(
+        "click",
+        function () {
+
+            addPast("public");
+        }
+    );
+}
+
+
+if ($("addPrivatePastBtn")) {
+
+    $("addPrivatePastBtn").addEventListener(
+        "click",
+        function () {
+
+            addPast("private");
+        }
+    );
+}
+
+
+/* =========================================================
+   違反ログ
+   ========================================================= */
+
+let violations =
+    loadJSON(
+        "patgs27_violations",
+        []
+    );
+
+
+function saveViolations() {
+
+    saveJSON(
+        "patgs27_violations",
+        violations
+    );
+}
+
+
+function renderViolations() {
+
+    const list =
+        $("violationList");
+
+
+    if (!list) {
+        return;
+    }
+
+
+    list.innerHTML = "";
+
+
+    violations
+        .slice()
+        .reverse()
+        .forEach(
+            function (item, reverseIndex) {
+
+                const row =
+                    document.createElement(
+                        "p"
+                    );
+
+
+                row.textContent =
+                    item.dateTime +
+                    "｜" +
+                    item.level +
+                    "｜" +
+                    item.text;
+
+
+                const button =
+                    document.createElement(
+                        "button"
+                    );
+
+                button.type =
+                    "button";
+
+                button.textContent =
+                    "削除";
+
+
+                button.addEventListener(
+                    "click",
+                    function () {
+
+                        const index =
+                            violations.length -
+                            1 -
+                            reverseIndex;
+
+
+                        violations.splice(
+                            index,
+                            1
+                        );
+
+
+                        saveViolations();
+
+                        renderViolations();
+                    }
+                );
+
+
+                row.append(
+                    " ",
+                    button
+                );
+
+
+                list.appendChild(
+                    row
+                );
+            }
+        );
+}
+
+
+if ($("addViolationBtn")) {
+
+    $("addViolationBtn").addEventListener(
+        "click",
+        function () {
+
+            const level =
+                $("violationLevel")?.value ||
+                "";
+
+            const text =
+                $("violationText")?.value.trim() ||
+                "";
+
+
+            if (!level || !text) {
+
+                alert(
+                    "判定と内容を入力してください。"
+                );
+
+                return;
+            }
+
+
+            violations.push(
+                {
+                    date:
+                        todayKey(),
+
+                    dateTime:
+                        nowText(),
+
+                    level:
+                        level,
+
+                    text:
+                        text
+                }
+            );
+
+
+            saveViolations();
+
+
+            $("violationLevel").value =
+                "";
+
+            $("violationText").value =
+                "";
+
+
+            renderViolations();
+        }
+    );
+}
+
+
+/* =========================================================
+   週次レビュー
+   ========================================================= */
+
+let weeklyReviews =
+    loadJSON(
+        "patgs27_weekly_reviews",
+        []
+    );
+
+
+function saveWeeklyReviews() {
+
+    saveJSON(
+        "patgs27_weekly_reviews",
+        weeklyReviews
+    );
+}
+
+
+function loadWeeklyReview() {
+
+    const current =
+        weeklyReviews.find(
+            function (item) {
+
+                return (
+                    item.week ===
+                    todayKey()
+                );
+            }
+        );
+
+
+    if ($("weeklyReviewText")) {
+
+        $("weeklyReviewText").value =
+            current?.text || "";
+    }
+}
+
+
+function saveWeeklyReview() {
+
+    if (!$("weeklyReviewText")) {
+        return;
+    }
+
+
+    const key =
+        todayKey();
+
+
+    let current =
+        weeklyReviews.find(
+            function (item) {
+
+                return (
+                    item.week ===
+                    key
+                );
+            }
+        );
+
+
+    if (!current) {
+
+        current =
+            {
+                week:
+                    key,
+
+                dateTime:
+                    nowText(),
+
+                text:
+                    ""
+            };
+
+
+        weeklyReviews.push(
+            current
+        );
+    }
+
+
+    current.text =
+        $("weeklyReviewText").value;
+
+
+    current.updatedAt =
+        nowText();
+
+
+    saveWeeklyReviews();
+
+
+    showSave(
+        "weeklyReviewSaveStatus"
+    );
+
+
+    renderWeeklyReviews();
+}
+
+
+function renderWeeklyReviews() {
+
+    const list =
+        $("weeklyReviewList");
+
+
+    if (!list) {
+        return;
+    }
+
+
+    list.innerHTML = "";
+
+
+    weeklyReviews
+        .slice()
+        .reverse()
+        .forEach(
+            function (item) {
+
+                const box =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                const title =
+                    document.createElement(
+                        "strong"
+                    );
+
+
+                title.textContent =
+                    item.week +
+                    "｜" +
+                    (
+                        item.updatedAt ||
+                        item.dateTime ||
+                        ""
+                    );
+
+
+                const text =
+                    document.createElement(
+                        "p"
+                    );
+
+
+                text.textContent =
+                    item.text ||
+                    "（未入力）";
+
+
+                box.append(
+                    title,
+                    text
+                );
+
+
+                list.appendChild(
+                    box
+                );
+            }
+        );
+}
+
+
+if ($("weeklyReviewText")) {
+
+    $("weeklyReviewText").addEventListener(
+        "input",
+        saveWeeklyReview
+    );
+}
+
+
+/* =========================================================
+   テスト・提出物
+   ========================================================= */
+
+let exams =
+    loadJSON(
+        "exams",
+        []
+    );
+
+
+function saveExams() {
+
+    saveJSON(
+        "exams",
+        exams
+    );
+}
+
+
+function renderExams() {
+
+    const list =
+        $("examList");
+
+
+    if (!list) {
+        return;
+    }
+
+
+    list.innerHTML = "";
+
+
+    exams.forEach(
+        function (exam, index) {
+
+            const row =
+                document.createElement(
+                    "div"
+                );
+
+
+            const type =
+                document.createElement(
+                    "select"
+                );
+
+
+            [
+                "提出物",
+                "テスト",
+                "模試"
+            ].forEach(
+                function (value) {
+
+                    const option =
+                        document.createElement(
+                            "option"
+                        );
+
+                    option.value =
+                        value;
+
+                    option.textContent =
+                        value;
+
+                    type.appendChild(
+                        option
+                    );
+                }
+            );
+
+
+            type.value =
+                exam.type ||
+                "提出物";
+
+
+            const date =
+                document.createElement(
+                    "input"
+                );
+
+            date.type =
+                "date";
+
+            date.value =
+                exam.date ||
+                "";
+
+
+            const text =
+                document.createElement(
+                    "input"
+                );
+
+            text.type =
+                "text";
+
+            text.value =
+                exam.text ||
+                "";
+
+            text.placeholder =
+                "内容";
+
+
+            const done =
+                document.createElement(
+                    "input"
+                );
+
+            done.type =
+                "checkbox";
+
+            done.checked =
+                !!exam.done;
+
+
+            const deleteButton =
+                document.createElement(
+                    "button"
+                );
+
+            deleteButton.type =
+                "button";
+
+            deleteButton.textContent =
+                "削除";
+
+
+            function save() {
+
+                exam.type =
+                    type.value;
+
+                exam.date =
+                    date.value;
+
+                exam.text =
+                    text.value;
+
+                exam.done =
+                    done.checked;
+
+
+                saveExams();
+            }
+
+
+            type.addEventListener(
+                "change",
+                save
+            );
+
+            date.addEventListener(
+                "change",
+                save
+            );
+
+            text.addEventListener(
+                "input",
+                save
+            );
+
+            done.addEventListener(
+                "change",
+                save
+            );
+
+
+            deleteButton.addEventListener(
+                "click",
+                function () {
+
+                    exams.splice(
+                        index,
+                        1
+                    );
+
+                    saveExams();
+
+                    renderExams();
+                }
+            );
+
+
+            row.append(
+                type,
+                " ",
+                date,
+                " ",
+                text,
+                " ",
+                done,
+                " 完了 ",
+                deleteButton
+            );
+
+
+            list.appendChild(
+                row
+            );
+        }
+    );
+}
+
+
+if ($("addExamBtn")) {
+
+    $("addExamBtn").addEventListener(
+        "click",
+        function () {
+
+            exams.push(
+                {
+                    type:
+                        "提出物",
+
+                    date:
+                        "",
+
+                    text:
+                        "",
+
+                    done:
+                        false
+                }
+            );
+
+
+            saveExams();
+
+            renderExams();
+        }
+    );
+}
+
+
+/* =========================================================
+   教材
+   ========================================================= */
+
+let materials =
+    loadJSON(
+        "materials",
+        []
+    );
+
+
+function saveMaterials() {
+
+    saveJSON(
+        "materials",
+        materials
+    );
+}
+
+
+function renderMaterials() {
+
+    const list =
+        $("materialList");
+
+
+    if (!list) {
+        return;
+    }
+
+
+    list.innerHTML = "";
+
+
+    materials.forEach(
+        function (material, index) {
+
+            const row =
+                document.createElement(
+                    "div"
+                );
+
+
+            const check =
+                document.createElement(
+                    "input"
+                );
+
+            check.type =
+                "checkbox";
+
+            check.checked =
+                !!material.checked;
+
+
+            const text =
+                document.createElement(
+                    "input"
+                );
+
+            text.type =
+                "text";
+
+            text.value =
+                material.text ||
+                "";
+
+            text.placeholder =
+                "教材名";
+
+
+            const deleteButton =
+                document.createElement(
+                    "button"
+                );
+
+            deleteButton.type =
+                "button";
+
+            deleteButton.textContent =
+                "削除";
+
+
+            check.addEventListener(
+                "change",
+                function () {
+
+                    materials[index].checked =
+                        check.checked;
+
+                    saveMaterials();
+                }
+            );
+
+
+            text.addEventListener(
+                "input",
+                function () {
+
+                    materials[index].text =
+                        text.value;
+
+                    saveMaterials();
+                }
+            );
+
+
+            deleteButton.addEventListener(
+                "click",
+                function () {
+
+                    materials.splice(
+                        index,
+                        1
+                    );
+
+                    saveMaterials();
+
+                    renderMaterials();
+                }
+            );
+
+
+            row.append(
+                check,
+                " ",
+                text,
+                " ",
+                deleteButton
+            );
+
+
+            list.appendChild(
+                row
+            );
+        }
+    );
+}
+
+
+if ($("addMaterialBtn")) {
+
+    $("addMaterialBtn").addEventListener(
+        "click",
+        function () {
+
+            materials.push(
+                {
+                    text:
+                        "新しい教材",
+
+                    checked:
+                        false
+                }
+            );
+
 
             saveMaterials();
 
             renderMaterials();
-
-        });
-
-
-
-        materialList.appendChild(item);
-
-    });
-
+        }
+    );
 }
 
 
+/* =========================================================
+   学習以外の予定
+   ========================================================= */
 
-addMaterialBtn.addEventListener("click",function(){
+if ($("otherSchedule")) {
 
-    materials.push({
+    $("otherSchedule").value =
+        localStorage.getItem(
+            "otherSchedule"
+        ) || "";
 
-        text:"新しい教材",
 
-        checked:false
+    $("otherSchedule").addEventListener(
+        "input",
+        function () {
 
-    });
+            localStorage.setItem(
+                "otherSchedule",
+                $("otherSchedule").value
+            );
+        }
+    );
+}
 
-    saveMaterials();
+
+/* =========================================================
+   初期化
+   ========================================================= */
+
+function initializePATGS27() {
+
+    loadLife();
+
+    loadDaily();
+
+    renderTodos();
+
+    loadCramDraft();
+
+    updateDateDisplay();
+
+    updateWeeklyNotice();
+
+    updateCramDisplay();
+
+    renderCramHistory();
+
+    renderTemptations();
+
+    renderMockExams();
+
+    renderPast(
+        "public"
+    );
+
+    renderPast(
+        "private"
+    );
+
+    renderViolations();
+
+    loadWeeklyReview();
+
+    renderWeeklyReviews();
+
+    renderExams();
 
     renderMaterials();
 
-});
 
-renderMaterials();
-
-// ===============================
-// 自動保存
-// ===============================
-
-const goalText =
-document.getElementById("goalText");
-
-const messageText =
-document.getElementById("messageText");
-
-const resultText =
-document.getElementById("resultText");
-
-
-// 読み込み
-goalText.value =
-localStorage.getItem("goalText") || "";
-
-messageText.value =
-localStorage.getItem("messageText") || "";
-
-resultText.value =
-localStorage.getItem("resultText") || "";
-
-
-// 保存
-goalText.addEventListener("input", function(){
-
-    localStorage.setItem(
-        "goalText",
-        goalText.value
+    console.log(
+        "PATGS27 script.js loaded successfully."
     );
-
-});
-
-messageText.addEventListener("input", function(){
-
-    localStorage.setItem(
-        "messageText",
-        messageText.value
-    );
-
-});
-
-resultText.addEventListener("input", function(){
-
-    localStorage.setItem(
-        "resultText",
-        resultText.value
-    );
-
-});
-
-// ===============================
-// 学習以外の予定 保存
-// ===============================
-
-const otherSchedule =
-document.getElementById("otherSchedule");
-
-const savedOtherSchedule =
-localStorage.getItem("otherSchedule");
-
-if(savedOtherSchedule){
-
-    otherSchedule.value =
-    savedOtherSchedule;
-
 }
 
-otherSchedule.addEventListener(
-    "input",
-    function(){
 
-        localStorage.setItem(
-            "otherSchedule",
-            otherSchedule.value
-        );
-
-    }
-);
+initializePATGS27();
