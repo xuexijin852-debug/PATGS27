@@ -772,14 +772,31 @@ let mockExams =
 
 
 const MOCK_FIELDS = [
-    ["国語", "japanese"],
-    ["数学", "math"],
-    ["英語", "english"],
-    ["理科", "science"],
-    ["社会", "social"],
-    ["3科", "three"],
-    ["5科", "five"],
-    ["偏差値", "henshenshi"]
+    ["国語 得点", "japanese"],
+    ["国語 偏差値", "japanese_deviation"],
+    ["数学 得点", "math"],
+    ["数学 偏差値", "math_deviation"],
+    ["英語 得点", "english"],
+    ["英語 偏差値", "english_deviation"],
+    ["理科 得点", "science"],
+    ["理科 偏差値", "science_deviation"],
+    ["社会 得点", "social"],
+    ["社会 偏差値", "social_deviation"],
+    ["3科 得点", "three"],
+    ["5科 得点", "five"],
+    ["5科 偏差値", "henshenshi"]
+];
+
+
+/* グラフに表示する偏差値の項目（科目名と、対応するscoresのキー） */
+
+const DEVIATION_TREND_FIELDS = [
+    ["国語", "japanese_deviation", "#c62828"],
+    ["数学", "math_deviation", "#1565c0"],
+    ["英語", "english_deviation", "#2e7d32"],
+    ["理科", "science_deviation", "#ef6c00"],
+    ["社会", "social_deviation", "#6a1b9a"],
+    ["5科", "henshenshi", "#455a64"]
 ];
 
 
@@ -4040,18 +4057,9 @@ function renderScoreTrend() {
     );
 
 
-    const sorted =
+    const sortedExams =
         mockExams
             .slice()
-            .filter(
-                function (exam) {
-
-                    return (
-                        exam.scores?.henshenshi !== undefined &&
-                        exam.scores?.henshenshi !== ""
-                    );
-                }
-            )
             .sort(
                 function (a, b) {
 
@@ -4064,7 +4072,30 @@ function renderScoreTrend() {
             );
 
 
-    if (sorted.length === 0) {
+    /* 教科ごとに、データが1件以上ある項目だけを対象にする */
+
+    const activeFields =
+        DEVIATION_TREND_FIELDS.filter(
+            function (field) {
+
+                const key =
+                    field[1];
+
+
+                return sortedExams.some(
+                    function (exam) {
+
+                        return (
+                            exam.scores?.[key] !== undefined &&
+                            exam.scores?.[key] !== ""
+                        );
+                    }
+                );
+            }
+        );
+
+
+    if (activeFields.length === 0) {
 
         ctx.fillStyle =
             "#888";
@@ -4085,38 +4116,57 @@ function renderScoreTrend() {
     const padding = 40;
 
 
-    const values =
-        sorted.map(
-            function (exam) {
+    /* 全教科・全回の値からグラフの縦軸の範囲を決める */
 
-                return Number(
-                    exam.scores.henshenshi
-                );
-            }
-        );
+    let allValues = [];
+
+
+    activeFields.forEach(
+        function (field) {
+
+            const key =
+                field[1];
+
+
+            sortedExams.forEach(
+                function (exam) {
+
+                    if (
+                        exam.scores?.[key] !== undefined &&
+                        exam.scores?.[key] !== ""
+                    ) {
+
+                        allValues.push(
+                            Number(exam.scores[key])
+                        );
+                    }
+                }
+            );
+        }
+    );
 
 
     const maxValue =
         Math.max(
             70,
-            ...values
+            ...allValues
         );
 
     const minValue =
         Math.min(
             30,
-            ...values
+            ...allValues
         );
 
 
     const stepX =
-        sorted.length > 1
+        sortedExams.length > 1
             ? (
                 width -
                 padding * 2
             ) /
             (
-                sorted.length -
+                sortedExams.length -
                 1
             )
             : 0;
@@ -4170,93 +4220,131 @@ function renderScoreTrend() {
     ctx.stroke();
 
 
-    /* 折れ線 */
+    /* 教科ごとの折れ線 */
 
-    ctx.strokeStyle =
-        "#2e7d32";
+    activeFields.forEach(
+        function (field) {
 
-    ctx.lineWidth = 2;
+            const label =
+                field[0];
 
-    ctx.beginPath();
+            const key =
+                field[1];
 
-
-    sorted.forEach(
-        function (exam, i) {
-
-            const x =
-                toX(i);
-
-            const y =
-                toY(
-                    Number(
-                        exam.scores.henshenshi
-                    )
-                );
+            const color =
+                field[2];
 
 
-            if (i === 0) {
+            ctx.strokeStyle =
+                color;
 
-                ctx.moveTo(
-                    x,
-                    y
-                );
-
-            } else {
-
-                ctx.lineTo(
-                    x,
-                    y
-                );
-            }
-        }
-    );
-
-    ctx.stroke();
-
-
-    /* 点とラベル */
-
-    ctx.fillStyle =
-        "#2e7d32";
-
-    ctx.font =
-        "11px sans-serif";
-
-
-    sorted.forEach(
-        function (exam, i) {
-
-            const x =
-                toX(i);
-
-            const y =
-                toY(
-                    Number(
-                        exam.scores.henshenshi
-                    )
-                );
-
+            ctx.lineWidth = 2;
 
             ctx.beginPath();
 
-            ctx.arc(
-                x,
-                y,
-                3,
-                0,
-                Math.PI * 2
+
+            let started = false;
+
+
+            sortedExams.forEach(
+                function (exam, i) {
+
+                    if (
+                        exam.scores?.[key] === undefined ||
+                        exam.scores?.[key] === ""
+                    ) {
+                        return;
+                    }
+
+
+                    const x =
+                        toX(i);
+
+                    const y =
+                        toY(
+                            Number(exam.scores[key])
+                        );
+
+
+                    if (!started) {
+
+                        ctx.moveTo(
+                            x,
+                            y
+                        );
+
+                        started = true;
+
+                    } else {
+
+                        ctx.lineTo(
+                            x,
+                            y
+                        );
+                    }
+                }
             );
 
-            ctx.fill();
+            ctx.stroke();
 
 
-            ctx.fillText(
-                String(
-                    exam.scores.henshenshi
-                ),
-                x - 8,
-                y - 8
+            /* 点 */
+
+            ctx.fillStyle =
+                color;
+
+
+            sortedExams.forEach(
+                function (exam, i) {
+
+                    if (
+                        exam.scores?.[key] === undefined ||
+                        exam.scores?.[key] === ""
+                    ) {
+                        return;
+                    }
+
+
+                    const x =
+                        toX(i);
+
+                    const y =
+                        toY(
+                            Number(exam.scores[key])
+                        );
+
+
+                    ctx.beginPath();
+
+                    ctx.arc(
+                        x,
+                        y,
+                        3,
+                        0,
+                        Math.PI * 2
+                    );
+
+                    ctx.fill();
+                }
             );
+        }
+    );
+
+
+    /* 日付ラベル */
+
+    ctx.fillStyle =
+        "#333";
+
+    ctx.font =
+        "10px sans-serif";
+
+
+    sortedExams.forEach(
+        function (exam, i) {
+
+            const x =
+                toX(i);
 
 
             ctx.save();
@@ -4277,6 +4365,139 @@ function renderScoreTrend() {
             );
 
             ctx.restore();
+        }
+    );
+
+
+    /* 凡例 */
+
+    ctx.font =
+        "11px sans-serif";
+
+
+    activeFields.forEach(
+        function (field, i) {
+
+            const label =
+                field[0];
+
+            const color =
+                field[2];
+
+
+            ctx.fillStyle =
+                color;
+
+            ctx.fillText(
+                "● " + label,
+                padding + i * 60,
+                14
+            );
+        }
+    );
+}
+
+
+/* =========================================================
+   PATGS代理ローテーション
+   ========================================================= */
+
+const PATGS_PROXY_ORDER = [
+    "総裁",
+    "ChatGPT",
+    "Gemini",
+    "Claude"
+];
+
+
+function getPatgsArbiter(proxy) {
+
+    const index =
+        PATGS_PROXY_ORDER.indexOf(
+            proxy
+        );
+
+
+    if (index === -1) {
+        return "";
+    }
+
+
+    const nextIndex =
+        (index + 1) %
+        PATGS_PROXY_ORDER.length;
+
+
+    return PATGS_PROXY_ORDER[nextIndex];
+}
+
+
+function updatePatgsProxyResult() {
+
+    if (!$("patgsProxyResult")) {
+        return;
+    }
+
+
+    const proxy =
+        $("patgsProxySelect")?.value ||
+        "";
+
+
+    if (!proxy) {
+
+        $("patgsProxyResult").textContent =
+            "";
+
+        return;
+    }
+
+
+    const arbiter =
+        getPatgsArbiter(proxy);
+
+
+    $("patgsProxyResult").textContent =
+        "今週のPATGS代理：" +
+        proxy +
+        "／自己判断の裁定者：" +
+        arbiter;
+}
+
+
+function loadPatgsProxy() {
+
+    const saved =
+        localStorage.getItem(
+            "patgs27_proxy_selection"
+        ) ||
+        "";
+
+
+    if ($("patgsProxySelect")) {
+
+        $("patgsProxySelect").value =
+            saved;
+    }
+
+
+    updatePatgsProxyResult();
+}
+
+
+if ($("patgsProxySelect")) {
+
+    $("patgsProxySelect").addEventListener(
+        "change",
+        function () {
+
+            localStorage.setItem(
+                "patgs27_proxy_selection",
+                $("patgsProxySelect").value
+            );
+
+
+            updatePatgsProxyResult();
         }
     );
 }
@@ -4327,6 +4548,8 @@ function initializePATGS27() {
     renderQuestionNotes();
 
     renderScoreTrend();
+
+    loadPatgsProxy();
 
 
     console.log(
