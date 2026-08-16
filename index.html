@@ -867,6 +867,73 @@
 
 
         <!-- =================================================
+             PATGS代理ローテーション
+        ================================================== -->
+
+        <section>
+
+            <h2>🔄 PATGS代理ローテーション</h2>
+
+            <h3>一、PATGS代理の順序</h3>
+
+            <p>
+                事前抽選の結果、以下の順序で週替わりの交代制とする。
+            </p>
+
+            <p>
+                総裁 → ChatGPT → Gemini → Claude（以後この順で反復）
+            </p>
+
+
+            <h3>二、自己判断に関する裁定者</h3>
+
+            <p>
+                PATGS代理を務める者自身の判断が問題となった場合、
+                当人がこれを裁定することはできない。
+                この場合、ローテーションにおいて当人の次の順番にある者が裁定を行う。
+            </p>
+
+            <p>
+                総裁の自己判断 → ChatGPTが裁定
+            </p>
+
+            <p>
+                ChatGPTの自己判断 → Geminiが裁定
+            </p>
+
+            <p>
+                Geminiの自己判断 → Claudeが裁定
+            </p>
+
+            <p>
+                Claudeの自己判断 → 総裁が裁定
+            </p>
+
+
+            <hr>
+
+
+            <h3>今週のPATGS代理</h3>
+
+            <select id="patgsProxySelect">
+
+                <option value="">選択してください</option>
+                <option value="総裁">総裁</option>
+                <option value="ChatGPT">ChatGPT</option>
+                <option value="Gemini">Gemini</option>
+                <option value="Claude">Claude</option>
+
+            </select>
+
+            <p id="patgsProxyResult"></p>
+
+        </section>
+
+
+        <hr>
+
+
+        <!-- =================================================
              受験リンク
         ================================================== -->
 
