@@ -30,6 +30,38 @@ function $(id) {
 function todayKey() {
     const d = new Date();
 
+    return ("use strict";
+
+/* =========================================================
+   PATGS27
+   script.js
+   =========================================================
+   ・日付表示
+   ・生活リズム自動保存
+   ・今日の目標/一言/実績 自動保存
+   ・今日の予定
+   ・誘惑報告
+   ・模試結果
+   ・過去問
+   ・違反ログ
+   ・週次レビュー
+   ・テスト・提出物
+   ・教材
+   ・学習以外の予定
+   ========================================================= */
+
+
+/* =========================================================
+   共通関数
+   ========================================================= */
+
+function $(id) {
+    return document.getElementById(id);
+}
+
+function todayKey() {
+    const d = new Date();
+
     return (
         d.getFullYear() +
         "-" +
@@ -4504,6 +4536,397 @@ if ($("patgsProxySelect")) {
 
 
 /* =========================================================
+   教科別 学習プラン
+   ========================================================= */
+
+const SUBJECT_PLAN_SUBJECTS = [
+    "国語",
+    "数学",
+    "英語",
+    "理科",
+    "社会"
+];
+
+const SUBJECT_PLAN_COLORS = [
+    "#c62828",
+    "#1565c0",
+    "#2e7d32",
+    "#ef6c00",
+    "#6a1b9a"
+];
+
+
+function subjectPlanTodayKey() {
+
+    return (
+        "patgs27_subject_today_" +
+        todayKey()
+    );
+}
+
+
+let subjectPlanNotes =
+    loadJSON(
+        "patgs27_subject_notes",
+        {}
+    );
+
+
+let subjectPlanToday =
+    loadJSON(
+        subjectPlanTodayKey(),
+        {}
+    );
+
+
+function saveSubjectPlanNotes() {
+
+    saveJSON(
+        "patgs27_subject_notes",
+        subjectPlanNotes
+    );
+}
+
+
+function saveSubjectPlanToday() {
+
+    saveJSON(
+        subjectPlanTodayKey(),
+        subjectPlanToday
+    );
+}
+
+
+function updateSubjectPlanTotal() {
+
+    let totalKoma = 0;
+
+
+    SUBJECT_PLAN_SUBJECTS.forEach(
+        function (subject) {
+
+            totalKoma +=
+                Number(subjectPlanToday[subject]) || 0;
+        }
+    );
+
+
+    const totalMinutes =
+        totalKoma * 50;
+
+    const hours =
+        Math.floor(
+            totalMinutes / 60
+        );
+
+    const minutes =
+        totalMinutes % 60;
+
+
+    if ($("subjectPlanTotal")) {
+
+        $("subjectPlanTotal").textContent =
+            "今日の合計：" +
+            totalKoma +
+            "コマ（約" +
+            hours +
+            "時間" +
+            minutes +
+            "分／1コマ50分換算）";
+    }
+}
+
+
+function renderSubjectPlanChart() {
+
+    const canvas =
+        $("subjectPlanChart");
+
+
+    if (!canvas) {
+        return;
+    }
+
+
+    const ctx =
+        canvas.getContext(
+            "2d"
+        );
+
+
+    const width =
+        canvas.width;
+
+    const height =
+        canvas.height;
+
+
+    ctx.clearRect(
+        0,
+        0,
+        width,
+        height
+    );
+
+
+    const values =
+        SUBJECT_PLAN_SUBJECTS.map(
+            function (subject) {
+
+                return Number(subjectPlanToday[subject]) || 0;
+            }
+        );
+
+
+    const maxValue =
+        Math.max(
+            1,
+            ...values
+        );
+
+
+    const padding = 40;
+
+    const barAreaWidth =
+        width -
+        padding * 2;
+
+    const gap =
+        barAreaWidth /
+        SUBJECT_PLAN_SUBJECTS.length;
+
+    const barWidth =
+        gap * 0.6;
+
+
+    /* 軸 */
+
+    ctx.strokeStyle =
+        "#ccc";
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+        padding,
+        padding
+    );
+
+    ctx.lineTo(
+        padding,
+        height - padding
+    );
+
+    ctx.lineTo(
+        width - padding,
+        height - padding
+    );
+
+    ctx.stroke();
+
+
+    SUBJECT_PLAN_SUBJECTS.forEach(
+        function (subject, i) {
+
+            const value =
+                values[i];
+
+            const barHeight =
+                (
+                    value / maxValue
+                ) *
+                (
+                    height -
+                    padding * 2
+                );
+
+            const x =
+                padding +
+                gap * i +
+                (
+                    gap - barWidth
+                ) / 2;
+
+            const y =
+                height -
+                padding -
+                barHeight;
+
+
+            ctx.fillStyle =
+                SUBJECT_PLAN_COLORS[
+                    i % SUBJECT_PLAN_COLORS.length
+                ];
+
+            ctx.fillRect(
+                x,
+                y,
+                barWidth,
+                barHeight
+            );
+
+
+            ctx.fillStyle =
+                "#333";
+
+            ctx.font =
+                "11px sans-serif";
+
+            ctx.fillText(
+                subject,
+                x,
+                height - padding + 14
+            );
+
+
+            if (value > 0) {
+
+                ctx.fillText(
+                    String(value),
+                    x +
+                    barWidth / 2 -
+                    5,
+                    y - 4
+                );
+            }
+        }
+    );
+}
+
+
+function renderSubjectPlan() {
+
+    const list =
+        $("subjectPlanList");
+
+
+    if (!list) {
+        return;
+    }
+
+
+    list.innerHTML = "";
+
+
+    SUBJECT_PLAN_SUBJECTS.forEach(
+        function (subject) {
+
+            const row =
+                document.createElement(
+                    "div"
+                );
+
+
+            const title =
+                document.createElement(
+                    "h4"
+                );
+
+            title.textContent =
+                subject;
+
+
+            const note =
+                document.createElement(
+                    "textarea"
+                );
+
+            note.rows = 2;
+
+            note.style.width =
+                "100%";
+
+            note.placeholder =
+                subject +
+                "で効果的な学習法メモ";
+
+            note.value =
+                subjectPlanNotes[subject] ||
+                "";
+
+
+            const komaLabel =
+                document.createElement(
+                    "span"
+                );
+
+            komaLabel.textContent =
+                "今日のコマ数：";
+
+
+            const koma =
+                document.createElement(
+                    "input"
+                );
+
+            koma.type =
+                "number";
+
+            koma.min =
+                "0";
+
+            koma.value =
+                subjectPlanToday[subject] ||
+                "";
+
+
+            note.addEventListener(
+                "input",
+                function () {
+
+                    subjectPlanNotes[subject] =
+                        note.value;
+
+                    saveSubjectPlanNotes();
+
+                    showSave(
+                        "subjectPlanSaveStatus"
+                    );
+                }
+            );
+
+
+            koma.addEventListener(
+                "input",
+                function () {
+
+                    subjectPlanToday[subject] =
+                        koma.value;
+
+                    saveSubjectPlanToday();
+
+                    updateSubjectPlanTotal();
+
+                    renderSubjectPlanChart();
+
+                    showSave(
+                        "subjectPlanSaveStatus"
+                    );
+                }
+            );
+
+
+            row.append(
+                title,
+                note,
+                komaLabel,
+                koma
+            );
+
+
+            list.appendChild(
+                row
+            );
+        }
+    );
+
+
+    updateSubjectPlanTotal();
+
+    renderSubjectPlanChart();
+}
+
+
+/* =========================================================
    初期化
    ========================================================= */
 
@@ -4550,6 +4973,8 @@ function initializePATGS27() {
     renderScoreTrend();
 
     loadPatgsProxy();
+
+    renderSubjectPlan();
 
 
     console.log(
