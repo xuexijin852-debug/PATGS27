@@ -4895,6 +4895,240 @@ function renderSubjectPlan() {
 
 
 /* =========================================================
+   通知（勉強を促す通知・週次レビュー通知）
+   ========================================================= */
+
+/*
+
+   毎日 8, 9, 10, 12, 14, 18, 20, 22時に学習を促す通知。
+   土曜(getDay() === 6) の 8時に週次レビューの通知。
+
+   ブラウザ・このタブを開いている間だけ動作する
+   （閉じている間・スリープ中は届かない）。
+
+*/
+
+const STUDY_REMINDER_HOURS = [
+    8,
+    9,
+    10,
+    12,
+    14,
+    18,
+    20,
+    22
+];
+
+const WEEKLY_REVIEW_REMINDER_DAY = 6; /* 0=日,1=月,...,6=土 */
+
+const WEEKLY_REVIEW_REMINDER_HOUR = 8;
+
+
+function getNotificationStatus() {
+
+    if (!("Notification" in window)) {
+
+        return "notsupported";
+    }
+
+
+    return Notification.permission;
+}
+
+
+function updateNotificationStatus() {
+
+    if (!$("notificationStatus")) {
+        return;
+    }
+
+
+    const status =
+        getNotificationStatus();
+
+
+    if (status === "granted") {
+
+        $("notificationStatus").textContent =
+            "✓ 通知は有効です。このタブを開いている間、設定した時刻に届きます。";
+
+    } else if (status === "denied") {
+
+        $("notificationStatus").textContent =
+            "✗ 通知がブロックされています。ブラウザのサイト設定から許可してください。";
+
+    } else if (status === "notsupported") {
+
+        $("notificationStatus").textContent =
+            "このブラウザは通知に対応していません。";
+
+    } else {
+
+        $("notificationStatus").textContent =
+            "通知はまだ許可されていません。上のボタンから許可してください。";
+    }
+}
+
+
+if ($("enableNotificationBtn")) {
+
+    $("enableNotificationBtn").addEventListener(
+        "click",
+        function () {
+
+            if (!("Notification" in window)) {
+
+                alert(
+                    "このブラウザは通知に対応していません。"
+                );
+
+                return;
+            }
+
+
+            Notification.requestPermission().then(
+                function () {
+
+                    updateNotificationStatus();
+                }
+            );
+        }
+    );
+}
+
+
+function sendPatgsNotification(title, body) {
+
+    if (
+        !("Notification" in window) ||
+        Notification.permission !== "granted"
+    ) {
+        return;
+    }
+
+
+    try {
+
+        new Notification(
+            title,
+            {
+                body: body
+            }
+        );
+
+    } catch (error) {
+
+        console.error(
+            "通知の送信に失敗しました:",
+            error
+        );
+    }
+}
+
+
+function checkScheduledNotifications() {
+
+    if (
+        !("Notification" in window) ||
+        Notification.permission !== "granted"
+    ) {
+        return;
+    }
+
+
+    const now =
+        new Date();
+
+    const hour =
+        now.getHours();
+
+    const minute =
+        now.getMinutes();
+
+    const day =
+        now.getDay();
+
+
+    /*
+
+       正確に0分ちょうどでなくても、
+       0～4分の間なら発火対象とする
+       （タブが非アクティブな時のタイマーの遅れに対応するため）。
+
+    */
+
+    if (minute > 4) {
+        return;
+    }
+
+
+    const fireKey =
+        now.getFullYear() +
+        "-" +
+        (now.getMonth() + 1) +
+        "-" +
+        now.getDate() +
+        "-" +
+        hour;
+
+
+    const lastFired =
+        localStorage.getItem(
+            "patgs27_last_notification"
+        ) ||
+        "";
+
+
+    if (lastFired === fireKey) {
+        return;
+    }
+
+
+    let fired = false;
+
+
+    if (
+        day === WEEKLY_REVIEW_REMINDER_DAY &&
+        hour === WEEKLY_REVIEW_REMINDER_HOUR
+    ) {
+
+        sendPatgsNotification(
+            "📅 週次レビューの時間です",
+            "PATGS27を開いて今週の振り返りを記録しましょう。"
+        );
+
+        fired = true;
+
+    } else if (
+        STUDY_REMINDER_HOURS.includes(hour)
+    ) {
+
+        sendPatgsNotification(
+            "📚 学習の時間です",
+            "PATGS27を開いて今日の学習を進めましょう。"
+        );
+
+        fired = true;
+    }
+
+
+    if (fired) {
+
+        localStorage.setItem(
+            "patgs27_last_notification",
+            fireKey
+        );
+    }
+}
+
+
+setInterval(
+    checkScheduledNotifications,
+    30 * 1000
+);
+
+
+/* =========================================================
    初期化
    ========================================================= */
 
@@ -4943,6 +5177,10 @@ function initializePATGS27() {
     loadPatgsProxy();
 
     renderSubjectPlan();
+
+    updateNotificationStatus();
+
+    checkScheduledNotifications();
 
 
     console.log(
