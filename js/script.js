@@ -4924,6 +4924,53 @@ const WEEKLY_REVIEW_REMINDER_DAY = 6; /* 0=日,1=月,...,6=土 */
 const WEEKLY_REVIEW_REMINDER_HOUR = 8;
 
 
+/*
+
+   Service Workerの登録。
+
+   PCのブラウザは new Notification() を直接呼んでも動くが、
+   Android Chromeはこの方式に対応しておらず、
+   Service Worker経由の showNotification() でないと
+   通知が表示されない。
+
+   そのためPC・Android共通で、
+   Service Worker経由での表示に統一する。
+
+   ※ file:// で直接HTMLを開いている場合は登録できない。
+   　 https（Firebase Hostingなど）で公開している必要がある。
+
+*/
+
+let patgsServiceWorkerReady = null;
+
+
+if (
+    "serviceWorker" in navigator
+) {
+
+    patgsServiceWorkerReady =
+        navigator.serviceWorker
+            .register("/sw.js")
+            .then(
+                function (registration) {
+
+                    return registration;
+                }
+            )
+            .catch(
+                function (error) {
+
+                    console.error(
+                        "Service Workerの登録に失敗しました:",
+                        error
+                    );
+
+                    return null;
+                }
+            );
+}
+
+
 function getNotificationStatus() {
 
     if (!("Notification" in window)) {
@@ -5003,6 +5050,59 @@ function sendPatgsNotification(title, body) {
         !("Notification" in window) ||
         Notification.permission !== "granted"
     ) {
+        return;
+    }
+
+
+    /*
+
+       Service Worker経由で表示できればそちらを優先する
+       （Android Chromeはこちらでないと表示されない）。
+
+       Service Workerが使えない環境（登録に失敗した場合など）は、
+       PCなどで動く従来の new Notification() にフォールバックする。
+
+    */
+
+    if (patgsServiceWorkerReady) {
+
+        patgsServiceWorkerReady
+            .then(
+                function (registration) {
+
+                    if (
+                        registration &&
+                        registration.showNotification
+                    ) {
+
+                        registration.showNotification(
+                            title,
+                            {
+                                body: body
+                            }
+                        );
+
+                    } else {
+
+                        new Notification(
+                            title,
+                            {
+                                body: body
+                            }
+                        );
+                    }
+                }
+            )
+            .catch(
+                function (error) {
+
+                    console.error(
+                        "通知の送信に失敗しました:",
+                        error
+                    );
+                }
+            );
+
         return;
     }
 
