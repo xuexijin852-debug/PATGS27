@@ -4571,7 +4571,7 @@ function saveSubjectPlanToday() {
 }
 
 
-function updateSubjectPlanTotal() {
+function getTodayTotalKoma() {
 
     let totalKoma = 0;
 
@@ -4583,6 +4583,16 @@ function updateSubjectPlanTotal() {
                 Number(subjectPlanToday[subject]) || 0;
         }
     );
+
+
+    return totalKoma;
+}
+
+
+function updateSubjectPlanTotal() {
+
+    const totalKoma =
+        getTodayTotalKoma();
 
 
     const totalMinutes =
@@ -4874,6 +4884,8 @@ function renderSubjectPlan() {
 
                     renderTodaySummary();
 
+                    renderStudyHeatmap();
+
                     showSave(
                         "subjectPlanSaveStatus"
                     );
@@ -4917,19 +4929,47 @@ function renderSubjectPlan() {
 */
 
 const STUDY_REMINDER_HOURS = [
+    7,
     8,
     9,
     10,
+    11,
     12,
+    13,
     14,
+    15,
+    16,
+    17,
     18,
+    19,
     20,
-    22
+    21,
+    22,
+    23
 ];
 
 const WEEKLY_REVIEW_REMINDER_DAY = 6; /* 0=日,1=月,...,6=土 */
 
 const WEEKLY_REVIEW_REMINDER_HOUR = 8;
+
+const NIGHT_CHECK_HOUR = 20; /* この時刻に、今日まだ何も記録がなければ特別な通知を送る */
+
+
+/*
+
+   PATGS27のバージョン。
+
+   index.html・script.js・sw.js を更新して配信するたびに、
+   この値と、index.html内の ?v=... の値を同じ文字列に
+   書き換えてください。
+
+   これにより、ブラウザ・スマホが古いキャッシュを
+   使い続けてしまう問題を防ぎ、更新のたびに
+   確実に新しいファイルを読み込ませることができる。
+
+*/
+
+const PATGS_VERSION = "20260916b";
 
 
 /*
@@ -4947,6 +4987,14 @@ const WEEKLY_REVIEW_REMINDER_HOUR = 8;
    ※ file:// で直接HTMLを開いている場合は登録できない。
    　 https（Firebase Hostingなど）で公開している必要がある。
 
+
+   あわせて、Service Workerが新しいバージョンに更新された
+   タイミングを検知して、ページを自動で再読み込みする。
+   これにより「強制リロードしないと反映されない」問題を
+   軽減する（sw.js自体はブラウザがページ読み込みのたびに
+   バイト単位で差分チェックしてくれるため、内容が変われば
+   自動的に新しいものに更新される）。
+
 */
 
 let patgsServiceWorkerReady = null;
@@ -4956,9 +5004,24 @@ if (
     "serviceWorker" in navigator
 ) {
 
+    /*
+
+       既にService Workerが有効な状態で開かれた場合だけ
+       （＝2回目以降の訪問）、更新検知時の自動リロードを行う。
+       初回登録時に無条件でリロードしてしまうのを防ぐため。
+
+    */
+
+    const patgsHadController =
+        !!navigator.serviceWorker.controller;
+
+
     patgsServiceWorkerReady =
         navigator.serviceWorker
-            .register("/sw.js")
+            .register(
+                "/sw.js?v=" +
+                PATGS_VERSION
+            )
             .then(
                 function (registration) {
 
@@ -4976,6 +5039,28 @@ if (
                     return null;
                 }
             );
+
+
+    if (patgsHadController) {
+
+        let patgsSwRefreshing = false;
+
+
+        navigator.serviceWorker.addEventListener(
+            "controllerchange",
+            function () {
+
+                if (patgsSwRefreshing) {
+                    return;
+                }
+
+
+                patgsSwRefreshing = true;
+
+                window.location.reload();
+            }
+        );
+    }
 }
 
 
@@ -5208,6 +5293,18 @@ function checkScheduledNotifications() {
         fired = true;
 
     } else if (
+        hour === NIGHT_CHECK_HOUR &&
+        getTodayTotalKoma() === 0
+    ) {
+
+        sendPatgsNotification(
+            "😳 今日はまだ学習記録がありません",
+            "ストリークが途切れる前に、今日中に少しでも進めておきましょう。"
+        );
+
+        fired = true;
+
+    } else if (
         STUDY_REMINDER_HOURS.includes(hour)
     ) {
 
@@ -5258,6 +5355,219 @@ function getDateKeyOffset(offsetDays) {
         "-" +
         String(d.getDate()).padStart(2, "0")
     );
+}
+
+
+function recordOpenedDate(dateKey) {
+
+    let openedDates =
+        loadJSON(
+            "patgs27_opened_dates",
+            []
+        );
+
+
+    if (!openedDates.includes(dateKey)) {
+
+        openedDates.push(
+            dateKey
+        );
+
+
+        /* 際限なく増え続けないよう、直近120日分だけ保持する */
+
+        if (openedDates.length > 120) {
+
+            openedDates =
+                openedDates.slice(
+                    openedDates.length - 120
+                );
+        }
+
+
+        saveJSON(
+            "patgs27_opened_dates",
+            openedDates
+        );
+    }
+}
+
+
+function getSubjectTotalForDate(dateKey) {
+
+    const data =
+        loadJSON(
+            "patgs27_subject_today_" +
+            dateKey,
+            {}
+        );
+
+
+    let total = 0;
+
+
+    SUBJECT_PLAN_SUBJECTS.forEach(
+        function (subject) {
+
+            total +=
+                Number(data[subject]) || 0;
+        }
+    );
+
+
+    return total;
+}
+
+
+function renderStudyHeatmap() {
+
+    const container =
+        $("studyHeatmap");
+
+
+    if (!container) {
+        return;
+    }
+
+
+    container.innerHTML = "";
+
+    container.style.display =
+        "flex";
+
+    container.style.flexWrap =
+        "wrap";
+
+    container.style.gap =
+        "3px";
+
+
+    const openedDates =
+        loadJSON(
+            "patgs27_opened_dates",
+            []
+        );
+
+
+    for (
+        let i = 29;
+        i >= 0;
+        i--
+    ) {
+
+        const dateKey =
+            getDateKeyOffset(-i);
+
+        const total =
+            getSubjectTotalForDate(
+                dateKey
+            );
+
+        const opened =
+            openedDates.includes(
+                dateKey
+            );
+
+
+        let bgColor =
+            "#ebedf0"; /* 未使用 */
+
+
+        if (total > 0) {
+
+            if (total >= 6) {
+
+                bgColor =
+                    "#196127";
+
+            } else if (total >= 3) {
+
+                bgColor =
+                    "#39a637";
+
+            } else {
+
+                bgColor =
+                    "#9be9a8";
+            }
+
+        } else if (opened) {
+
+            bgColor =
+                "#c9e3f5";
+        }
+
+
+        const cell =
+            document.createElement(
+                "div"
+            );
+
+        cell.title =
+            dateKey +
+            "：" +
+            total +
+            "コマ" +
+            (
+                opened
+                    ? "（開いた）"
+                    : "（未訪問）"
+            );
+
+        cell.style.width =
+            "16px";
+
+        cell.style.height =
+            "16px";
+
+        cell.style.borderRadius =
+            "2px";
+
+        cell.style.backgroundColor =
+            bgColor;
+
+
+        container.appendChild(
+            cell
+        );
+    }
+}
+
+
+/* =========================================================
+   開いた瞬間のランダム一言
+   ========================================================= */
+
+const PATGS_RANDOM_MESSAGES = [
+    "今日もコツコツ積み上げよう。",
+    "昨日より1コマでも多く。",
+    "小さな一歩が合格への近道。",
+    "迷ったら、まず机に向かおう。",
+    "続けていることが、もう才能。",
+    "今日の自分が、未来の自分を助ける。",
+    "焦らず、でも止まらず。",
+    "できたことを、ちゃんと数えよう。",
+    "今日という日は今日しかない。",
+    "完璧じゃなくていい、続けよう。"
+];
+
+
+function renderRandomMessage() {
+
+    if (!$("randomMessage")) {
+        return;
+    }
+
+
+    const index =
+        Math.floor(
+            Math.random() *
+            PATGS_RANDOM_MESSAGES.length
+        );
+
+
+    $("randomMessage").textContent =
+        PATGS_RANDOM_MESSAGES[index];
 }
 
 
@@ -5317,10 +5627,45 @@ function updateStreak() {
     }
 
 
+    /* 自己ベストストリークの更新 */
+
+    let bestStreak =
+        Number(
+            localStorage.getItem(
+                "patgs27_best_streak"
+            )
+        ) || 0;
+
+
+    if (streak > bestStreak) {
+
+        bestStreak = streak;
+
+        localStorage.setItem(
+            "patgs27_best_streak",
+            String(bestStreak)
+        );
+    }
+
+
+    /* 学習カレンダー用に、開いた日を記録しておく */
+
+    recordOpenedDate(
+        today
+    );
+
+
     if ($("streakCount")) {
 
         $("streakCount").textContent =
             String(streak);
+    }
+
+
+    if ($("bestStreakCount")) {
+
+        $("bestStreakCount").textContent =
+            String(bestStreak);
     }
 }
 
@@ -5345,20 +5690,10 @@ function renderTodaySummary() {
 
     if ($("summaryKoma")) {
 
-        let totalKoma = 0;
-
-
-        SUBJECT_PLAN_SUBJECTS.forEach(
-            function (subject) {
-
-                totalKoma +=
-                    Number(subjectPlanToday[subject]) || 0;
-            }
-        );
-
-
         $("summaryKoma").textContent =
-            String(totalKoma);
+            String(
+                getTodayTotalKoma()
+            );
     }
 
 
@@ -5447,6 +5782,10 @@ function initializePATGS27() {
     updateStreak();
 
     renderTodaySummary();
+
+    renderRandomMessage();
+
+    renderStudyHeatmap();
 
 
     console.log(
