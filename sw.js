@@ -29,3 +29,56 @@ self.addEventListener("activate", function (event) {
         self.clients.claim()
     );
 });
+
+
+/* =========================================================
+   通知タップ時の処理
+
+   通知をタップしたら、
+   ・既にPATGS27を開いているタブがあればそれを前面に出す
+   ・開いていなければ新しくPATGS27を開く
+   ========================================================= */
+
+self.addEventListener("notificationclick", function (event) {
+
+    event.notification.close();
+
+
+    event.waitUntil(
+        clients
+            .matchAll(
+                {
+                    type: "window",
+                    includeUncontrolled: true
+                }
+            )
+            .then(
+                function (clientList) {
+
+                    for (
+                        let i = 0;
+                        i < clientList.length;
+                        i++
+                    ) {
+
+                        const client =
+                            clientList[i];
+
+
+                        if ("focus" in client) {
+
+                            return client.focus();
+                        }
+                    }
+
+
+                    if (clients.openWindow) {
+
+                        return clients.openWindow(
+                            "/"
+                        );
+                    }
+                }
+            )
+    );
+});
