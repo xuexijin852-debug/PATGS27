@@ -115,37 +115,7 @@ function showSave(id, text = "✓ 自動保存") {
 const WEEKLY_REVIEW_DATES = [
     "2026-08-15",
     "2026-08-22",
-    "2026-08-29",
-    "2026-09-03",
-    "2026-09-03",
-   "2026-09-05",
-   "2026-09-12",
-   "2026-09-19",
-   "2026-09-26",
-   "2026-10-03",
-   "2026-10-10",
-   "2026-10-17",
-   "2026-10-24",
-   "2026-10-31",
-   "2026-11-07",
-   "2026-11-14",
-   "2026-11-21",
-   "2026-11-28",
-   "2026-12-05",
-   "2026-12-12",
-   "2026-12-19",
-   "2026-12-26",
-   "2027-01-02",
-   "2027-01-09",
-   "2027-01-16",
-   "2027-01-23",
-   "2027-01-30",
-   "2027-02-06",
-   "2027-02-13",
-   "2027-02-16",
-   "2027-02-20",
-   "2027-02-26",
-   "2027-02-27",
+    "2026-08-29"
 ];
 
 
@@ -362,6 +332,9 @@ function saveDaily() {
         "resultText",
         data.result
     );
+
+
+    renderTodaySummary();
 }
 
 
@@ -492,6 +465,9 @@ function updateTodoRate() {
                 "🔴ベースアップしよう！";
         }
     }
+
+
+    renderTodaySummary();
 }
 
 
@@ -4896,6 +4872,8 @@ function renderSubjectPlan() {
 
                     renderSubjectPlanChart();
 
+                    renderTodaySummary();
+
                     showSave(
                         "subjectPlanSaveStatus"
                     );
@@ -5259,6 +5237,160 @@ setInterval(
 
 
 /* =========================================================
+   継続日数（ストリーク）
+   ========================================================= */
+
+function getDateKeyOffset(offsetDays) {
+
+    const d =
+        new Date();
+
+    d.setDate(
+        d.getDate() +
+        offsetDays
+    );
+
+
+    return (
+        d.getFullYear() +
+        "-" +
+        String(d.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(d.getDate()).padStart(2, "0")
+    );
+}
+
+
+function updateStreak() {
+
+    const today =
+        todayKey();
+
+    const yesterday =
+        getDateKeyOffset(-1);
+
+    const lastOpened =
+        localStorage.getItem(
+            "patgs27_last_opened"
+        ) ||
+        "";
+
+    let streak =
+        Number(
+            localStorage.getItem(
+                "patgs27_streak"
+            )
+        ) || 0;
+
+
+    if (lastOpened === today) {
+
+        /* 今日は既にカウント済み */
+
+    } else if (lastOpened === yesterday) {
+
+        streak += 1;
+
+        localStorage.setItem(
+            "patgs27_last_opened",
+            today
+        );
+
+        localStorage.setItem(
+            "patgs27_streak",
+            String(streak)
+        );
+
+    } else {
+
+        streak = 1;
+
+        localStorage.setItem(
+            "patgs27_last_opened",
+            today
+        );
+
+        localStorage.setItem(
+            "patgs27_streak",
+            String(streak)
+        );
+    }
+
+
+    if ($("streakCount")) {
+
+        $("streakCount").textContent =
+            String(streak);
+    }
+}
+
+
+/* =========================================================
+   今日のサマリー
+   ========================================================= */
+
+function renderTodaySummary() {
+
+    if ($("summaryGoal")) {
+
+        const goalValue =
+            $("goalText")?.value.trim() ||
+            "";
+
+        $("summaryGoal").textContent =
+            goalValue ||
+            "未設定";
+    }
+
+
+    if ($("summaryKoma")) {
+
+        let totalKoma = 0;
+
+
+        SUBJECT_PLAN_SUBJECTS.forEach(
+            function (subject) {
+
+                totalKoma +=
+                    Number(subjectPlanToday[subject]) || 0;
+            }
+        );
+
+
+        $("summaryKoma").textContent =
+            String(totalKoma);
+    }
+
+
+    if ($("summaryTodoRate")) {
+
+        const total =
+            todos.length;
+
+        const done =
+            todos.filter(
+                function (todo) {
+
+                    return todo.checked;
+                }
+            ).length;
+
+        const rate =
+            total === 0
+                ? 0
+                : Math.round(
+                    done / total * 100
+                );
+
+
+        $("summaryTodoRate").textContent =
+            rate +
+            "%";
+    }
+}
+
+
+/* =========================================================
    初期化
    ========================================================= */
 
@@ -5311,6 +5443,10 @@ function initializePATGS27() {
     updateNotificationStatus();
 
     checkScheduledNotifications();
+
+    updateStreak();
+
+    renderTodaySummary();
 
 
     console.log(
