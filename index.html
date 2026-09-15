@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PATGS27</title>
 
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=20260916b">
 </head>
 
 <body>
@@ -78,6 +78,12 @@
             <h2>🔥 <span id="streakCount">0</span>日連続で開いています</h2>
 
             <p>
+                自己ベスト：<span id="bestStreakCount">0</span>日
+            </p>
+
+            <p id="randomMessage"></p>
+
+            <p>
                 🎯 今日の目標：<span id="summaryGoal">未設定</span>
             </p>
 
@@ -87,6 +93,14 @@
 
             <p>
                 📋 今日の予定 達成率：<span id="summaryTodoRate">0%</span>
+            </p>
+
+            <h3>📅 学習カレンダー（過去30日）</h3>
+
+            <div id="studyHeatmap"></div>
+
+            <p style="font-size:12px; color:#666;">
+                🟩 学習あり（濃いほどコマ数が多い）／🟦 開いたが記録なし／⬜ 未使用
             </p>
 
         </section>
@@ -202,8 +216,9 @@
             <h2>🔔 通知設定</h2>
 
             <p>
-                毎日 8:00・9:00・10:00・12:00・14:00・18:00・20:00・22:00 に学習を促す通知、
+                毎日 7:00〜23:00の毎時（7:00・8:00・…・23:00）に学習を促す通知、
                 土曜 8:00 に週次レビューの通知を送ります。
+                さらに20:00時点で今日の学習記録が0コマの場合は、特別な通知に切り替わります。
                 ブラウザでこのタブ（またはこのサイトのページ）を開いている間だけ届きます。
                 閉じている間は届きません。
             </p>
@@ -1111,8 +1126,8 @@
          JavaScript
     ====================================================== -->
 
-    <script src="js/script.js"></script>
-    <script type="module" src="js/firebase.js"></script>
+    <script src="js/script.js?v=20260916b"></script>
+    <script type="module" src="js/firebase.js?v=20260916b"></script>
 
 </body>
 
