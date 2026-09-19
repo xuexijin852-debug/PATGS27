@@ -1,319 +1,595 @@
-body{
-    background:#f4f8f4;
-    font-family:"Yu Gothic","Meiryo",sans-serif;
-    margin:40px;
-    line-height:1.8;
+@charset "UTF-8";
+
+/* =========================================================
+   PATGS27 style.css
+   ========================================================= */
+
+:root {
+    --ink: #1c232c;
+    --ink-soft: #5a6472;
+    --navy: #1b3a6b;
+    --navy-deep: #12284a;
+    --paper: #f5f4ef;
+    --card: #ffffff;
+    --line: #d9d5cb;
+    --green: #2e6d3a;
+    --green-soft: #e3f0e4;
+    --red: #a8342a;
+    --red-soft: #f6e5e2;
+    --amber: #8a6410;
+    --amber-soft: #f7efd9;
 }
 
-h1{
-    color:#2a67ae;
-    text-align:center;
-    font-size:42px;
+
+/* =========================================================
+   ベース
+   ========================================================= */
+
+* {
+    box-sizing: border-box;
 }
 
-h2{
-    background:#dff5df;
-    border-left:8px solid #765ae6;
-    padding:10px;
+html {
+    -webkit-text-size-adjust: 100%;
 }
 
-p{
-    font-size:18px;
+body {
+    margin: 0;
+    padding: 0 0 64px;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.75;
 }
 
-hr{
-    border:none;
-    border-top:2px solid #cccccc;
-}
-section{
-    background:white;
-    padding:20px;
-    margin:20px 0;
-    border-radius:12px;
-    box-shadow:0 0 10px rgba(0,0,0,0.1);
-}
-progress{
-    width:100%;
-    height:25px;
+h1, h2, h3, h4 {
+    font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    line-height: 1.4;
+    margin: 0 0 8px;
 }
 
-h3{
-    color:#1b5e20;
-    font-size:28px;
+h2 {
+    font-size: 19px;
+    border-bottom: 2px solid var(--navy);
+    padding-bottom: 6px;
 }
 
-header{
-    background:#2e7d32;
-    color:white;
-    padding:25px;
-    border-radius:15px;
-    text-align:center;
-    margin-bottom:30px;
+h3 {
+    font-size: 16px;
+    margin-top: 20px;
+    color: var(--navy-deep);
 }
 
-header h1,
-header h2,
-header p{
-    color:white;
+h4 {
+    font-size: 15px;
+    margin-top: 14px;
 }
 
-table{
-    width:100%;
-    border-collapse:collapse;
-    margin-top:10px;
+p {
+    margin: 6px 0;
 }
 
-th,td{
-    border:1px solid #cccccc;
-    padding:8px;
-    text-align:center;
+a {
+    color: var(--navy);
 }
 
-th{
-    background:#dff5df;
+hr {
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: 20px 0;
 }
 
-#todayDate {
-    font-size: 28px;
-    font-weight: bold;
-    color: #1d7d3b;
+.sub {
+    font-size: 13px;
+    color: var(--ink-soft);
+}
+
+.save-status {
+    font-size: 12px;
+    color: var(--ink-soft);
+}
+
+
+/* =========================================================
+   ログイン画面
+   ========================================================= */
+
+#loginScreen {
+    max-width: 420px;
+    margin: 80px auto;
+    padding: 32px 24px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 6px;
     text-align: center;
 }
 
-textarea,
-input[type="text"] {
-    font-family: "BIZ UDPGothic";
-    font-size: 18px;
+#mainApp {
+    display: none;
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 12px;
 }
 
+
 /* =========================================================
-   PATGS27 STEP 5
-   トップ・40日間計画表示
+   ヘッダー
    ========================================================= */
 
 .patgs-header {
-    position: relative;
-
-    background: #287c35;
-    color: #ffffff;
-
-    padding: 22px 24px;
-    margin-bottom: 14px;
-
-    border-radius: 6px;
-
-    text-align: center;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    background: var(--navy-deep);
+    color: #fff;
+    padding: 18px 20px;
+    margin: 0 -12px 18px;
 }
 
 .patgs-header h1 {
-    margin: 0 0 8px 0;
-
     font-size: 28px;
-    letter-spacing: 1px;
+    letter-spacing: 0.12em;
+    margin: 0;
 }
 
-.patgs-header p {
-    margin: 4px 0;
-}
-
-.patgs-subtitle {
+.patgs-subtitle,
+.patgs-today {
     font-size: 13px;
-    opacity: 0.95;
+    color: #cdd8ea;
+    margin: 2px 0 0;
 }
 
 .logout-button {
-    position: absolute;
+    flex: none;
+    background: transparent;
+    color: #cdd8ea;
+    border: 1px solid #52678b;
+}
 
-    top: 18px;
-    right: 18px;
 
-    padding: 7px 13px;
+/* =========================================================
+   パネル
+   ========================================================= */
 
-    border: none;
-    border-radius: 5px;
+.panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 16px;
+    margin: 0 0 16px;
+}
 
-    background: #ffffff;
-    color: #287c35;
+.panel-main {
+    border-left: 5px solid var(--navy);
+}
 
-    font-weight: bold;
+.panel-quiet {
+    background: #fbfaf7;
+}
 
+.panel-law {
+    background: #fbfaf5;
+}
+
+.panel-law p {
+    font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
+}
+
+
+/* =========================================================
+   今日のPATGS
+   ========================================================= */
+
+.next-koma {
+    border: 1px solid var(--navy);
+    border-radius: 4px;
+    padding: 12px 14px;
+    margin: 10px 0 16px;
+    background: #f2f6fc;
+}
+
+.next-koma .next-time {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.next-koma .next-subject {
+    font-size: 17px;
+    font-weight: 700;
+    margin-left: 8px;
+}
+
+.next-koma .next-detail {
+    font-size: 13px;
+    color: var(--ink-soft);
+}
+
+.next-koma.is-empty {
+    background: #fafaf7;
+    border-style: dashed;
+    border-color: var(--line);
+    color: var(--ink-soft);
+}
+
+.stat-row {
+    display: flex;
+    gap: 8px;
+    margin: 8px 0 4px;
+}
+
+.stat {
+    flex: 1 1 0;
+    text-align: center;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 8px 2px;
+}
+
+.stat-num {
+    display: block;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.stat-label {
+    display: block;
+    font-size: 12px;
+    color: var(--ink-soft);
+}
+
+.stat-done {
+    color: var(--green);
+}
+
+.stat-missed {
+    color: var(--red);
+}
+
+.stat-debt {
+    color: var(--amber);
+}
+
+
+/* =========================================================
+   フォーム
+   ========================================================= */
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 12px 0;
+}
+
+.form-grid label {
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+    color: var(--ink-soft);
+    gap: 4px;
+}
+
+.form-grid label.wide {
+    grid-column: 1 / -1;
+}
+
+.inline-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.inline-label input {
+    width: 90px;
+}
+
+input,
+select,
+textarea,
+button,
+progress {
+    font-family: inherit;
+    font-size: 14px;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="date"],
+select,
+textarea {
+    width: 100%;
+    padding: 7px 8px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: #fff;
+    color: var(--ink);
+}
+
+textarea {
+    resize: vertical;
+    line-height: 1.6;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+button:focus-visible {
+    outline: 2px solid var(--navy);
+    outline-offset: 1px;
+}
+
+button {
+    padding: 8px 14px;
+    border: 1px solid var(--navy);
+    border-radius: 3px;
+    background: #fff;
+    color: var(--navy);
     cursor: pointer;
 }
 
-.logout-button:hover {
-    opacity: 0.85;
+button:hover {
+    background: #eef3fa;
 }
 
-
-/* =========================================
-   日付・40日計画・残り日数
-   ========================================= */
-
-.date-dashboard {
-    display: grid;
-
-    grid-template-columns:
-        1fr
-        1.4fr
-        1fr;
-
-    gap: 12px;
-
-    margin-bottom: 14px;
+button.primary {
+    background: var(--navy);
+    color: #fff;
 }
 
-.date-card,
-.day-card,
-.remain-card {
-    background: #ffffff;
-
-    border: 1px solid #d7e5d9;
-    border-radius: 6px;
-
-    padding: 16px;
-
-    box-sizing: border-box;
-
-    min-height: 150px;
+button.primary:hover {
+    background: var(--navy-deep);
 }
 
-.date-card h2,
-.day-card h2,
-.remain-card h2 {
-    margin: 0 0 12px 0;
-
-    padding-bottom: 8px;
-
-    border-bottom: 2px solid #dff1df;
-
-    font-size: 16px;
+button.ghost {
+    border-color: var(--line);
+    color: var(--ink-soft);
 }
 
-
-/* 今日の日付 */
-
-.date-main {
-    margin: 25px 0 0 0;
-
-    text-align: center;
-
-    font-size: 24px;
-    font-weight: bold;
-
-    color: #173d20;
+button.small {
+    padding: 4px 8px;
+    font-size: 12px;
 }
 
-
-/* 40日計画 */
-
-.day-card {
-    text-align: center;
+.btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 6px 0;
 }
 
-.period-text {
-    margin: 0;
-
-    font-size: 14px;
-    color: #285f32;
-    font-weight: bold;
-}
-
-.day-main {
-    margin: 12px 0 0 0;
-
-    font-size: 30px;
-    font-weight: bold;
-
-    color: #287c35;
-}
-
-
-/* 残り日数 */
-
-.remain-card {
-    text-align: center;
-
-    border: 2px solid #287c35;
-}
-
-.remain-main {
-    margin: 12px 0 4px 0;
-
-    font-size: 32px;
-    font-weight: bold;
-
-    color: #287c35;
-}
-
-.remain-date {
-    margin: 0;
-
-    color: #444444;
+.form-status {
     font-size: 13px;
+    min-height: 20px;
+    color: var(--green);
+}
+
+.form-status.error {
+    color: var(--red);
 }
 
 
-/* =========================================
-   週次レビュー通知
-   ========================================= */
+/* =========================================================
+   コマ一覧
+   ========================================================= */
+
+.koma {
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--navy);
+    border-radius: 3px;
+    padding: 10px 12px;
+    margin: 8px 0;
+    background: #fff;
+}
+
+.koma.done {
+    border-left-color: var(--green);
+    background: var(--green-soft);
+}
+
+.koma.missed {
+    border-left-color: var(--red);
+    background: var(--red-soft);
+}
+
+.koma.running {
+    border-left-color: var(--amber);
+    background: var(--amber-soft);
+}
+
+.koma.moved {
+    opacity: 0.7;
+}
+
+.koma-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.koma-time {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.koma-subject {
+    font-weight: 700;
+}
+
+.koma-tag {
+    font-size: 11px;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+    padding: 0 5px;
+}
+
+.koma-detail {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin: 4px 0 0;
+}
+
+.koma-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+    align-items: center;
+}
+
+.koma-actions select {
+    width: auto;
+    min-width: 170px;
+}
+
+.empty-note {
+    font-size: 13px;
+    color: var(--ink-soft);
+    padding: 6px 0;
+}
+
+.summary-box {
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: #fbfaf7;
+    padding: 10px 12px;
+    margin: 10px 0;
+    font-size: 14px;
+}
+
+.summary-box strong {
+    font-variant-numeric: tabular-nums;
+}
+
+
+/* =========================================================
+   リスト系
+   ========================================================= */
+
+#todoList > div,
+#materialList > div,
+#otherScheduleList > div,
+#examList > div,
+#weakPointList > div,
+#questionList > div,
+#naishinList > div,
+.schedule-setting-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 0;
+    border-bottom: 1px dashed var(--line);
+}
+
+#todoList input[type="text"],
+#materialList input[type="text"],
+#otherScheduleList input[type="text"],
+#examList input[type="text"] {
+    flex: 1 1 160px;
+    width: auto;
+}
+
+.schedule-setting-row input[type="text"] {
+    width: auto;
+    flex: 1 1 100px;
+}
+
+.schedule-setting-row input[type="date"] {
+    width: auto;
+}
+
+#naishinList input[type="number"] {
+    width: 70px;
+}
+
+.schedule-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.schedule-name {
+    flex: 1 1 160px;
+    font-weight: 700;
+}
+
+.schedule-date {
+    font-size: 13px;
+    color: var(--ink-soft);
+}
+
+.schedule-days {
+    font-variant-numeric: tabular-nums;
+    color: var(--navy);
+    font-weight: 700;
+}
+
+.link-list {
+    padding-left: 20px;
+}
 
 .weekly-notice {
-    min-height: 0;
-
-    margin-bottom: 12px;
-
-    padding: 0;
-
-    color: #285f32;
-    font-weight: bold;
-
-    text-align: center;
+    color: var(--red);
+    font-weight: 700;
 }
 
-.weekly-notice:not(:empty) {
-    padding: 10px;
+progress {
+    width: 100%;
+    height: 12px;
+}
 
-    background: #eef9ee;
+canvas {
+    max-width: 100%;
+    border: 1px solid var(--line);
+    background: #fff;
+    margin-top: 8px;
+}
 
-    border: 1px solid #c9e5ca;
-    border-radius: 6px;
+#studyHeatmap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin: 8px 0;
 }
 
 
-/* =========================================
-   スマホ対応
-   ========================================= */
+/* =========================================================
+   スマホ
+   ========================================================= */
 
-@media (max-width: 700px) {
+@media (max-width: 600px) {
 
-    .date-dashboard {
-        grid-template-columns: 1fr;
+    body {
+        font-size: 15px;
     }
 
     .patgs-header {
-        padding: 18px 12px 20px 12px;
+        flex-direction: column;
+        align-items: stretch;
     }
 
     .patgs-header h1 {
-        font-size: 23px;
+        font-size: 24px;
     }
 
-    .logout-button {
-        position: static;
-
-        margin-top: 10px;
+    .form-grid {
+        grid-template-columns: 1fr;
     }
 
-    .date-main {
-        font-size: 21px;
+    .stat-num {
+        font-size: 20px;
     }
 
-    .day-main {
-        font-size: 26px;
+    .koma-actions button {
+        flex: 1 1 auto;
     }
-
-    .remain-main {
-        font-size: 28px;
-    }
-
 }
