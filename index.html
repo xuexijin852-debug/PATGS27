@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PATGS27</title>
 
-    <link rel="stylesheet" href="css/style.css?v=20260919a">
+    <link rel="stylesheet" href="css/style.css?v=20260919b">
 </head>
 
 <body>
@@ -66,16 +66,14 @@
 
 
         <!-- =================================================
-             今日のPATGS（トップ画面）
+             今日のPATGS
         ================================================== -->
 
         <section class="panel panel-main">
 
             <h2>🗓 今日のPATGS</h2>
 
-            <div class="next-koma" id="nextReservationBox">
-                <!-- JavaScriptで自動生成 -->
-            </div>
+            <div class="next-koma" id="nextReservationBox"></div>
 
             <h3>今日</h3>
 
@@ -140,6 +138,19 @@
 
 
         <!-- =================================================
+             今後の重要予定（上部に配置）
+        ================================================== -->
+
+        <section class="panel panel-main">
+
+            <h2>📅 今後の重要予定</h2>
+
+            <div id="upcomingScheduleList"></div>
+
+        </section>
+
+
+        <!-- =================================================
              コマ予約
         ================================================== -->
 
@@ -148,17 +159,37 @@
             <h2>📌 コマ予約</h2>
 
             <p class="sub">
-                1コマ＝30分。予約は2週間先まで。予約は義務ではありませんが、
-                予約したコマは開始2時間前を過ぎると変更が記録されます。
+                開始時刻は固定枠です。日付 → 種類 → 開始時刻 の順に選んでください。
+                通常学習は30分（＋休憩10分の40分周期）、模試・過去問は70分（実施50分＋採点分析20分）。
+                予約は2週間先まで、義務ではありません。開始2時間前を過ぎた変更は記録に残ります。
             </p>
 
             <div class="form-grid">
 
-                <label>日付
+                <label>① 日付
                     <input type="date" id="resDate">
                 </label>
 
-                <label>開始時刻
+                <label>① 平日／土休日
+                    <select id="resDayType">
+                        <option value="weekday">平日</option>
+                        <option value="holiday">土休日</option>
+                    </select>
+                </label>
+
+                <label class="wide check-label">
+                    <input type="checkbox" id="resHolidayCheck">
+                    この日は祝日・学校休みなので土休日の枠を使う
+                </label>
+
+                <label>② 種類
+                    <select id="resType">
+                        <option value="normal">通常学習（30分）</option>
+                        <option value="exam">模試・過去問（70分）</option>
+                    </select>
+                </label>
+
+                <label>③ 開始時刻
                     <select id="resTime"></select>
                 </label>
 
@@ -198,10 +229,6 @@
                     この内容で予約する
                 </button>
 
-                <button id="addPastPairBtn">
-                    📚 過去問2コマ（30分×2）で予約
-                </button>
-
                 <button id="cancelEditBtn" class="ghost" style="display:none;">
                     編集をやめる
                 </button>
@@ -219,8 +246,42 @@
             <h3>来週以降</h3>
             <div id="futureReservationList"></div>
 
-            <h3>変更の記録（開始2時間前以降の変更）</h3>
-            <div id="changeLogList"></div>
+        </section>
+
+
+        <!-- =================================================
+             空き枠検索
+        ================================================== -->
+
+        <section class="panel">
+
+            <h2>🔍 空き枠検索</h2>
+
+            <p class="sub">
+                「明日、数学を1コマ足したい」というときに、その日の空いている固定枠を出します。
+                枠を押すと上の予約フォームにその日時が入ります。
+            </p>
+
+            <div class="form-grid">
+
+                <label>日付
+                    <input type="date" id="searchDate">
+                </label>
+
+                <label>種類
+                    <select id="searchType">
+                        <option value="normal">通常学習（30分）</option>
+                        <option value="exam">模試・過去問（70分）</option>
+                    </select>
+                </label>
+
+            </div>
+
+            <div class="btn-row">
+                <button id="searchSlotBtn" class="primary">空き枠を探す</button>
+            </div>
+
+            <div id="searchResult"></div>
 
         </section>
 
@@ -234,9 +295,11 @@
             <h2>⏳ 未実行コマ</h2>
 
             <p class="sub">
-                開始から15分たっても開始されなかったコマは、自動で未実行として記録されます。
-                未実行は違反ではありません。原因を4分類で記録し、同じ週の別のコマへ振り替えてください。
+                開始から15分たっても開始されなかったコマは、自動で未実行になります。
+                未実行は違反ではありません。原因を4分類で記録し、同じ週の別の枠へ振り替えてください。
             </p>
+
+            <div id="hardStartNotice"></div>
 
             <div id="missedList"></div>
 
@@ -244,7 +307,28 @@
 
 
         <!-- =================================================
-             債務（週末に残った未達コマ）
+             取り消しの記録
+        ================================================== -->
+
+        <section class="panel">
+
+            <h2>🗂 取り消し・変更の記録</h2>
+
+            <p class="sub">
+                予定が崩れた理由を後から見返すための記録です。
+            </p>
+
+            <h3>取り消した理由</h3>
+            <div id="cancelLogList"></div>
+
+            <h3>開始2時間前以降の変更</h3>
+            <div id="changeLogList"></div>
+
+        </section>
+
+
+        <!-- =================================================
+             債務
         ================================================== -->
 
         <section class="panel">
@@ -426,23 +510,14 @@
 
 
         <!-- =================================================
-             今後の重要予定
+             日付・予定設定
         ================================================== -->
-
-        <section class="panel">
-
-            <h2>📅 今後の重要予定</h2>
-
-            <div id="upcomingScheduleList"></div>
-
-        </section>
-
 
         <section class="panel">
 
             <h2>⚙️ 日付・予定設定</h2>
 
-            <p class="sub">ここから予定の日付を変更・追加できます。</p>
+            <p class="sub">ここから重要予定の日付を変更・追加できます。</p>
 
             <div id="patgsDateSettings"></div>
 
@@ -472,7 +547,7 @@
 
 
         <!-- =================================================
-             学習カレンダー・継続日数
+             学習カレンダー
         ================================================== -->
 
         <section class="panel panel-quiet">
@@ -746,14 +821,13 @@
             <h2>🔔 通知設定</h2>
 
             <p class="sub">
-                通知は予約と連動します。予約の15分前、開始時刻、そして未実行になった時に届きます。
-                土曜8:00には週次レビューの通知が届きます。
-                ブラウザでこのページを開いている間だけ届き、閉じている間は届きません。
+                届く通知は4種類です。予約の5分前、予約の開始時刻、未実行になった時（いずれも予約の内容つき）、
+                そして毎時00分（6:00〜23:00）の学習確認。土曜8:00には週次レビューの通知が届きます。
             </p>
 
             <p class="sub">
+                ブラウザでこのページを開いている間だけ届きます。閉じている間は届きません。
                 https で公開されているサイト（Firebase Hostingなど）で開いている必要があります。
-                パソコンのファイルを直接開いた場合（file://）は動作しません。
             </p>
 
             <button id="enableNotificationBtn">🔔 通知を許可する</button>
@@ -909,6 +983,7 @@
 
             <p>
                 学習の単位は1コマ30分とし、予約、実行、完了の順に運用する。
+                開始時刻は固定枠とし、通常学習は40分周期、模試・過去問は80分周期とする。
             </p>
 
             <h4>第10条　未実行</h4>
@@ -922,7 +997,7 @@
             <h4>第11条　振替及び債務</h4>
 
             <p>
-                未実行のコマは同じ週の別のコマへ振り替えることができる。
+                未実行のコマは同じ週の別の枠へ振り替えることができる。
                 週の終了時に必要コマ数に達しなかった分は債務として記録する。
             </p>
 
@@ -987,8 +1062,8 @@
          JavaScript
     ====================================================== -->
 
-    <script src="js/script.js?v=20260919a"></script>
-    <script type="module" src="js/firebase.js?v=20260919a"></script>
+    <script src="js/script.js?v=20260919b"></script>
+    <script type="module" src="js/firebase.js?v=20260919b"></script>
 
 </body>
 
