@@ -1,37 +1,26 @@
 "use strict";
 
 /* =========================================================
-   PATGS27  script.js  （第五次改革版）
+   PATGS27  script.js  （第五次改革・改良版）
    =========================================================
-   【新設】
-     ・コマ予約（日時／科目／教材／内容／範囲／目標）
-     ・予約一覧（今日・今週・来週以降）
-     ・コマ実行（次の予約・開始・完了）
-     ・未実行処理（開始15分経過で自動記録＋4分類）
-     ・振替（同じ週の別コマへ）／債務（週末に残った未達分）
-     ・LS記録（30分を超えた学習）
-     ・週間コマ管理（必要・予約・完了・未実行・債務）
-     ・過去問2コマ（30分×2）の一括予約
-     ・2時間前ルール（以降の変更は記録に残る）
-   【廃止】
-     ・「今日○コマ」だけの旧コマ管理
-     ・未実行＝違反という単純判定
-   【縮小】
-     ・連続日数／自己ベスト（残すがトップの主役から外す）
-   【維持】
-     ・模試・過去問・内申・弱点・予定・提出物・教材・生活リズム
-     ・誘惑報告・違反ログ・週次レビュー・質問メモ・リンク
-     ・バックアップ・憲法・PATGS代理
+   【コマ制度】
+     ・開始時刻は固定枠（平日／土休日 × 通常学習／模試・過去問）
+     ・通常学習：30分学習＋10分休憩＝40分周期
+     ・模試・過去問：50分実施＋20分採点分析＝70分（80分周期）
+     ・模試と通常コマが時間的に重なる枠は予約できない
+     ・予約 → 実行 → 完了。開始15分で未実行、4分類で記録
+     ・開始困難は原因を記録。回数は3回・5回・10回で到達表示
+     ・振替（同じ週）／債務（週末に残った未達分）
+     ・取り消しは理由を記録
+     ・空き枠検索
+   【通知】
+     ・予約の5分前／開始時刻／未実行（いずれも内容つき）
+     ・毎時00分（6:00〜23:00）の学習確認
+     ・土曜8:00の週次レビュー
    ========================================================= */
 
 
-/* =========================================================
-   バージョン
-   ---------------------------------------------------------
-   index.html の ?v=... と sw.js に合わせて書き換えること。
-   ========================================================= */
-
-const PATGS_VERSION = "20260919a";
+const PATGS_VERSION = "20260919b";
 
 
 /* =========================================================
@@ -48,10 +37,8 @@ function pad2(value) {
 
 function dateKeyOf(dateObject) {
     return (
-        dateObject.getFullYear() +
-        "-" +
-        pad2(dateObject.getMonth() + 1) +
-        "-" +
+        dateObject.getFullYear() + "-" +
+        pad2(dateObject.getMonth() + 1) + "-" +
         pad2(dateObject.getDate())
     );
 }
@@ -93,6 +80,7 @@ function getWeekStartKey(dateKey) {
 }
 
 function formatShortDate(dateKey) {
+
     if (!dateKey) {
         return "未設定";
     }
@@ -106,10 +94,17 @@ function formatShortDate(dateKey) {
     const week = ["日", "月", "火", "水", "木", "金", "土"];
     const d = new Date(dateKey + "T00:00:00");
 
-    return (
-        Number(parts[1]) + "/" + Number(parts[2]) +
-        "(" + week[d.getDay()] + ")"
-    );
+    return Number(parts[1]) + "/" + Number(parts[2]) + "(" + week[d.getDay()] + ")";
+}
+
+function timeToMinutes(time) {
+    const parts = (time || "00:00").split(":");
+    return Number(parts[0]) * 60 + Number(parts[1]);
+}
+
+function minutesToTime(minutes) {
+    const total = ((minutes % 1440) + 1440) % 1440;
+    return pad2(Math.floor(total / 60)) + ":" + pad2(total % 60);
 }
 
 function loadJSON(key, fallback) {
@@ -137,6 +132,7 @@ function saveJSON(key, data) {
 }
 
 function showSave(id, text = "✓ 自動保存") {
+
     const element = $(id);
 
     if (!element) {
@@ -162,8 +158,57 @@ function makeButton(label, className) {
 
 
 /* =========================================================
-   コマ制度：定数とデータ
+   固定枠の定義
    ========================================================= */
+
+/* 通常学習：30分学習＋10分休憩＝40分周期 */
+
+const NORMAL_SLOTS = {
+
+    weekday: [
+        "06:30",
+        "13:30", "14:10", "14:50", "15:30", "16:10", "16:50",
+        "17:30", "18:10", "18:50", "19:30", "20:10", "20:50",
+        "21:30", "22:10"
+    ],
+
+    holiday: [
+        "09:00", "09:40", "10:20", "11:00", "11:40", "12:20",
+        "13:00", "13:40", "14:20", "15:00", "15:40", "16:20",
+        "17:00", "17:40", "18:20", "19:00", "19:40", "20:20",
+        "21:00", "21:40", "22:20"
+    ]
+};
+
+/* 模試・過去問：50分実施＋20分採点分析＝70分（80分周期） */
+
+const EXAM_SLOTS = {
+
+    weekday: [
+        "13:30", "14:50", "16:10", "17:30", "18:50", "20:10", "21:30"
+    ],
+
+    holiday: [
+        "09:00", "10:20", "11:40", "13:00", "14:20",
+        "15:40", "17:00", "18:20", "19:40", "21:00"
+    ]
+};
+
+const TYPE_LABEL = {
+    normal: "通常学習",
+    exam: "模試・過去問"
+};
+
+const TYPE_DURATION = {
+    normal: 30,
+    exam: 70
+};
+
+/* 模試・過去問は2コマ分として数える */
+const TYPE_KOMA = {
+    normal: 1,
+    exam: 2
+};
 
 const KOMA_MINUTES = 30;
 
@@ -185,21 +230,32 @@ const MISSED_CATEGORIES = [
     "予定・制度上の問題"
 ];
 
-/* 予約できるのは2週間先まで */
+const CANCEL_REASONS = [
+    "学校・予定",
+    "体調・休養",
+    "緊急事態",
+    "計画変更",
+    "その他"
+];
+
+const HARD_START_MILESTONES = [3, 5, 10];
+
 const RESERVATION_LIMIT_DAYS = 14;
-
-/* 開始15分で未実行 */
 const MISSED_AFTER_MINUTES = 15;
-
-/* 通常変更ができるのは開始2時間前まで */
 const FREE_CHANGE_HOURS = 2;
 
+
+/* =========================================================
+   コマ制度のデータ
+   ========================================================= */
 
 let reservations = loadJSON("patgs27_reservations", []);
 let weekRequired = loadJSON("patgs27_week_required", {});
 let debts = loadJSON("patgs27_debts", []);
 let lsRecords = loadJSON("patgs27_ls_records", []);
 let changeLogs = loadJSON("patgs27_change_logs", []);
+let cancelLogs = loadJSON("patgs27_cancel_logs", []);
+let dayTypeOverrides = loadJSON("patgs27_day_type_overrides", {});
 
 let editingReservationId = null;
 let transferFromId = null;
@@ -225,18 +281,54 @@ function saveChangeLogs() {
     saveJSON("patgs27_change_logs", changeLogs);
 }
 
+function saveCancelLogs() {
+    saveJSON("patgs27_cancel_logs", cancelLogs);
+}
+
+function saveDayTypeOverrides() {
+    saveJSON("patgs27_day_type_overrides", dayTypeOverrides);
+}
+
+
+function dayTypeOf(dateKey) {
+
+    if (dayTypeOverrides[dateKey]) {
+        return dayTypeOverrides[dateKey];
+    }
+
+    const day = new Date(dateKey + "T00:00:00").getDay();
+
+    return (day === 0 || day === 6) ? "holiday" : "weekday";
+}
+
+function dayTypeLabel(dateKey) {
+    return dayTypeOf(dateKey) === "holiday" ? "土休日" : "平日";
+}
+
+function slotListFor(dateKey, type) {
+    const table = type === "exam" ? EXAM_SLOTS : NORMAL_SLOTS;
+    return table[dayTypeOf(dateKey)] || [];
+}
+
+function reservationType(record) {
+    return record.type === "exam" ? "exam" : "normal";
+}
+
+function reservationDuration(record) {
+    return TYPE_DURATION[reservationType(record)];
+}
+
+function komaValue(record) {
+    return TYPE_KOMA[reservationType(record)];
+}
 
 function reservationStart(record) {
     return new Date(record.date + "T" + (record.time || "00:00") + ":00");
 }
 
-function reservationEndText(record) {
-    const end = new Date(reservationStart(record).getTime() + KOMA_MINUTES * 60000);
-    return pad2(end.getHours()) + ":" + pad2(end.getMinutes());
-}
-
 function reservationTimeText(record) {
-    return record.time + "〜" + reservationEndText(record);
+    const start = timeToMinutes(record.time);
+    return record.time + "〜" + minutesToTime(start + reservationDuration(record));
 }
 
 function findReservation(id) {
@@ -246,6 +338,7 @@ function findReservation(id) {
 }
 
 function statusLabel(record) {
+
     if (record.status === "done") {
         return "完了";
     }
@@ -262,192 +355,32 @@ function statusLabel(record) {
 }
 
 
-/* =========================================================
-   時刻セレクト（30分刻み）
-   ========================================================= */
+/* 重なりの判定（模試と通常が重なる枠は取れない） */
 
-function buildTimeOptions(selectElement) {
-    if (!selectElement) {
-        return;
-    }
+function isSlotBusy(dateKey, time, type, ignoreId) {
 
-    selectElement.innerHTML = "";
+    const start = timeToMinutes(time);
+    const end = start + TYPE_DURATION[type];
 
-    for (let hour = 6; hour <= 23; hour++) {
-        for (let minute = 0; minute < 60; minute += KOMA_MINUTES) {
+    return reservations.some(function (record) {
 
-            const value = pad2(hour) + ":" + pad2(minute);
-
-            const option = document.createElement("option");
-            option.value = value;
-            option.textContent = value;
-
-            selectElement.appendChild(option);
-        }
-    }
-}
-
-
-/* =========================================================
-   未実行の自動判定
-   ========================================================= */
-
-function processMissedReservations() {
-
-    const now = Date.now();
-    let changed = false;
-
-    reservations.forEach(function (record) {
-
-        if (record.status !== "reserved") {
-            return;
+        if (record.date !== dateKey) {
+            return false;
         }
 
-        const limit =
-            reservationStart(record).getTime() +
-            MISSED_AFTER_MINUTES * 60000;
-
-        if (now >= limit) {
-
-            record.status = "missed";
-            record.missedCategory = record.missedCategory || "";
-            record.missedAt = nowText();
-
-            changed = true;
-
-            sendPatgsNotification(
-                "⏳ 未実行になりました",
-                reservationTimeText(record) + " " +
-                (record.subject || "") + " / " +
-                (record.content || "内容未設定") +
-                "　原因を記録して振り替えましょう。"
-            );
+        if (record.id === ignoreId) {
+            return false;
         }
+
+        if (record.status === "missed") {
+            return false;
+        }
+
+        const otherStart = timeToMinutes(record.time);
+        const otherEnd = otherStart + reservationDuration(record);
+
+        return start < otherEnd && otherStart < end;
     });
-
-    if (changed) {
-        saveReservations();
-    }
-
-    return changed;
-}
-
-
-/* =========================================================
-   週の集計
-   ========================================================= */
-
-function getWeekReservations(weekStartKey) {
-
-    const endKey = addDaysToKey(weekStartKey, 6);
-
-    return reservations.filter(function (record) {
-        return record.date >= weekStartKey && record.date <= endKey;
-    });
-}
-
-function getWeekStats(weekStartKey) {
-
-    const list = getWeekReservations(weekStartKey);
-
-    const done = list.filter(function (r) {
-        return r.status === "done";
-    }).length;
-
-    const missed = list.filter(function (r) {
-        return r.status === "missed";
-    }).length;
-
-    const moved = list.filter(function (r) {
-        return !!r.rescheduledTo;
-    }).length;
-
-    const required = Number(weekRequired[weekStartKey]) || 0;
-
-    return {
-        week: weekStartKey,
-        required: required,
-        reserved: list.length,
-        done: done,
-        missed: missed,
-        moved: moved,
-        shortage: Math.max(0, required - done)
-    };
-}
-
-function getDayStats(dateKey) {
-
-    const list = reservations.filter(function (record) {
-        return record.date === dateKey;
-    });
-
-    return {
-        reserved: list.length,
-        done: list.filter(function (r) { return r.status === "done"; }).length,
-        missed: list.filter(function (r) { return r.status === "missed"; }).length,
-        moved: list.filter(function (r) { return !!r.rescheduledTo; }).length
-    };
-}
-
-function getDoneKomaForDate(dateKey) {
-
-    const fromReservations = reservations.filter(function (record) {
-        return record.date === dateKey && record.status === "done";
-    }).length;
-
-    /* 旧「教科別コマ数」の記録も、過去の分は表示に使う */
-    const legacy = loadJSON("patgs27_subject_today_" + dateKey, {});
-
-    let legacyTotal = 0;
-
-    Object.keys(legacy).forEach(function (key) {
-        legacyTotal += Number(legacy[key]) || 0;
-    });
-
-    return fromReservations + legacyTotal;
-}
-
-
-/* 週が終わったら、足りなかった分を債務として自動で記録する */
-
-function closeFinishedWeeks() {
-
-    const currentWeek = getWeekStartKey(todayKey());
-    let changed = false;
-
-    Object.keys(weekRequired).forEach(function (weekStartKey) {
-
-        if (weekStartKey >= currentWeek) {
-            return;
-        }
-
-        const already = debts.some(function (debt) {
-            return debt.week === weekStartKey;
-        });
-
-        if (already) {
-            return;
-        }
-
-        const stats = getWeekStats(weekStartKey);
-
-        if (stats.shortage > 0) {
-
-            debts.push({
-                id: "debt_" + weekStartKey,
-                week: weekStartKey,
-                koma: stats.shortage,
-                createdAt: nowText(),
-                resolved: false
-            });
-
-            changed = true;
-        }
-    });
-
-    if (changed) {
-        saveDebts();
-    }
 }
 
 
@@ -455,10 +388,99 @@ function closeFinishedWeeks() {
    予約フォーム
    ========================================================= */
 
+function currentFormDate() {
+    return $("resDate")?.value || todayKey();
+}
+
+function currentFormType() {
+    return $("resType")?.value === "exam" ? "exam" : "normal";
+}
+
+function syncDayTypeControls() {
+
+    const dateKey = currentFormDate();
+    const type = dayTypeOf(dateKey);
+
+    if ($("resDayType")) {
+        $("resDayType").value = type;
+    }
+
+    if ($("resHolidayCheck")) {
+        $("resHolidayCheck").checked = (type === "holiday");
+    }
+}
+
+function setDayTypeOverride(dateKey, type) {
+
+    const day = new Date(dateKey + "T00:00:00").getDay();
+    const natural = (day === 0 || day === 6) ? "holiday" : "weekday";
+
+    if (type === natural) {
+        delete dayTypeOverrides[dateKey];
+    } else {
+        dayTypeOverrides[dateKey] = type;
+    }
+
+    saveDayTypeOverrides();
+}
+
+
+function renderTimeOptions() {
+
+    const select = $("resTime");
+
+    if (!select) {
+        return;
+    }
+
+    const previous = select.value;
+    const dateKey = currentFormDate();
+    const type = currentFormType();
+    const slots = slotListFor(dateKey, type);
+
+    select.innerHTML = "";
+
+    const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+    const isToday = dateKey === todayKey();
+
+    slots.forEach(function (time) {
+
+        const option = document.createElement("option");
+        option.value = time;
+
+        const busy = isSlotBusy(dateKey, time, type, editingReservationId);
+        const past = isToday && timeToMinutes(time) < nowMinutes;
+
+        option.textContent =
+            time + "〜" + minutesToTime(timeToMinutes(time) + TYPE_DURATION[type]) +
+            (busy ? "（予約済）" : past ? "（過ぎた枠）" : "");
+
+        option.disabled = busy;
+
+        select.appendChild(option);
+    });
+
+    if (slots.includes(previous)) {
+        select.value = previous;
+    } else {
+
+        const firstFree = slots.find(function (time) {
+            return (
+                !isSlotBusy(dateKey, time, type, editingReservationId) &&
+                !(isToday && timeToMinutes(time) < nowMinutes)
+            );
+        });
+
+        select.value = firstFree || slots[0] || "";
+    }
+}
+
+
 function readReservationForm() {
     return {
         date: $("resDate")?.value || "",
         time: $("resTime")?.value || "",
+        type: currentFormType(),
         subject: $("resSubject")?.value || "",
         material: $("resMaterial")?.value.trim() || "",
         content: $("resContent")?.value.trim() || "",
@@ -468,8 +490,14 @@ function readReservationForm() {
 }
 
 function fillReservationForm(record) {
+
     if ($("resDate")) { $("resDate").value = record.date || ""; }
-    if ($("resTime")) { $("resTime").value = record.time || "06:00"; }
+    if ($("resType")) { $("resType").value = reservationType(record); }
+
+    syncDayTypeControls();
+    renderTimeOptions();
+
+    if ($("resTime")) { $("resTime").value = record.time || $("resTime").value; }
     if ($("resSubject")) { $("resSubject").value = record.subject || ""; }
     if ($("resMaterial")) { $("resMaterial").value = record.material || ""; }
     if ($("resContent")) { $("resContent").value = record.content || ""; }
@@ -508,6 +536,8 @@ function resetReservationFormMode() {
     if ($("cancelEditBtn")) {
         $("cancelEditBtn").style.display = "none";
     }
+
+    renderTimeOptions();
 }
 
 
@@ -531,17 +561,15 @@ function validateReservation(values, ignoreId) {
         return "予約できるのは2週間先までです。";
     }
 
-    const duplicate = reservations.some(function (record) {
+    if (!slotListFor(values.date, values.type).includes(values.time)) {
         return (
-            record.id !== ignoreId &&
-            record.date === values.date &&
-            record.time === values.time &&
-            record.status !== "missed"
+            "その時刻は" + dayTypeLabel(values.date) + "の" +
+            TYPE_LABEL[values.type] + "の固定枠にありません。"
         );
-    });
+    }
 
-    if (duplicate) {
-        return "その時間にはすでにコマがあります。";
+    if (isSlotBusy(values.date, values.time, values.type, ignoreId)) {
+        return "その時間帯にはすでに別のコマがあります（模試と通常コマは重ねられません）。";
     }
 
     return "";
@@ -549,9 +577,7 @@ function validateReservation(values, ignoreId) {
 
 
 function isWithinFreeChange(record) {
-
     const diff = reservationStart(record).getTime() - Date.now();
-
     return diff > FREE_CHANGE_HOURS * 60 * 60 * 1000;
 }
 
@@ -560,8 +586,9 @@ function recordChangeLog(record, action) {
 
     changeLogs.push({
         dateTime: nowText(),
-        target: formatShortDate(record.date) + " " + reservationTimeText(record) +
-                " " + (record.subject || ""),
+        target:
+            formatShortDate(record.date) + " " + reservationTimeText(record) +
+            " " + (record.subject || ""),
         action: action
     });
 
@@ -597,11 +624,7 @@ function submitReservationForm() {
 
         if (!isWithinFreeChange(record)) {
 
-            const ok = confirm(
-                "開始2時間を切っています。変更内容は記録に残りますが、変更しますか？"
-            );
-
-            if (!ok) {
+            if (!confirm("開始2時間を切っています。変更は記録に残りますが、変更しますか？")) {
                 return;
             }
 
@@ -650,12 +673,12 @@ function submitReservationForm() {
         id: "res_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
         date: values.date,
         time: values.time,
+        type: values.type,
         subject: values.subject,
         material: values.material,
         content: values.content,
         range: values.range,
         goal: values.goal,
-        type: "normal",
         status: "reserved",
         createdAt: nowText(),
         notified: {}
@@ -670,82 +693,7 @@ function submitReservationForm() {
 
     saveReservations();
 
-    setFormStatus(
-        origin
-            ? "振替のコマを予約しました。"
-            : "予約しました。",
-        false
-    );
-
-    resetReservationFormMode();
-    clearReservationForm();
-    renderKomaAll();
-}
-
-
-function addPastExamPair() {
-
-    const values = readReservationForm();
-
-    const error = validateReservation(values, null);
-
-    if (error) {
-        setFormStatus(error, true);
-        return;
-    }
-
-    const secondStart = new Date(
-        new Date(values.date + "T" + values.time + ":00").getTime() +
-        KOMA_MINUTES * 60000
-    );
-
-    if (secondStart.getHours() === 0 && secondStart.getMinutes() === 0) {
-        setFormStatus("2コマ目が日をまたぐため、別の時刻を選んでください。", true);
-        return;
-    }
-
-    const secondValues = {
-        date: dateKeyOf(secondStart),
-        time: pad2(secondStart.getHours()) + ":" + pad2(secondStart.getMinutes()),
-        subject: values.subject,
-        material: values.material,
-        content: values.content,
-        range: values.range,
-        goal: values.goal
-    };
-
-    const secondError = validateReservation(secondValues, null);
-
-    if (secondError) {
-        setFormStatus("2コマ目が取れません：" + secondError, true);
-        return;
-    }
-
-    const pairId = "pair_" + Date.now();
-
-    [values, secondValues].forEach(function (item, index) {
-
-        reservations.push({
-            id: "res_" + Date.now() + "_" + index,
-            date: item.date,
-            time: item.time,
-            subject: item.subject,
-            material: item.material,
-            content: item.content,
-            range: item.range,
-            goal: item.goal,
-            type: "past",
-            pairId: pairId,
-            pairIndex: index + 1,
-            status: "reserved",
-            createdAt: nowText(),
-            notified: {}
-        });
-    });
-
-    saveReservations();
-
-    setFormStatus("過去問の2コマ（30分×2）を予約しました。", false);
+    setFormStatus(origin ? "振替のコマを予約しました。" : "予約しました。", false);
 
     resetReservationFormMode();
     clearReservationForm();
@@ -780,28 +728,28 @@ function reopenReservation(record) {
 
     record.status = "reserved";
     record.completedAt = "";
-    record.missedCategory = "";
 
     saveReservations();
     renderKomaAll();
 }
 
-function deleteReservation(record) {
+function removeReservation(record, reason) {
 
-    if (!isWithinFreeChange(record) && record.status === "reserved") {
+    if (reason) {
 
-        const ok = confirm(
-            "開始2時間を切っています。取り消しは記録に残りますが、取り消しますか？"
-        );
+        cancelLogs.push({
+            dateTime: nowText(),
+            target:
+                formatShortDate(record.date) + " " + reservationTimeText(record) +
+                " " + (record.subject || "") + "（" + TYPE_LABEL[reservationType(record)] + "）",
+            reason: reason
+        });
 
-        if (!ok) {
-            return;
+        if (cancelLogs.length > 100) {
+            cancelLogs = cancelLogs.slice(cancelLogs.length - 100);
         }
 
-        recordChangeLog(record, "2時間前以降の取り消し");
-
-    } else if (!confirm("このコマを削除しますか？")) {
-        return;
+        saveCancelLogs();
     }
 
     reservations = reservations.filter(function (item) {
@@ -833,7 +781,7 @@ function beginEditReservation(record) {
         $("cancelEditBtn").style.display = "inline-block";
     }
 
-    setFormStatus("予約を編集しています。内容を直して「この内容に変更する」を押してください。", false);
+    setFormStatus("予約を編集しています。直したら「この内容に変更する」を押してください。", false);
 
     $("resDate")?.scrollIntoView({ behavior: "smooth", block: "center" });
 }
@@ -857,7 +805,7 @@ function beginTransferReservation(record) {
         "振替先を選んでいます。同じ週（" +
         formatShortDate(getWeekStartKey(record.date)) + "〜" +
         formatShortDate(addDaysToKey(getWeekStartKey(record.date), 6)) +
-        "）の日時を選んでください。",
+        "）の枠を選んでください。",
         false
     );
 
@@ -868,6 +816,53 @@ function beginTransferReservation(record) {
 /* =========================================================
    コマの表示
    ========================================================= */
+
+function buildCancelPanel(record, box) {
+
+    const panel = document.createElement("div");
+    panel.className = "koma-actions";
+
+    const select = document.createElement("select");
+
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = "取り消す理由を選ぶ";
+    select.appendChild(empty);
+
+    CANCEL_REASONS.forEach(function (reason) {
+        const option = document.createElement("option");
+        option.value = reason;
+        option.textContent = reason;
+        select.appendChild(option);
+    });
+
+    const confirmButton = makeButton("取り消しを確定", "primary");
+
+    confirmButton.addEventListener("click", function () {
+
+        if (!select.value) {
+            alert("理由を選んでください。");
+            return;
+        }
+
+        if (!isWithinFreeChange(record) && record.status === "reserved") {
+            recordChangeLog(record, "2時間前以降の取り消し");
+        }
+
+        removeReservation(record, select.value);
+    });
+
+    const backButton = makeButton("やめる", "ghost");
+
+    backButton.addEventListener("click", function () {
+        renderKomaAll();
+    });
+
+    panel.append(select, confirmButton, backButton);
+
+    box.appendChild(panel);
+}
+
 
 function buildKomaCard(record, options) {
 
@@ -893,18 +888,15 @@ function buildKomaCard(record, options) {
     subject.className = "koma-subject";
     subject.textContent = record.subject || "科目未設定";
 
+    const typeTag = document.createElement("span");
+    typeTag.className = "koma-tag";
+    typeTag.textContent = TYPE_LABEL[reservationType(record)];
+
     const status = document.createElement("span");
     status.className = "koma-tag";
     status.textContent = statusLabel(record);
 
-    head.append(time, subject, status);
-
-    if (record.type === "past") {
-        const tag = document.createElement("span");
-        tag.className = "koma-tag";
-        tag.textContent = "過去問 " + (record.pairIndex || 1) + "/2";
-        head.appendChild(tag);
-    }
+    head.append(time, subject, typeTag, status);
 
     if (record.movedFrom) {
         const tag = document.createElement("span");
@@ -945,7 +937,13 @@ function buildKomaCard(record, options) {
             beginEditReservation(record);
         });
 
-        actions.append(startButton, doneButton, editButton);
+        const cancelButton = makeButton("取り消す", "ghost");
+        cancelButton.addEventListener("click", function () {
+            actions.remove();
+            buildCancelPanel(record, box);
+        });
+
+        actions.append(startButton, doneButton, editButton, cancelButton);
     }
 
     if (record.status === "running") {
@@ -955,7 +953,13 @@ function buildKomaCard(record, options) {
             completeReservation(record);
         });
 
-        actions.append(doneButton);
+        const cancelButton = makeButton("取り消す", "ghost");
+        cancelButton.addEventListener("click", function () {
+            actions.remove();
+            buildCancelPanel(record, box);
+        });
+
+        actions.append(doneButton, cancelButton);
     }
 
     if (record.status === "done") {
@@ -965,61 +969,100 @@ function buildKomaCard(record, options) {
             reopenReservation(record);
         });
 
-        actions.append(undoButton);
+        const deleteButton = makeButton("削除", "ghost");
+        deleteButton.addEventListener("click", function () {
+
+            if (confirm("この記録を削除しますか？")) {
+                removeReservation(record, "");
+            }
+        });
+
+        actions.append(undoButton, deleteButton);
     }
 
-    if (record.status === "missed" && settings.showMissedTools) {
+    if (record.status === "missed") {
 
-        const select = document.createElement("select");
+        if (settings.showMissedTools) {
 
-        const empty = document.createElement("option");
-        empty.value = "";
-        empty.textContent = "原因を選ぶ";
-        select.appendChild(empty);
+            const select = document.createElement("select");
 
-        MISSED_CATEGORIES.forEach(function (category) {
-            const option = document.createElement("option");
-            option.value = category;
-            option.textContent = category;
-            select.appendChild(option);
-        });
+            const empty = document.createElement("option");
+            empty.value = "";
+            empty.textContent = "原因を選ぶ";
+            select.appendChild(empty);
 
-        select.value = record.missedCategory || "";
-
-        select.addEventListener("change", function () {
-            record.missedCategory = select.value;
-            saveReservations();
-            renderKomaAll();
-        });
-
-        actions.appendChild(select);
-
-        if (!record.rescheduledTo) {
-
-            const transferButton = makeButton("振替する", "primary");
-            transferButton.addEventListener("click", function () {
-                beginTransferReservation(record);
+            MISSED_CATEGORIES.forEach(function (category) {
+                const option = document.createElement("option");
+                option.value = category;
+                option.textContent = category;
+                select.appendChild(option);
             });
 
-            actions.appendChild(transferButton);
+            select.value = record.missedCategory || "";
 
-        } else {
+            select.addEventListener("change", function () {
+                record.missedCategory = select.value;
+                saveReservations();
+                renderKomaAll();
+            });
 
-            const note = document.createElement("span");
-            note.className = "sub";
-            note.textContent = "振替済み";
-            actions.appendChild(note);
+            actions.appendChild(select);
+
+            if (!record.rescheduledTo) {
+
+                const transferButton = makeButton("振替する", "primary");
+                transferButton.addEventListener("click", function () {
+                    beginTransferReservation(record);
+                });
+
+                actions.appendChild(transferButton);
+
+            } else {
+
+                const note = document.createElement("span");
+                note.className = "sub";
+                note.textContent = "振替済み";
+                actions.appendChild(note);
+            }
         }
+
+        const deleteButton = makeButton("削除", "ghost");
+        deleteButton.addEventListener("click", function () {
+
+            if (confirm("この未実行の記録を削除しますか？")) {
+                removeReservation(record, "");
+            }
+        });
+
+        actions.appendChild(deleteButton);
     }
 
-    const deleteButton = makeButton("削除", "ghost");
-    deleteButton.addEventListener("click", function () {
-        deleteReservation(record);
-    });
-
-    actions.appendChild(deleteButton);
-
     box.appendChild(actions);
+
+    /* 開始困難のときだけ、原因を書ける欄を出す */
+
+    if (record.status === "missed" &&
+        record.missedCategory === "開始困難" &&
+        settings.showMissedTools) {
+
+        const reasonLabel = document.createElement("label");
+        reasonLabel.className = "hard-reason";
+        reasonLabel.textContent = "何が原因で始められなかった？";
+
+        const reasonInput = document.createElement("input");
+        reasonInput.type = "text";
+        reasonInput.placeholder = "例：スマホを触っていた／気分が重かった";
+        reasonInput.value = record.hardReason || "";
+
+        reasonInput.addEventListener("input", function () {
+            record.hardReason = reasonInput.value;
+            saveReservations();
+        });
+
+        reasonLabel.appendChild(reasonInput);
+
+        box.appendChild(reasonLabel);
+    }
 
     return box;
 }
@@ -1033,8 +1076,7 @@ function sortByStart(a, b) {
 function renderReservationLists() {
 
     const today = todayKey();
-    const weekStart = getWeekStartKey(today);
-    const weekEnd = addDaysToKey(weekStart, 6);
+    const weekEnd = addDaysToKey(getWeekStartKey(today), 6);
 
     const groups = [
         {
@@ -1044,9 +1086,7 @@ function renderReservationLists() {
         },
         {
             id: "weekReservationList",
-            filter: function (r) {
-                return r.date > today && r.date <= weekEnd;
-            },
+            filter: function (r) { return r.date > today && r.date <= weekEnd; },
             empty: "今週の残りに予約はありません。"
         },
         {
@@ -1083,6 +1123,43 @@ function renderReservationLists() {
 }
 
 
+function renderHardStartNotice() {
+
+    const container = $("hardStartNotice");
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = "";
+
+    const count = reservations.filter(function (record) {
+        return record.missedCategory === "開始困難";
+    }).length;
+
+    const reached = HARD_START_MILESTONES
+        .filter(function (milestone) { return count >= milestone; })
+        .pop();
+
+    if (!reached) {
+        return;
+    }
+
+    const note = document.createElement("p");
+    note.className = "weekly-notice";
+
+    note.textContent =
+        "開始困難 " + reached + "回到達。" +
+        (reached >= 10
+            ? "枠の置き方そのものを組み直す段階です。週次レビューで作り直しましょう。"
+            : reached >= 5
+                ? "同じ時間帯が続いていないか、週次レビューで確認しましょう。"
+                : "原因の記録を見返して、始めやすい形に変えてみましょう。");
+
+    container.appendChild(note);
+}
+
+
 function renderMissedList() {
 
     const container = $("missedList");
@@ -1094,9 +1171,7 @@ function renderMissedList() {
     container.innerHTML = "";
 
     const list = reservations
-        .filter(function (record) {
-            return record.status === "missed";
-        })
+        .filter(function (record) { return record.status === "missed"; })
         .sort(sortByStart)
         .reverse();
 
@@ -1111,24 +1186,6 @@ function renderMissedList() {
     list.forEach(function (record) {
         container.appendChild(buildKomaCard(record, { showMissedTools: true }));
     });
-
-    /* 開始困難は内部記録のみ。カウントダウンは出さない。 */
-
-    const weekStart = getWeekStartKey(todayKey());
-
-    const hardCount = getWeekReservations(weekStart).filter(function (record) {
-        return record.missedCategory === "開始困難";
-    }).length;
-
-    if (hardCount >= 3) {
-
-        const note = document.createElement("p");
-        note.className = "weekly-notice";
-        note.textContent =
-            "今週は開始困難が続いています。週次レビューで、コマの置き方や時間帯そのものを見直しましょう。";
-
-        container.appendChild(note);
-    }
 }
 
 
@@ -1152,15 +1209,14 @@ function renderNextReservation() {
         .filter(function (record) {
             return (
                 record.status === "reserved" &&
-                reservationStart(record).getTime() +
-                MISSED_AFTER_MINUTES * 60000 >= now
+                reservationStart(record).getTime() + MISSED_AFTER_MINUTES * 60000 >= now
             );
         })
         .sort(sortByStart)[0];
 
     if (!next) {
         box.className = "next-koma is-empty";
-        box.textContent = "次の予約はありません。下のコマ予約から入れられます。";
+        box.textContent = "次の予約はありません。コマ予約か空き枠検索から入れられます。";
         return;
     }
 
@@ -1181,6 +1237,7 @@ function renderNextReservation() {
     day.textContent =
         "　" + formatShortDate(next.date) +
         "　" + reservationTimeText(next) +
+        "　" + TYPE_LABEL[reservationType(next)] +
         (next.status === "running" ? "　実行中" : "");
 
     head.append(time, subject, day);
@@ -1218,11 +1275,128 @@ function renderNextReservation() {
 }
 
 
+/* =========================================================
+   集計
+   ========================================================= */
+
+function getWeekReservations(weekStartKey) {
+
+    const endKey = addDaysToKey(weekStartKey, 6);
+
+    return reservations.filter(function (record) {
+        return record.date >= weekStartKey && record.date <= endKey;
+    });
+}
+
+function sumKoma(list, status) {
+
+    return list
+        .filter(function (record) {
+            return status ? record.status === status : true;
+        })
+        .reduce(function (total, record) {
+            return total + komaValue(record);
+        }, 0);
+}
+
+function getWeekStats(weekStartKey) {
+
+    const list = getWeekReservations(weekStartKey);
+
+    const required = Number(weekRequired[weekStartKey]) || 0;
+    const done = sumKoma(list, "done");
+
+    return {
+        week: weekStartKey,
+        required: required,
+        reserved: sumKoma(list, null),
+        done: done,
+        missed: sumKoma(list, "missed"),
+        moved: list.filter(function (r) { return !!r.rescheduledTo; }).length,
+        shortage: Math.max(0, required - done)
+    };
+}
+
+function getDayStats(dateKey) {
+
+    const list = reservations.filter(function (record) {
+        return record.date === dateKey;
+    });
+
+    return {
+        reserved: sumKoma(list, null),
+        done: sumKoma(list, "done"),
+        missed: sumKoma(list, "missed"),
+        moved: list.filter(function (r) { return !!r.rescheduledTo; }).length
+    };
+}
+
+function getDoneKomaForDate(dateKey) {
+
+    const fromReservations = reservations
+        .filter(function (record) {
+            return record.date === dateKey && record.status === "done";
+        })
+        .reduce(function (total, record) {
+            return total + komaValue(record);
+        }, 0);
+
+    const legacy = loadJSON("patgs27_subject_today_" + dateKey, {});
+
+    let legacyTotal = 0;
+
+    Object.keys(legacy).forEach(function (key) {
+        legacyTotal += Number(legacy[key]) || 0;
+    });
+
+    return fromReservations + legacyTotal;
+}
+
+function closeFinishedWeeks() {
+
+    const currentWeek = getWeekStartKey(todayKey());
+    let changed = false;
+
+    Object.keys(weekRequired).forEach(function (weekStartKey) {
+
+        if (weekStartKey >= currentWeek) {
+            return;
+        }
+
+        const already = debts.some(function (debt) {
+            return debt.week === weekStartKey;
+        });
+
+        if (already) {
+            return;
+        }
+
+        const stats = getWeekStats(weekStartKey);
+
+        if (stats.shortage > 0) {
+
+            debts.push({
+                id: "debt_" + weekStartKey,
+                week: weekStartKey,
+                koma: stats.shortage,
+                createdAt: nowText(),
+                resolved: false
+            });
+
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        saveDebts();
+    }
+}
+
+
 function renderTopStats() {
 
     const today = todayKey();
     const weekStart = getWeekStartKey(today);
-    const weekEnd = addDaysToKey(weekStart, 6);
 
     const day = getDayStats(today);
     const week = getWeekStats(weekStart);
@@ -1243,7 +1417,7 @@ function renderTopStats() {
 
     if ($("weekRangeLabel")) {
         $("weekRangeLabel").textContent =
-            formatShortDate(weekStart) + "〜" + formatShortDate(weekEnd);
+            formatShortDate(weekStart) + "〜" + formatShortDate(addDaysToKey(weekStart, 6));
     }
 }
 
@@ -1272,8 +1446,6 @@ function renderWeekSummary() {
             "残り <strong>" + remaining + "</strong> コマ（約 " +
             (remaining * KOMA_MINUTES / 60).toFixed(1) + " 時間）";
     }
-
-    /* 過去の週 */
 
     const history = $("weekHistoryList");
 
@@ -1342,8 +1514,7 @@ function renderDebts() {
         const text = document.createElement("div");
         text.className = "koma-head";
         text.textContent =
-            formatShortDate(debt.week) + "の週：" +
-            debt.koma + "コマ" +
+            formatShortDate(debt.week) + "の週：" + debt.koma + "コマ" +
             (debt.resolved ? "（返済済み）" : "（未返済）");
 
         row.appendChild(text);
@@ -1386,9 +1557,9 @@ function renderDebts() {
 }
 
 
-function renderChangeLogs() {
+function renderLogList(containerId, list, emptyText, formatter) {
 
-    const container = $("changeLogList");
+    const container = $(containerId);
 
     if (!container) {
         return;
@@ -1396,21 +1567,251 @@ function renderChangeLogs() {
 
     container.innerHTML = "";
 
-    if (changeLogs.length === 0) {
+    if (list.length === 0) {
         const empty = document.createElement("p");
         empty.className = "empty-note";
-        empty.textContent = "記録はありません。";
+        empty.textContent = emptyText;
         container.appendChild(empty);
         return;
     }
 
-    changeLogs.slice().reverse().slice(0, 20).forEach(function (log) {
+    list.slice().reverse().slice(0, 20).forEach(function (item) {
 
         const row = document.createElement("p");
         row.className = "sub";
-        row.textContent = log.dateTime + "｜" + log.target + "｜" + log.action;
+        row.textContent = formatter(item);
 
         container.appendChild(row);
+    });
+}
+
+
+function renderCancelLogs() {
+
+    renderLogList(
+        "cancelLogList",
+        cancelLogs,
+        "取り消しの記録はありません。",
+        function (log) {
+            return log.dateTime + "｜" + log.target + "｜" + log.reason;
+        }
+    );
+}
+
+function renderChangeLogs() {
+
+    renderLogList(
+        "changeLogList",
+        changeLogs,
+        "記録はありません。",
+        function (log) {
+            return log.dateTime + "｜" + log.target + "｜" + log.action;
+        }
+    );
+}
+
+
+/* =========================================================
+   空き枠検索
+   ========================================================= */
+
+function renderSlotSearch() {
+
+    const container = $("searchResult");
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = "";
+
+    const dateKey = $("searchDate")?.value || todayKey();
+    const type = $("searchType")?.value === "exam" ? "exam" : "normal";
+
+    if (dateKey < todayKey()) {
+        const note = document.createElement("p");
+        note.className = "form-status error";
+        note.textContent = "過去の日付は検索できません。";
+        container.appendChild(note);
+        return;
+    }
+
+    const heading = document.createElement("p");
+    heading.className = "sub";
+    heading.textContent =
+        formatShortDate(dateKey) + "／" + dayTypeLabel(dateKey) + "／" +
+        TYPE_LABEL[type] + " の空き枠";
+
+    container.appendChild(heading);
+
+    const isToday = dateKey === todayKey();
+    const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+
+    const free = slotListFor(dateKey, type).filter(function (time) {
+        return (
+            !isSlotBusy(dateKey, time, type, null) &&
+            !(isToday && timeToMinutes(time) < nowMinutes)
+        );
+    });
+
+    if (free.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "empty-note";
+        empty.textContent = "空いている枠はありません。";
+        container.appendChild(empty);
+        return;
+    }
+
+    const grid = document.createElement("div");
+    grid.className = "slot-grid";
+
+    free.forEach(function (time) {
+
+        const button = makeButton(
+            time + "〜" + minutesToTime(timeToMinutes(time) + TYPE_DURATION[type])
+        );
+
+        button.addEventListener("click", function () {
+
+            if ($("resDate")) { $("resDate").value = dateKey; }
+            if ($("resType")) { $("resType").value = type; }
+
+            syncDayTypeControls();
+            renderTimeOptions();
+
+            if ($("resTime")) { $("resTime").value = time; }
+
+            setFormStatus(
+                formatShortDate(dateKey) + " " + time + " を選びました。科目と内容を入れて予約してください。",
+                false
+            );
+
+            $("resDate")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+
+        grid.appendChild(button);
+    });
+
+    container.appendChild(grid);
+}
+
+
+/* =========================================================
+   未実行の自動判定
+   ========================================================= */
+
+function processMissedReservations() {
+
+    const now = Date.now();
+    let changed = false;
+
+    reservations.forEach(function (record) {
+
+        if (record.status !== "reserved") {
+            return;
+        }
+
+        const limit =
+            reservationStart(record).getTime() + MISSED_AFTER_MINUTES * 60000;
+
+        if (now >= limit) {
+
+            record.status = "missed";
+            record.missedCategory = record.missedCategory || "";
+            record.missedAt = nowText();
+
+            changed = true;
+
+            sendPatgsNotification(
+                "⏳ 未実行になりました",
+                formatShortDate(record.date) + " " + reservationTimeText(record) + "　" +
+                (record.subject || "") + "　" +
+                (record.content || "内容未設定") +
+                (record.range ? "　" + record.range : "") +
+                "　原因を記録して振り替えましょう。"
+            );
+        }
+    });
+
+    if (changed) {
+        saveReservations();
+    }
+
+    return changed;
+}
+
+
+/* =========================================================
+   教科別 完了コマのグラフ
+   ========================================================= */
+
+function renderSubjectKomaChart() {
+
+    const canvas = $("subjectKomaChart");
+
+    if (!canvas) {
+        return;
+    }
+
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width;
+    const height = canvas.height;
+
+    ctx.clearRect(0, 0, width, height);
+
+    const weekStart = getWeekStartKey(todayKey());
+
+    const counts = {};
+
+    KOMA_SUBJECTS.forEach(function (subject) {
+        counts[subject] = 0;
+    });
+
+    getWeekReservations(weekStart).forEach(function (record) {
+
+        if (record.status !== "done") {
+            return;
+        }
+
+        const subject = KOMA_SUBJECTS.includes(record.subject) ? record.subject : "その他";
+
+        counts[subject] += komaValue(record);
+    });
+
+    const values = KOMA_SUBJECTS.map(function (subject) {
+        return counts[subject];
+    });
+
+    const maxValue = Math.max(1, ...values);
+    const padding = 34;
+    const areaWidth = width - padding * 2;
+    const gap = areaWidth / KOMA_SUBJECTS.length;
+    const barWidth = gap * 0.55;
+
+    ctx.strokeStyle = "#ccc";
+    ctx.beginPath();
+    ctx.moveTo(padding, padding / 2);
+    ctx.lineTo(padding, height - padding);
+    ctx.lineTo(width - padding, height - padding);
+    ctx.stroke();
+
+    KOMA_SUBJECTS.forEach(function (subject, index) {
+
+        const value = values[index];
+        const barHeight = (value / maxValue) * (height - padding * 1.6);
+        const x = padding + gap * index + (gap - barWidth) / 2;
+        const y = height - padding - barHeight;
+
+        ctx.fillStyle = SUBJECT_COLORS[subject] || "#546e7a";
+        ctx.fillRect(x, y, barWidth, barHeight);
+
+        ctx.fillStyle = "#333";
+        ctx.font = "11px sans-serif";
+        ctx.fillText(subject, x, height - padding + 14);
+
+        if (value > 0) {
+            ctx.fillText(String(value), x + barWidth / 2 - 4, y - 4);
+        }
     });
 }
 
@@ -1482,7 +1883,6 @@ function renderLsRecords() {
     });
 }
 
-
 function addLsRecord() {
 
     const date = $("lsDate")?.value || todayKey();
@@ -1514,83 +1914,6 @@ function addLsRecord() {
 
 
 /* =========================================================
-   今週の完了コマ（教科別）グラフ
-   ========================================================= */
-
-function renderSubjectKomaChart() {
-
-    const canvas = $("subjectKomaChart");
-
-    if (!canvas) {
-        return;
-    }
-
-    const ctx = canvas.getContext("2d");
-    const width = canvas.width;
-    const height = canvas.height;
-
-    ctx.clearRect(0, 0, width, height);
-
-    const weekStart = getWeekStartKey(todayKey());
-
-    const counts = {};
-
-    KOMA_SUBJECTS.forEach(function (subject) {
-        counts[subject] = 0;
-    });
-
-    getWeekReservations(weekStart).forEach(function (record) {
-
-        if (record.status !== "done") {
-            return;
-        }
-
-        const subject = KOMA_SUBJECTS.includes(record.subject)
-            ? record.subject
-            : "その他";
-
-        counts[subject] += 1;
-    });
-
-    const values = KOMA_SUBJECTS.map(function (subject) {
-        return counts[subject];
-    });
-
-    const maxValue = Math.max(1, ...values);
-    const padding = 34;
-    const areaWidth = width - padding * 2;
-    const gap = areaWidth / KOMA_SUBJECTS.length;
-    const barWidth = gap * 0.55;
-
-    ctx.strokeStyle = "#ccc";
-    ctx.beginPath();
-    ctx.moveTo(padding, padding / 2);
-    ctx.lineTo(padding, height - padding);
-    ctx.lineTo(width - padding, height - padding);
-    ctx.stroke();
-
-    KOMA_SUBJECTS.forEach(function (subject, index) {
-
-        const value = values[index];
-        const barHeight = (value / maxValue) * (height - padding * 1.6);
-        const x = padding + gap * index + (gap - barWidth) / 2;
-        const y = height - padding - barHeight;
-
-        ctx.fillStyle = SUBJECT_COLORS[subject] || "#546e7a";
-        ctx.fillRect(x, y, barWidth, barHeight);
-
-        ctx.fillStyle = "#333";
-        ctx.font = "11px sans-serif";
-        ctx.fillText(subject, x, height - padding + 14);
-
-        if (value > 0) {
-            ctx.fillText(String(value), x + barWidth / 2 - 4, y - 4);
-        }
-    });
-}
-
-
-/* =========================================================
    コマ関連のまとめ描画
    ========================================================= */
 
@@ -1601,12 +1924,15 @@ function renderKomaAll() {
     renderNextReservation();
     renderTopStats();
     renderReservationLists();
+    renderHardStartNotice();
     renderMissedList();
     renderDebts();
+    renderCancelLogs();
     renderChangeLogs();
     renderWeekSummary();
     renderSubjectKomaChart();
     renderWeeklyKomaReport();
+    renderTimeOptions();
 }
 
 
@@ -1616,39 +1942,55 @@ function renderKomaAll() {
 
 function setupReservationForm() {
 
-    buildTimeOptions($("resTime"));
-
     if ($("resDate")) {
         $("resDate").value = todayKey();
         $("resDate").min = todayKey();
         $("resDate").max = getDateKeyOffset(RESERVATION_LIMIT_DAYS);
     }
 
-    if ($("resTime")) {
-        const now = new Date();
-        const minute = now.getMinutes() < 30 ? 30 : 0;
-        const hour = now.getMinutes() < 30 ? now.getHours() : now.getHours() + 1;
-        const candidate = pad2(Math.min(hour, 23)) + ":" + pad2(minute);
-
-        $("resTime").value = candidate;
-
-        if (!$("resTime").value) {
-            $("resTime").value = "19:00";
-        }
+    if ($("searchDate")) {
+        $("searchDate").value = todayKey();
+        $("searchDate").min = todayKey();
+        $("searchDate").max = getDateKeyOffset(RESERVATION_LIMIT_DAYS);
     }
 
     if ($("lsDate")) {
         $("lsDate").value = todayKey();
     }
 
-    $("addReservationBtn")?.addEventListener("click", submitReservationForm);
+    syncDayTypeControls();
+    renderTimeOptions();
 
-    $("addPastPairBtn")?.addEventListener("click", addPastExamPair);
+    $("resDate")?.addEventListener("change", function () {
+        syncDayTypeControls();
+        renderTimeOptions();
+    });
+
+    $("resType")?.addEventListener("change", renderTimeOptions);
+
+    $("resDayType")?.addEventListener("change", function () {
+        setDayTypeOverride(currentFormDate(), $("resDayType").value);
+        syncDayTypeControls();
+        renderTimeOptions();
+    });
+
+    $("resHolidayCheck")?.addEventListener("change", function () {
+        setDayTypeOverride(
+            currentFormDate(),
+            $("resHolidayCheck").checked ? "holiday" : "weekday"
+        );
+        syncDayTypeControls();
+        renderTimeOptions();
+    });
+
+    $("addReservationBtn")?.addEventListener("click", submitReservationForm);
 
     $("cancelEditBtn")?.addEventListener("click", function () {
         resetReservationFormMode();
         setFormStatus("", false);
     });
+
+    $("searchSlotBtn")?.addEventListener("click", renderSlotSearch);
 
     $("addLsBtn")?.addEventListener("click", addLsRecord);
 
@@ -1672,36 +2014,19 @@ function setupReservationForm() {
 
 
 /* =========================================================
-   週次レビュー日
+   週次レビュー
    ========================================================= */
-
-const WEEKLY_REVIEW_DATES = [
-    "2026-08-15",
-    "2026-08-22",
-    "2026-08-29"
-];
 
 function updateWeeklyNotice() {
 
-    const key = todayKey();
     const isSaturday = new Date().getDay() === 6;
 
-    const message =
-        (WEEKLY_REVIEW_DATES.includes(key) || isSaturday)
-            ? "🔔 本日は週次レビュー日です。"
-            : "";
-
-    if ($("weeklyReviewNotice")) {
-        $("weeklyReviewNotice").textContent = message;
-    }
+    const message = isSaturday ? "🔔 本日は週次レビュー日です。" : "";
 
     if ($("weeklyReviewNoticeLarge")) {
         $("weeklyReviewNoticeLarge").textContent = message;
     }
 }
-
-
-/* 週次レビューにコマ制度の決算を出す */
 
 function renderWeeklyKomaReport() {
 
@@ -1712,13 +2037,11 @@ function renderWeeklyKomaReport() {
     }
 
     const weekStart = getWeekStartKey(todayKey());
+    const weekEnd = addDaysToKey(weekStart, 6);
     const stats = getWeekStats(weekStart);
 
     const lsCount = lsRecords.filter(function (record) {
-        return (
-            record.date >= weekStart &&
-            record.date <= addDaysToKey(weekStart, 6)
-        );
+        return record.date >= weekStart && record.date <= weekEnd;
     }).length;
 
     const openDebt = debts
@@ -1741,17 +2064,279 @@ function renderWeeklyKomaReport() {
         return category + " " + categoryCounts[category];
     }).join("／");
 
+    const cancelCount = cancelLogs.filter(function (log) {
+        return true;
+    }).length;
+
     box.innerHTML =
         "今週のコマ決算（" + formatShortDate(weekStart) + "〜" +
-        formatShortDate(addDaysToKey(weekStart, 6)) + "）<br>" +
+        formatShortDate(weekEnd) + "）<br>" +
         "必要 <strong>" + stats.required + "</strong>／" +
         "完了 <strong>" + stats.done + "</strong>／" +
         "未実行 <strong>" + stats.missed + "</strong>／" +
         "振替 <strong>" + stats.moved + "</strong>／" +
         "債務 <strong>" + openDebt + "</strong>／" +
         "LS <strong>" + lsCount + "</strong><br>" +
-        "未実行の内訳：" + categoryText;
+        "未実行の内訳：" + categoryText + "<br>" +
+        "取り消しの記録：" + cancelCount + "件（理由は「取り消し・変更の記録」で確認）";
 }
+
+
+/* =========================================================
+   通知
+   ========================================================= */
+
+const HOURLY_START_HOUR = 6;
+const HOURLY_END_HOUR = 23;
+const WEEKLY_REVIEW_REMINDER_DAY = 6; /* 0=日 … 6=土 */
+const WEEKLY_REVIEW_REMINDER_HOUR = 8;
+const PRE_NOTICE_MINUTES = 5;
+
+let patgsServiceWorkerReady = null;
+
+if ("serviceWorker" in navigator) {
+
+    const patgsHadController = !!navigator.serviceWorker.controller;
+
+    patgsServiceWorkerReady = navigator.serviceWorker
+        .register("/sw.js?v=" + PATGS_VERSION)
+        .then(function (registration) {
+            return registration;
+        })
+        .catch(function (error) {
+            console.error("Service Workerの登録に失敗しました:", error);
+            return null;
+        });
+
+    if (patgsHadController) {
+
+        let patgsSwRefreshing = false;
+
+        navigator.serviceWorker.addEventListener("controllerchange", function () {
+
+            if (patgsSwRefreshing) {
+                return;
+            }
+
+            patgsSwRefreshing = true;
+            window.location.reload();
+        });
+    }
+}
+
+function getNotificationStatus() {
+
+    if (!("Notification" in window)) {
+        return "notsupported";
+    }
+
+    return Notification.permission;
+}
+
+function updateNotificationStatus() {
+
+    if (!$("notificationStatus")) {
+        return;
+    }
+
+    const status = getNotificationStatus();
+
+    if (status === "granted") {
+        $("notificationStatus").textContent =
+            "✓ 通知は有効です。このページを開いている間、予約と毎時00分に届きます。";
+    } else if (status === "denied") {
+        $("notificationStatus").textContent =
+            "✗ 通知がブロックされています。ブラウザのサイト設定から許可してください。";
+    } else if (status === "notsupported") {
+        $("notificationStatus").textContent =
+            "このブラウザは通知に対応していません。";
+    } else {
+        $("notificationStatus").textContent =
+            "通知はまだ許可されていません。上のボタンから許可してください。";
+    }
+}
+
+function sendPatgsNotification(title, body) {
+
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+        return;
+    }
+
+    if (patgsServiceWorkerReady) {
+
+        patgsServiceWorkerReady
+            .then(function (registration) {
+
+                if (registration && registration.showNotification) {
+                    registration.showNotification(title, { body: body });
+                } else {
+                    new Notification(title, { body: body });
+                }
+            })
+            .catch(function (error) {
+                console.error("通知の送信に失敗しました:", error);
+            });
+
+        return;
+    }
+
+    try {
+        new Notification(title, { body: body });
+    } catch (error) {
+        console.error("通知の送信に失敗しました:", error);
+    }
+}
+
+function reservationBody(record) {
+
+    return [
+        formatShortDate(record.date) + " " + reservationTimeText(record),
+        TYPE_LABEL[reservationType(record)],
+        record.subject || "科目未設定",
+        record.material,
+        record.content,
+        record.range,
+        record.goal ? "目標：" + record.goal : ""
+    ].filter(Boolean).join("　");
+}
+
+
+/* 予約の5分前・開始時刻 */
+
+function checkReservationNotifications() {
+
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+        return;
+    }
+
+    const now = Date.now();
+    let changed = false;
+
+    reservations.forEach(function (record) {
+
+        if (record.status !== "reserved") {
+            return;
+        }
+
+        const start = reservationStart(record).getTime();
+
+        record.notified = record.notified || {};
+
+        if (!record.notified.pre &&
+            now >= start - PRE_NOTICE_MINUTES * 60000 &&
+            now < start) {
+
+            sendPatgsNotification("⏰ 5分後にコマが始まります", reservationBody(record));
+
+            record.notified.pre = true;
+            changed = true;
+        }
+
+        if (!record.notified.start && now >= start && now < start + 5 * 60000) {
+
+            sendPatgsNotification("▶ コマの開始時刻です", reservationBody(record));
+
+            record.notified.start = true;
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        saveReservations();
+    }
+}
+
+
+/* 毎時00分（6:00〜23:00）の学習確認、土曜8:00の週次レビュー */
+
+function checkHourlyNotifications() {
+
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+        return;
+    }
+
+    const now = new Date();
+
+    if (now.getMinutes() > 4) {
+        return;
+    }
+
+    const hour = now.getHours();
+    const fireKey = todayKey() + "-" + hour;
+
+    if (localStorage.getItem("patgs27_last_hourly") === fireKey) {
+        return;
+    }
+
+    if (now.getDay() === WEEKLY_REVIEW_REMINDER_DAY &&
+        hour === WEEKLY_REVIEW_REMINDER_HOUR) {
+
+        sendPatgsNotification(
+            "📅 週次レビューの時間です",
+            "今週の必要・完了・未実行・振替・債務を確認しましょう。"
+        );
+
+        localStorage.setItem("patgs27_last_hourly", fireKey);
+        return;
+    }
+
+    if (hour < HOURLY_START_HOUR || hour > HOURLY_END_HOUR) {
+        return;
+    }
+
+    const day = getDayStats(todayKey());
+
+    const next = reservations
+        .filter(function (record) {
+            return (
+                record.status === "reserved" &&
+                reservationStart(record).getTime() >= Date.now()
+            );
+        })
+        .sort(sortByStart)[0];
+
+    sendPatgsNotification(
+        "📚 学習していますか？",
+        "今日：完了 " + day.done + " ／ 予約 " + day.reserved +
+        " ／ 未実行 " + day.missed + "　" +
+        (next
+            ? "次の予約 " + next.time + " " + (next.subject || "")
+            : "次の予約はありません。空き枠検索から入れられます。")
+    );
+
+    localStorage.setItem("patgs27_last_hourly", fireKey);
+}
+
+
+function tick() {
+
+    const changed = processMissedReservations();
+
+    checkReservationNotifications();
+    checkHourlyNotifications();
+
+    renderNextReservation();
+    renderTopStats();
+
+    if (changed) {
+        renderKomaAll();
+    }
+}
+
+setInterval(tick, 30 * 1000);
+
+
+$("enableNotificationBtn")?.addEventListener("click", function () {
+
+    if (!("Notification" in window)) {
+        alert("このブラウザは通知に対応していません。");
+        return;
+    }
+
+    Notification.requestPermission().then(function () {
+        updateNotificationStatus();
+    });
+});
 
 
 /* =========================================================
@@ -1985,9 +2570,7 @@ function renderTemptations() {
 
     if ($("temptationStatus")) {
         $("temptationStatus").textContent =
-            temptations.length > 0
-                ? "累計 " + temptations.length + " 件"
-                : "未報告";
+            temptations.length > 0 ? "累計 " + temptations.length + " 件" : "未報告";
     }
 }
 
@@ -2398,7 +2981,7 @@ $("addViolationBtn")?.addEventListener("click", function () {
 
 
 /* =========================================================
-   週次レビュー
+   週次レビュー本文
    ========================================================= */
 
 let weeklyReviews = loadJSON("patgs27_weekly_reviews", []);
@@ -3076,9 +3659,7 @@ function renderPublicDeviationTrend() {
     const maxValue = Math.max(70, ...values);
     const minValue = Math.min(30, ...values);
 
-    const stepX = sorted.length > 1
-        ? (width - padding * 2) / (sorted.length - 1)
-        : 0;
+    const stepX = sorted.length > 1 ? (width - padding * 2) / (sorted.length - 1) : 0;
 
     function toX(i) {
         return padding + stepX * i;
@@ -3213,9 +3794,7 @@ function renderPastChart(type) {
     const maxValue = Math.max(100, ...allValues);
     const minValue = Math.min(0, ...allValues);
 
-    const stepX = points.length > 1
-        ? (width - padding * 2) / (points.length - 1)
-        : 0;
+    const stepX = points.length > 1 ? (width - padding * 2) / (points.length - 1) : 0;
 
     function toX(i) {
         return padding + stepX * i;
@@ -3487,8 +4066,7 @@ function updatePatgsProxyResult() {
     }
 
     $("patgsProxyResult").textContent =
-        "今週のPATGS代理：" + proxy +
-        "／自己判断の裁定者：" + getPatgsArbiter(proxy);
+        "今週のPATGS代理：" + proxy + "／自己判断の裁定者：" + getPatgsArbiter(proxy);
 }
 
 function loadPatgsProxy() {
@@ -3558,223 +4136,7 @@ function renderSubjectPlan() {
 
 
 /* =========================================================
-   通知（予約連動）
-   ========================================================= */
-
-const WEEKLY_REVIEW_REMINDER_DAY = 6; /* 0=日 … 6=土 */
-const WEEKLY_REVIEW_REMINDER_HOUR = 8;
-
-let patgsServiceWorkerReady = null;
-
-if ("serviceWorker" in navigator) {
-
-    const patgsHadController = !!navigator.serviceWorker.controller;
-
-    patgsServiceWorkerReady = navigator.serviceWorker
-        .register("/sw.js?v=" + PATGS_VERSION)
-        .then(function (registration) {
-            return registration;
-        })
-        .catch(function (error) {
-            console.error("Service Workerの登録に失敗しました:", error);
-            return null;
-        });
-
-    if (patgsHadController) {
-
-        let patgsSwRefreshing = false;
-
-        navigator.serviceWorker.addEventListener("controllerchange", function () {
-
-            if (patgsSwRefreshing) {
-                return;
-            }
-
-            patgsSwRefreshing = true;
-            window.location.reload();
-        });
-    }
-}
-
-function getNotificationStatus() {
-
-    if (!("Notification" in window)) {
-        return "notsupported";
-    }
-
-    return Notification.permission;
-}
-
-function updateNotificationStatus() {
-
-    if (!$("notificationStatus")) {
-        return;
-    }
-
-    const status = getNotificationStatus();
-
-    if (status === "granted") {
-        $("notificationStatus").textContent =
-            "✓ 通知は有効です。このページを開いている間、予約に合わせて届きます。";
-    } else if (status === "denied") {
-        $("notificationStatus").textContent =
-            "✗ 通知がブロックされています。ブラウザのサイト設定から許可してください。";
-    } else if (status === "notsupported") {
-        $("notificationStatus").textContent =
-            "このブラウザは通知に対応していません。";
-    } else {
-        $("notificationStatus").textContent =
-            "通知はまだ許可されていません。上のボタンから許可してください。";
-    }
-}
-
-$("enableNotificationBtn")?.addEventListener("click", function () {
-
-    if (!("Notification" in window)) {
-        alert("このブラウザは通知に対応していません。");
-        return;
-    }
-
-    Notification.requestPermission().then(function () {
-        updateNotificationStatus();
-    });
-});
-
-function sendPatgsNotification(title, body) {
-
-    if (!("Notification" in window) || Notification.permission !== "granted") {
-        return;
-    }
-
-    if (patgsServiceWorkerReady) {
-
-        patgsServiceWorkerReady
-            .then(function (registration) {
-
-                if (registration && registration.showNotification) {
-                    registration.showNotification(title, { body: body });
-                } else {
-                    new Notification(title, { body: body });
-                }
-            })
-            .catch(function (error) {
-                console.error("通知の送信に失敗しました:", error);
-            });
-
-        return;
-    }
-
-    try {
-        new Notification(title, { body: body });
-    } catch (error) {
-        console.error("通知の送信に失敗しました:", error);
-    }
-}
-
-
-/* 予約の15分前・開始時刻に通知する */
-
-function checkReservationNotifications() {
-
-    if (!("Notification" in window) || Notification.permission !== "granted") {
-        return;
-    }
-
-    const now = Date.now();
-    let changed = false;
-
-    reservations.forEach(function (record) {
-
-        if (record.status !== "reserved") {
-            return;
-        }
-
-        const start = reservationStart(record).getTime();
-
-        record.notified = record.notified || {};
-
-        if (!record.notified.pre && now >= start - 15 * 60000 && now < start) {
-
-            sendPatgsNotification(
-                "⏰ まもなくコマの時間です",
-                reservationTimeText(record) + " " + (record.subject || "") +
-                "　" + (record.content || "") + "　" + (record.range || "")
-            );
-
-            record.notified.pre = true;
-            changed = true;
-        }
-
-        if (!record.notified.start && now >= start && now < start + 5 * 60000) {
-
-            sendPatgsNotification(
-                "▶ コマの開始時刻です",
-                reservationTimeText(record) + " " + (record.subject || "") +
-                "　" + (record.goal ? "目標：" + record.goal : "開始を押してはじめましょう。")
-            );
-
-            record.notified.start = true;
-            changed = true;
-        }
-    });
-
-    if (changed) {
-        saveReservations();
-    }
-}
-
-
-function checkWeeklyReviewNotification() {
-
-    if (!("Notification" in window) || Notification.permission !== "granted") {
-        return;
-    }
-
-    const now = new Date();
-
-    if (now.getDay() !== WEEKLY_REVIEW_REMINDER_DAY) {
-        return;
-    }
-
-    if (now.getHours() !== WEEKLY_REVIEW_REMINDER_HOUR || now.getMinutes() > 4) {
-        return;
-    }
-
-    const fireKey = todayKey() + "-weekly";
-
-    if (localStorage.getItem("patgs27_last_notification") === fireKey) {
-        return;
-    }
-
-    sendPatgsNotification(
-        "📅 週次レビューの時間です",
-        "今週の必要・完了・未実行・振替・債務を確認しましょう。"
-    );
-
-    localStorage.setItem("patgs27_last_notification", fireKey);
-}
-
-
-function tick() {
-
-    const changed = processMissedReservations();
-
-    checkReservationNotifications();
-    checkWeeklyReviewNotification();
-
-    renderNextReservation();
-    renderTopStats();
-
-    if (changed) {
-        renderKomaAll();
-    }
-}
-
-setInterval(tick, 30 * 1000);
-
-
-/* =========================================================
-   継続日数・学習カレンダー（縮小表示）
+   学習カレンダー・継続日数
    ========================================================= */
 
 function recordOpenedDate(dateKey) {
@@ -3828,8 +4190,7 @@ function renderStudyHeatmap() {
         const cell = document.createElement("div");
 
         cell.title =
-            dateKey + "：" + total + "コマ" +
-            (opened ? "（開いた）" : "（未訪問）");
+            dateKey + "：" + total + "コマ" + (opened ? "（開いた）" : "（未訪問）");
 
         cell.style.width = "16px";
         cell.style.height = "16px";
@@ -3907,7 +4268,7 @@ function renderRandomMessage() {
 
 
 /* =========================================================
-   今日のサマリー（目標・予定達成率）
+   今日のサマリー
    ========================================================= */
 
 function renderTodaySummary() {
@@ -3933,7 +4294,7 @@ function renderTodaySummary() {
 
 
 /* =========================================================
-   重要予定（日付管理）
+   重要予定
    ========================================================= */
 
 const DEFAULT_PATGS_SCHEDULE = [
