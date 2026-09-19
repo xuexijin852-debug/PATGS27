@@ -277,6 +277,17 @@ hr {
     grid-column: 1 / -1;
 }
 
+.form-grid label.check-label {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    color: var(--ink);
+}
+
+.form-grid label.check-label input {
+    width: auto;
+}
+
 .inline-label {
     display: inline-flex;
     align-items: center;
@@ -374,6 +385,23 @@ button.small {
 
 
 /* =========================================================
+   空き枠検索
+   ========================================================= */
+
+.slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.slot-grid button {
+    width: 100%;
+    font-variant-numeric: tabular-nums;
+}
+
+
+/* =========================================================
    コマ一覧
    ========================================================= */
 
@@ -445,6 +473,17 @@ button.small {
 .koma-actions select {
     width: auto;
     min-width: 170px;
+}
+
+.hard-reason {
+    display: block;
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-top: 8px;
+}
+
+.hard-reason input {
+    margin-top: 4px;
 }
 
 .empty-note {
@@ -568,10 +607,6 @@ canvas {
 
 @media (max-width: 600px) {
 
-    body {
-        font-size: 15px;
-    }
-
     .patgs-header {
         flex-direction: column;
         align-items: stretch;
@@ -591,5 +626,9 @@ canvas {
 
     .koma-actions button {
         flex: 1 1 auto;
+    }
+
+    .slot-grid {
+        grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
     }
 }
