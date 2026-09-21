@@ -151,6 +151,88 @@
 
 
         <!-- =================================================
+             PATGS27内蔵カレンダー
+        ================================================== -->
+
+        <section class="panel" id="calendarPanel">
+
+            <h2>🗓 カレンダー</h2>
+
+            <p class="sub">
+                「予定」（学校行事・テスト・提出物・私用・重要予定）と「コマ」（学習の実行）は分けて表示します。
+                色つきの札が予定、下の白いカードがコマです。日付をタップすると、その日の内容が下に出ます。
+            </p>
+
+            <div class="cal-toolbar">
+
+                <div class="cal-nav">
+                    <button id="calPrevBtn" class="ghost small">←</button>
+                    <button id="calTodayBtn" class="ghost small">今日</button>
+                    <button id="calNextBtn" class="ghost small">→</button>
+                    <span id="calRangeLabel" class="cal-range-label">-</span>
+                </div>
+
+                <div class="cal-view-toggle">
+                    <button id="calViewMonthBtn" class="small">月</button>
+                    <button id="calViewWeekBtn" class="small">週</button>
+                    <button id="calViewDayBtn" class="small">日</button>
+                </div>
+
+            </div>
+
+            <div id="calGrid"></div>
+
+            <h3>選んだ日の予定・コマ</h3>
+
+            <div id="calDayDetail"></div>
+
+            <h3>予定を追加</h3>
+
+            <div class="form-grid">
+
+                <label>日付
+                    <input type="date" id="calAddDate">
+                </label>
+
+                <label>種類
+                    <select id="calAddKind">
+                        <option value="school">学校行事</option>
+                        <option value="exam">テスト・提出物</option>
+                        <option value="personal">私用</option>
+                        <option value="important">重要予定</option>
+                    </select>
+                </label>
+
+                <label id="calAddExamTypeWrap">テストの種類
+                    <select id="calAddExamType">
+                        <option value="提出物">提出物</option>
+                        <option value="テスト">テスト</option>
+                        <option value="模試">模試</option>
+                    </select>
+                </label>
+
+                <label id="calAddIconWrap">アイコン
+                    <input type="text" id="calAddIcon" placeholder="📅">
+                </label>
+
+                <label>時刻（任意）
+                    <input type="time" id="calAddTime">
+                </label>
+
+                <label class="wide">内容
+                    <input type="text" id="calAddTitle" placeholder="例：文化祭／提出物の名前など">
+                </label>
+
+            </div>
+
+            <div class="btn-row">
+                <button id="calAddBtn" class="primary">この内容で追加</button>
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
              コマ予約
         ================================================== -->
 
