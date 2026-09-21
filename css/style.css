@@ -826,3 +826,229 @@ canvas {
         font-size: 24px;
     }
 }
+
+/* =========================================================
+   第六次追加：カレンダー／タイマー／学習結果
+   ========================================================= */
+
+.cal-toolbar {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 12px 0;
+}
+
+.cal-nav,
+.cal-view-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.cal-range-label {
+    font-weight: 800;
+    color: var(--indigo-deep);
+    margin-left: 6px;
+}
+
+.cal-grid {
+    display: grid;
+    gap: 4px;
+    margin-top: 10px;
+}
+
+.cal-month-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.cal-week-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.cal-day-grid {
+    grid-template-columns: 1fr;
+}
+
+.cal-weekday {
+    text-align: center;
+    font-weight: 800;
+    padding: 5px;
+    color: var(--ink-soft);
+}
+
+.cal-day-cell {
+    min-height: 112px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    padding: 6px;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.cal-week-grid .cal-day-cell {
+    min-height: 260px;
+}
+
+.cal-day-grid .cal-day-cell {
+    min-height: 360px;
+}
+
+.cal-day-cell:hover {
+    box-shadow: var(--shadow-sm);
+}
+
+.cal-day-cell.is-today {
+    border: 2px solid var(--violet);
+    background: #fbf9ff;
+}
+
+.cal-day-cell.is-other-month {
+    opacity: 0.48;
+}
+
+.cal-day-head {
+    font-weight: 800;
+    margin-bottom: 4px;
+}
+
+.cal-events,
+.cal-koma-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.cal-event-chip {
+    width: 100%;
+    border-radius: 6px;
+    padding: 3px 5px;
+    border: 0;
+    text-align: left;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.cal-event-school { background: #e9f2ff; color: #24558d; }
+.cal-event-exam { background: #fff1dc; color: #8a5410; }
+.cal-event-personal { background: #eaf8ed; color: #267044; }
+.cal-event-important { background: #f2e9ff; color: #6436a4; }
+
+.cal-koma-chip {
+    font-size: 11px;
+    padding: 3px 5px;
+    border-radius: 6px;
+    background: #f5f5f5;
+    border-left: 3px solid var(--indigo);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.cal-koma-chip.done { border-left-color: var(--green); background: var(--green-soft); }
+.cal-koma-chip.missed { border-left-color: var(--red); background: var(--red-soft); }
+.cal-koma-chip.running { border-left-color: var(--coral); background: #fff2ee; }
+
+.cal-more {
+    font-size: 11px;
+    color: var(--ink-soft);
+}
+
+.cal-detail-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--line);
+}
+
+.cal-detail-row > span {
+    flex: 1 1 auto;
+}
+
+.cal-detail-koma {
+    color: var(--indigo-deep);
+    font-weight: 700;
+}
+
+.study-timer-box {
+    border-radius: var(--radius);
+    background: linear-gradient(120deg, #f5f2ff 0%, #fff5f2 100%);
+    padding: 16px;
+    border: 1px solid #efe6ff;
+}
+
+.timer-main {
+    text-align: center;
+    font-size: 48px;
+    line-height: 1.1;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    color: var(--indigo-deep);
+    letter-spacing: 0.04em;
+}
+
+.timer-status {
+    text-align: center;
+    color: var(--ink-soft);
+    margin: 7px 0 12px;
+    font-size: 13px;
+}
+
+.study-result-summary {
+    margin-top: 8px;
+    padding: 9px 11px;
+    border-radius: 8px;
+    background: #f7f5ff;
+    border: 1px solid #ece6ff;
+    font-size: 13px;
+}
+
+.study-result-summary p {
+    margin: 3px 0;
+}
+
+.study-mode-tag {
+    font-weight: 800;
+    color: var(--violet);
+}
+
+.unresolved-item {
+    padding: 8px 10px;
+    margin: 5px 0;
+    border-left: 4px solid var(--coral);
+    border-radius: 7px;
+    background: #fff7f4;
+    font-size: 13px;
+}
+
+@media (max-width: 600px) {
+    .cal-month-grid {
+        gap: 2px;
+    }
+
+    .cal-day-cell {
+        min-height: 88px;
+        padding: 4px;
+    }
+
+    .cal-week-grid .cal-day-cell {
+        min-height: 220px;
+    }
+
+    .cal-event-chip,
+    .cal-koma-chip {
+        font-size: 10px;
+        padding: 2px 3px;
+    }
+
+    .timer-main {
+        font-size: 40px;
+    }
+}
