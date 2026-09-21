@@ -20,7 +20,7 @@
    ========================================================= */
 
 
-const PATGS_VERSION = "20260919b";
+const PATGS_VERSION = "20260919c";
 
 
 /* =========================================================
@@ -71,11 +71,10 @@ function addDaysToKey(dateKey, days) {
     return dateKeyOf(d);
 }
 
-/* 週は月曜はじまり */
+/* 週は日曜はじまり・土曜おわり */
 function getWeekStartKey(dateKey) {
     const d = new Date(dateKey + "T00:00:00");
-    const offset = (d.getDay() + 6) % 7;
-    d.setDate(d.getDate() - offset);
+    d.setDate(d.getDate() - d.getDay());
     return dateKeyOf(d);
 }
 
