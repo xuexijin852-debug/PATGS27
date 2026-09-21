@@ -20,7 +20,7 @@
    ========================================================= */
 
 
-const PATGS_VERSION = "20260919c";
+const PATGS_VERSION = "20260921a";
 
 
 /* =========================================================
@@ -713,6 +713,21 @@ function startReservation(record) {
     renderKomaAll();
 }
 
+function celebrateCompletion() {
+
+    const box = $("nextReservationBox");
+
+    if (!box) {
+        return;
+    }
+
+    box.classList.add("celebrate");
+
+    setTimeout(function () {
+        box.classList.remove("celebrate");
+    }, 700);
+}
+
 function completeReservation(record) {
 
     record.status = "done";
@@ -721,6 +736,7 @@ function completeReservation(record) {
     saveReservations();
     renderKomaAll();
     renderStudyHeatmap();
+    celebrateCompletion();
 }
 
 function reopenReservation(record) {
@@ -878,6 +894,10 @@ function buildKomaCard(record, options) {
 
     const head = document.createElement("div");
     head.className = "koma-head";
+
+    if (record.status === "reserved" && SUBJECT_COLORS[record.subject]) {
+        box.style.borderLeftColor = SUBJECT_COLORS[record.subject];
+    }
 
     const time = document.createElement("span");
     time.className = "koma-time";
@@ -4244,14 +4264,18 @@ function updateStreak() {
    ========================================================= */
 
 const PATGS_RANDOM_MESSAGES = [
-    "予約したコマを、ひとつずつ。",
-    "机に座るところまでが本番。",
+    "今日も1コマ、たしかに積み上がる。",
+    "始めた瞬間に、もう半分終わってる。",
     "できた分だけ、ちゃんと数えよう。",
     "未実行は失敗じゃなく、材料。",
-    "30分だけ、まず始めよう。",
+    "30分だけ、まず座ろう。",
     "今日の自分が、未来の自分を助ける。",
     "焦らず、でも止まらず。",
-    "完璧じゃなくていい、続けよう。"
+    "完璧じゃなくていい、続けよう。",
+    "昨日の自分より、ちょっとだけ前へ。",
+    "積み重ねは裏切らない。",
+    "迷ったら、とりあえず開始ボタン。",
+    "小さく始めて、大きく伸ばす。"
 ];
 
 function renderRandomMessage() {
