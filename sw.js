@@ -17,7 +17,7 @@
    通知タップ時に「今日のPATGS」へ移動するようにしている。
    ========================================================= */
 
-const PATGS_SW_VERSION = "20260922a";
+const PATGS_SW_VERSION = "20260922b";
 
 
 self.addEventListener("install", function () {
