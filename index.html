@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PATGS27</title>
 
-    <link rel="stylesheet" href="css/style.css?v=20260922a">
+    <link rel="stylesheet" href="css/style.css?v=20260922b">
 </head>
 
 <body>
@@ -154,13 +154,13 @@
              PATGS27内蔵カレンダー
         ================================================== -->
 
-        <section class="panel" id="calendarPanel">
+        <section class="panel panel-main" id="calendarPanel">
 
             <h2>🗓 カレンダー</h2>
 
             <p class="sub">
                 「予定」（学校行事・テスト・提出物・私用・重要予定）と「コマ」（学習の実行）は分けて表示します。
-                色つきの札が予定、下の白いカードがコマです。日付をタップすると、その日の内容が下に出ます。
+                マス内の色つきの札が予定です。日付をクリックすると、その日の内容が下に出ます。
             </p>
 
             <div class="cal-toolbar">
@@ -182,52 +182,64 @@
 
             <div id="calGrid"></div>
 
-            <h3>選んだ日の予定・コマ</h3>
+            <details class="cal-day-details" open>
 
-            <div id="calDayDetail"></div>
+                <summary>選んだ日：<span id="calSelectedLabel">-</span></summary>
 
-            <h3>予定を追加</h3>
+                <div id="calDayDetail"></div>
 
-            <div class="form-grid">
+                <details class="cal-add-details">
 
-                <label>日付
-                    <input type="date" id="calAddDate">
-                </label>
+                    <summary>📌 この日に予定を追加</summary>
 
-                <label>種類
-                    <select id="calAddKind">
-                        <option value="school">学校行事</option>
-                        <option value="exam">テスト・提出物</option>
-                        <option value="personal">私用</option>
-                        <option value="important">重要予定</option>
-                    </select>
-                </label>
+                    <div class="cal-add-form">
 
-                <label id="calAddExamTypeWrap">テストの種類
-                    <select id="calAddExamType">
-                        <option value="提出物">提出物</option>
-                        <option value="テスト">テスト</option>
-                        <option value="模試">模試</option>
-                    </select>
-                </label>
+                        <div class="form-grid cal-add-grid">
 
-                <label id="calAddIconWrap">アイコン
-                    <input type="text" id="calAddIcon" placeholder="📅">
-                </label>
+                            <label>日付
+                                <input type="date" id="calAddDate">
+                            </label>
 
-                <label>時刻（任意）
-                    <input type="time" id="calAddTime">
-                </label>
+                            <label>種類
+                                <select id="calAddKind">
+                                    <option value="school">学校行事</option>
+                                    <option value="exam">テスト・提出物</option>
+                                    <option value="personal">私用</option>
+                                    <option value="important">重要予定</option>
+                                </select>
+                            </label>
 
-                <label class="wide">内容
-                    <input type="text" id="calAddTitle" placeholder="例：文化祭／提出物の名前など">
-                </label>
+                            <label id="calAddExamTypeWrap">テストの種類
+                                <select id="calAddExamType">
+                                    <option value="提出物">提出物</option>
+                                    <option value="テスト">テスト</option>
+                                    <option value="模試">模試</option>
+                                </select>
+                            </label>
 
-            </div>
+                            <label id="calAddIconWrap">アイコン
+                                <input type="text" id="calAddIcon" placeholder="📅">
+                            </label>
 
-            <div class="btn-row">
-                <button id="calAddBtn" class="primary">この内容で追加</button>
-            </div>
+                            <label>時刻（任意）
+                                <input type="time" id="calAddTime">
+                            </label>
+
+                            <label class="wide">内容
+                                <input type="text" id="calAddTitle" placeholder="例：文化祭／提出物の名前など">
+                            </label>
+
+                        </div>
+
+                        <div class="btn-row">
+                            <button id="calAddBtn" class="primary small">この内容で追加</button>
+                        </div>
+
+                    </div>
+
+                </details>
+
+            </details>
 
         </section>
 
@@ -1190,8 +1202,8 @@
          JavaScript
     ====================================================== -->
 
-    <script src="js/script.js?v=20260922a"></script>
-    <script type="module" src="js/firebase.js?v=20260922a"></script>
+    <script src="js/script.js?v=20260922b"></script>
+    <script type="module" src="js/firebase.js?v=20260922b"></script>
 
 </body>
 
