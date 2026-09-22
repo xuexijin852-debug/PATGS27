@@ -20,7 +20,7 @@
    ========================================================= */
 
 
-const PATGS_VERSION = "20260922a";
+const PATGS_VERSION = "20260922b";
 
 
 /* =========================================================
@@ -3982,6 +3982,11 @@ function renderCalendarDayDetail() {
 
     if (!container) {
         return;
+    }
+
+    if ($("calSelectedLabel")) {
+        $("calSelectedLabel").textContent =
+            formatShortDate(calSelectedDate) + (calSelectedDate === todayKey() ? "（今日）" : "");
     }
 
     container.innerHTML = "";
