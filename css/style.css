@@ -840,6 +840,51 @@ canvas {
 
 
 /* =========================================================
+   カレンダー：PC（601px以上）表示での7列グリッド固定
+   ---------------------------------------------------------
+   スマホ側（上の @media (max-width: 600px)）は変更しない。
+   ここは幅の広い画面でだけ効く、念のための上書き指定。
+   ========================================================= */
+
+@media (min-width: 601px) {
+
+    .cal-grid-month,
+    .cal-grid-week {
+        display: grid !important;
+        grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    }
+
+    .cal-grid-month > .cal-head,
+    .cal-grid-week > .cal-head,
+    .cal-grid-month > .cal-cell,
+    .cal-grid-week > .cal-cell {
+        min-width: 0;
+    }
+}
+
+/* display:grid に対応していないブラウザ向けの保険（横並びを維持） */
+@supports not (display: grid) {
+
+    .cal-grid-month,
+    .cal-grid-week {
+        display: block;
+        font-size: 0;
+    }
+
+    .cal-grid-month > .cal-head,
+    .cal-grid-week > .cal-head,
+    .cal-grid-month > .cal-cell,
+    .cal-grid-week > .cal-cell {
+        display: inline-block;
+        width: 14.28%;
+        vertical-align: top;
+        font-size: 13px;
+        box-sizing: border-box;
+    }
+}
+
+
+/* =========================================================
    カレンダー
    ========================================================= */
 
@@ -984,6 +1029,55 @@ canvas {
     padding: 14px;
     border: 1px dashed var(--line);
     border-radius: var(--radius-sm);
+}
+
+.cal-day-details {
+    margin-top: 14px;
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+}
+
+.cal-day-details > summary,
+.cal-add-details > summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: var(--indigo-deep);
+    padding: 4px 0;
+    list-style: none;
+}
+
+.cal-day-details > summary::-webkit-details-marker,
+.cal-add-details > summary::-webkit-details-marker {
+    display: none;
+}
+
+.cal-day-details > summary::before {
+    content: "▾ ";
+}
+
+.cal-day-details:not([open]) > summary::before {
+    content: "▸ ";
+}
+
+.cal-add-details {
+    margin-top: 12px;
+    background: #faf9f5;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+}
+
+.cal-add-details > summary {
+    font-size: 13px;
+    color: var(--ink-soft);
+}
+
+.cal-add-details[open] > summary {
+    margin-bottom: 8px;
+}
+
+.cal-add-form .form-grid {
+    margin: 6px 0;
 }
 
 .cal-event-row {
