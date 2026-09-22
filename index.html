@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PATGS27</title>
 
-    <link rel="stylesheet" href="css/style.css?v=20260921a">
+    <link rel="stylesheet" href="css/style.css?v=20260922a">
 </head>
 
 <body>
@@ -332,6 +332,34 @@
 
 
         <!-- =================================================
+             PATGS27内蔵タイマー
+        ================================================== -->
+
+        <section class="panel" id="timerPanel">
+
+            <h2>⏱ 学習タイマー</h2>
+
+            <p class="sub">
+                通常学習コマを「開始」すると、自動で30分のタイマーが動きます。単体でも3・5・10・30・50・60分を計れます。
+                時間が来ても学習を止める機能ではなく、「予約した時間が終わった」ことをお知らせするだけです。
+                画面を閉じても再読み込みしても、続きから表示されます。
+            </p>
+
+            <div id="timerDisplay" class="timer-display"></div>
+
+            <div class="btn-row" id="timerQuickButtons">
+                <button class="timer-quick" data-minutes="3">3分</button>
+                <button class="timer-quick" data-minutes="5">5分</button>
+                <button class="timer-quick" data-minutes="10">10分</button>
+                <button class="timer-quick" data-minutes="30">30分</button>
+                <button class="timer-quick" data-minutes="50">50分</button>
+                <button class="timer-quick" data-minutes="60">60分</button>
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
              空き枠検索
         ================================================== -->
 
@@ -384,6 +412,24 @@
             <div id="hardStartNotice"></div>
 
             <div id="missedList"></div>
+
+        </section>
+
+
+        <!-- =================================================
+             未解決事項
+        ================================================== -->
+
+        <section class="panel">
+
+            <h2>🧩 未解決事項</h2>
+
+            <p class="sub">
+                コマ終了時の記録で「未解決」に書いた内容がここに並びます。
+                理解・解決コマの記録画面で、この一覧から選んで紐付けられます。
+            </p>
+
+            <div id="unresolvedList"></div>
 
         </section>
 
@@ -1144,8 +1190,8 @@
          JavaScript
     ====================================================== -->
 
-    <script src="js/script.js?v=20260921a"></script>
-    <script type="module" src="js/firebase.js?v=20260921a"></script>
+    <script src="js/script.js?v=20260922a"></script>
+    <script type="module" src="js/firebase.js?v=20260922a"></script>
 
 </body>
 
