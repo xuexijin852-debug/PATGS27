@@ -20,7 +20,7 @@
    ========================================================= */
 
 
-const PATGS_VERSION = "20260921a";
+const PATGS_VERSION = "20260922a";
 
 
 /* =========================================================
@@ -259,6 +259,9 @@ let dayTypeOverrides = loadJSON("patgs27_day_type_overrides", {});
 let editingReservationId = null;
 let transferFromId = null;
 
+/* 学習結果の記録フォームを開いているコマのID */
+let expandedLogIds = new Set();
+
 
 function saveReservations() {
     saveJSON("patgs27_reservations", reservations);
@@ -484,8 +487,7 @@ function readReservationForm() {
         material: $("resMaterial")?.value.trim() || "",
         content: $("resContent")?.value.trim() || "",
         range: $("resRange")?.value.trim() || "",
-        goal: $("resGoal")?.value.trim() || "",
-        studyMode: $("resStudyMode")?.value === "understanding" ? "understanding" : "normal"
+        goal: $("resGoal")?.value.trim() || ""
     };
 }
 
@@ -503,7 +505,6 @@ function fillReservationForm(record) {
     if ($("resContent")) { $("resContent").value = record.content || ""; }
     if ($("resRange")) { $("resRange").value = record.range || ""; }
     if ($("resGoal")) { $("resGoal").value = record.goal || ""; }
-    if ($("resStudyMode")) { $("resStudyMode").value = record.studyMode === "understanding" ? "understanding" : "normal"; }
 }
 
 function clearReservationForm() {
@@ -680,7 +681,6 @@ function submitReservationForm() {
         content: values.content,
         range: values.range,
         goal: values.goal,
-        studyMode: values.studyMode || "normal",
         status: "reserved",
         createdAt: nowText(),
         notified: {}
@@ -713,8 +713,16 @@ function startReservation(record) {
     record.startedAt = nowText();
 
     saveReservations();
-    startStudyTimerForReservation(record);
     renderKomaAll();
+
+    if (reservationType(record) === "normal") {
+
+        startTimer(
+            TYPE_DURATION.normal,
+            formatShortDate(record.date) + " " + record.time + " " + (record.subject || ""),
+            record.id
+        );
+    }
 }
 
 function celebrateCompletion() {
@@ -883,11 +891,113 @@ function buildCancelPanel(record, box) {
 }
 
 
+function buildLogForm(record) {
+
+    const form = document.createElement("div");
+    form.className = "koma-log-form";
+
+    const content = document.createElement("input");
+    content.type = "text";
+    content.placeholder = "今回の学習内容（例：二次関数 問題1〜10）";
+    content.value = record.log?.content || "";
+
+    const result = document.createElement("input");
+    result.type = "text";
+    result.placeholder = "結果（例：8/10正解）";
+    result.value = record.log?.result || "";
+
+    const learned = document.createElement("textarea");
+    learned.rows = 2;
+    learned.placeholder = "分かったこと・できるようになったこと";
+    learned.value = record.log?.learned || "";
+
+    const unresolved = document.createElement("textarea");
+    unresolved.rows = 2;
+    unresolved.placeholder = "未解決・まだ分からないこと（例：8・9番）";
+    unresolved.value = record.log?.unresolved || "";
+
+    const resolveSelect = document.createElement("select");
+
+    const noneOption = document.createElement("option");
+    noneOption.value = "";
+    noneOption.textContent = "この未解決を解決する（任意）";
+    resolveSelect.appendChild(noneOption);
+
+    reservations
+        .filter(function (item) {
+            return (
+                item.id !== record.id &&
+                item.log && item.log.unresolved && !item.log.resolved
+            );
+        })
+        .sort(sortByStart)
+        .forEach(function (item) {
+
+            const option = document.createElement("option");
+            option.value = item.id;
+            option.textContent =
+                formatShortDate(item.date) + " " + (item.subject || "") +
+                "：未解決 " + item.log.unresolved;
+
+            resolveSelect.appendChild(option);
+        });
+
+    resolveSelect.value = record.log?.resolvesId || "";
+
+    const saveButton = makeButton("保存", "primary");
+    const closeButton = makeButton("閉じる", "ghost");
+
+    saveButton.addEventListener("click", function () {
+
+        const resolvesId = resolveSelect.value || null;
+
+        record.log = {
+            content: content.value.trim(),
+            result: result.value.trim(),
+            learned: learned.value.trim(),
+            unresolved: unresolved.value.trim(),
+            resolved: record.log?.resolved || false,
+            resolvesId: resolvesId,
+            loggedAt: nowText()
+        };
+
+        if (resolvesId) {
+
+            const target = findReservation(resolvesId);
+
+            if (target && target.log) {
+                target.log.resolved = true;
+            }
+        }
+
+        saveReservations();
+        expandedLogIds.delete(record.id);
+        renderKomaAll();
+    });
+
+    closeButton.addEventListener("click", function () {
+        expandedLogIds.delete(record.id);
+        renderKomaAll();
+    });
+
+    form.append(content, result, learned, unresolved, resolveSelect);
+
+    const btnRow = document.createElement("div");
+    btnRow.className = "btn-row";
+    btnRow.append(saveButton, closeButton);
+
+    form.appendChild(btnRow);
+
+    return form;
+}
+
+
 function buildKomaCard(record, options) {
 
     const settings = options || {};
 
     const box = document.createElement("div");
+    box.dataset.resId = record.id;
 
     box.className =
         "koma " +
@@ -940,40 +1050,6 @@ function buildKomaCard(record, options) {
 
     box.append(head, detail);
 
-    if (record.studyMode === "understanding") {
-        const mode = document.createElement("p");
-        mode.className = "koma-detail study-mode-tag";
-        mode.textContent = "🔎 理解・解決コマ";
-        box.appendChild(mode);
-    }
-
-    if (record.studyResult) {
-        const resultBox = document.createElement("div");
-        resultBox.className = "study-result-summary";
-        const resultParts = [
-            record.studyResult.content ? "学習内容：" + record.studyResult.content : "",
-            record.studyResult.result ? "結果：" + record.studyResult.result : "",
-            record.studyResult.learned ? "理解：" + record.studyResult.learned : ""
-        ].filter(Boolean);
-        if (resultParts.length) {
-            const p = document.createElement("p");
-            p.textContent = resultParts.join("　／　");
-            resultBox.appendChild(p);
-        }
-        const unresolved = (record.studyResult.unresolvedIssues || []).filter(function (issue) { return !issue.resolved; });
-        if (unresolved.length) {
-            const p = document.createElement("p");
-            p.textContent = "未解決：" + unresolved.map(function (issue) { return issue.text; }).join("／");
-            resultBox.appendChild(p);
-        }
-        if (record.studyResult.resolvedIssueId) {
-            const p = document.createElement("p");
-            p.textContent = "解決した未解決事項：1件";
-            resultBox.appendChild(p);
-        }
-        if (resultBox.childNodes.length) box.appendChild(resultBox);
-    }
-
     const actions = document.createElement("div");
     actions.className = "koma-actions";
 
@@ -984,9 +1060,9 @@ function buildKomaCard(record, options) {
             startReservation(record);
         });
 
-        const doneButton = makeButton("完了・記録");
+        const doneButton = makeButton("完了");
         doneButton.addEventListener("click", function () {
-            finishReservationWithRecord(record);
+            completeReservation(record);
         });
 
         const editButton = makeButton("編集");
@@ -1005,9 +1081,9 @@ function buildKomaCard(record, options) {
 
     if (record.status === "running") {
 
-        const doneButton = makeButton("完了・記録", "primary");
+        const doneButton = makeButton("完了", "primary");
         doneButton.addEventListener("click", function () {
-            finishReservationWithRecord(record);
+            completeReservation(record);
         });
 
         const cancelButton = makeButton("取り消す", "ghost");
@@ -1120,6 +1196,70 @@ function buildKomaCard(record, options) {
 
         box.appendChild(reasonLabel);
     }
+
+    /* =========================================================
+       学習結果の記録（コマ終了時の記録・未解決の紐付け）
+       ========================================================= */
+
+    const logSection = document.createElement("div");
+    logSection.className = "koma-log";
+
+    if (record.log && (record.log.content || record.log.result || record.log.learned || record.log.unresolved)) {
+
+        const summary = document.createElement("p");
+        summary.className = "koma-log-summary";
+
+        summary.textContent = [
+            record.log.content ? "内容：" + record.log.content : "",
+            record.log.result ? "結果：" + record.log.result : "",
+            record.log.learned ? "わかったこと：" + record.log.learned : "",
+            record.log.unresolved
+                ? "未解決：" + record.log.unresolved + (record.log.resolved ? "（解決済み）" : "")
+                : ""
+        ].filter(Boolean).join("\n");
+
+        logSection.appendChild(summary);
+
+        if (record.log.resolvesId) {
+
+            const source = findReservation(record.log.resolvesId);
+
+            if (source && source.log) {
+
+                const refTag = document.createElement("p");
+                refTag.className = "sub";
+                refTag.textContent =
+                    "解決対象：" + formatShortDate(source.date) + " " +
+                    (source.subject || "") + "の未解決（" + (source.log.unresolved || "") + "）";
+
+                logSection.appendChild(refTag);
+            }
+        }
+    }
+
+    const logToggle = makeButton(
+        (record.log && record.log.loggedAt) ? "学習結果を編集" : "📝 学習結果を記録",
+        "ghost"
+    );
+
+    logToggle.addEventListener("click", function () {
+
+        if (expandedLogIds.has(record.id)) {
+            expandedLogIds.delete(record.id);
+        } else {
+            expandedLogIds.add(record.id);
+        }
+
+        renderKomaAll();
+    });
+
+    logSection.appendChild(logToggle);
+
+    if (expandedLogIds.has(record.id)) {
+        logSection.appendChild(buildLogForm(record));
+    }
+
+    box.appendChild(logSection);
 
     return box;
 }
@@ -1321,9 +1461,9 @@ function renderNextReservation() {
         actions.appendChild(startButton);
     }
 
-    const doneButton = makeButton("完了・記録", next.status === "running" ? "primary" : "");
+    const doneButton = makeButton("完了", next.status === "running" ? "primary" : "");
     doneButton.addEventListener("click", function () {
-        finishReservationWithRecord(next);
+        completeReservation(next);
     });
 
     actions.appendChild(doneButton);
@@ -1974,6 +2114,43 @@ function addLsRecord() {
    コマ関連のまとめ描画
    ========================================================= */
 
+function renderUnresolvedList() {
+
+    const container = $("unresolvedList");
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = "";
+
+    const items = reservations
+        .filter(function (record) {
+            return record.log && record.log.unresolved && !record.log.resolved;
+        })
+        .sort(sortByStart)
+        .reverse();
+
+    if (items.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "empty-note";
+        empty.textContent = "未解決の記録はありません。";
+        container.appendChild(empty);
+        return;
+    }
+
+    items.forEach(function (record) {
+
+        const row = document.createElement("p");
+        row.className = "sub";
+        row.textContent =
+            formatShortDate(record.date) + " " + (record.subject || "") +
+            "：未解決 " + record.log.unresolved;
+
+        container.appendChild(row);
+    });
+}
+
 function renderKomaAll() {
 
     closeFinishedWeeks();
@@ -1990,6 +2167,11 @@ function renderKomaAll() {
     renderSubjectKomaChart();
     renderWeeklyKomaReport();
     renderTimeOptions();
+    renderUnresolvedList();
+
+    if (typeof renderCalendarAll === "function") {
+        renderCalendarAll();
+    }
 }
 
 
@@ -3117,14 +3299,146 @@ $("weeklyReviewText")?.addEventListener("input", saveWeeklyReview);
 
 
 /* =========================================================
-   テスト・提出物
+   予定（カレンダー統合データ）
    ========================================================= */
 
-let exams = loadJSON("exams", []);
+const DEFAULT_PATGS_SCHEDULE = [
+    { id: "summerVacationEnd", name: "夏休み終了", date: "2026-08-26", icon: "🌻" },
+    { id: "mockExam1", name: "第1回模試", date: "", icon: "📝" },
+    { id: "regularTest", name: "定期テスト", date: "", icon: "📚" },
+    { id: "entranceExam", name: "入試", date: "2027-02-16", icon: "🎓" },
+    { id: "resultAnnouncement", name: "合格発表", date: "2027-02-26", icon: "🏆" }
+];
 
-function saveExams() {
-    saveJSON("exams", exams);
+const CALENDAR_KIND_LABEL = {
+    school: "学校行事",
+    exam: "テスト・提出物",
+    personal: "私用",
+    important: "重要予定"
+};
+
+const EXAM_TYPE_ICON = {
+    "提出物": "📮",
+    "テスト": "📝",
+    "模試": "📊"
+};
+
+function calendarEventIcon(event) {
+
+    if (event.kind === "important") {
+        return event.icon || "📅";
+    }
+
+    if (event.kind === "school") {
+        return "🏫";
+    }
+
+    if (event.kind === "exam") {
+        return EXAM_TYPE_ICON[event.examType] || "📝";
+    }
+
+    return "🧩";
 }
+
+function newCalendarEventId() {
+    return "cal_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+}
+
+let calendarEvents = loadJSON("patgs27_calendar_events", []);
+
+function saveCalendarEvents() {
+    saveJSON("patgs27_calendar_events", calendarEvents);
+}
+
+function migrateToCalendarEvents() {
+
+    if (localStorage.getItem("patgs27_calendar_migrated")) {
+        return;
+    }
+
+    const legacySchedule = loadJSON("patgs27_schedule", null);
+    const legacyExams = loadJSON("exams", []);
+    const legacyOther = loadJSON("patgs27_other_schedule", []);
+
+    const migrated = [];
+
+    (Array.isArray(legacySchedule) ? legacySchedule : DEFAULT_PATGS_SCHEDULE).forEach(function (item) {
+
+        migrated.push({
+            id: newCalendarEventId(),
+            date: item.date || "",
+            time: "",
+            kind: "important",
+            icon: item.icon || "📅",
+            examType: "",
+            title: item.name || "名称未設定",
+            done: false
+        });
+    });
+
+    legacyExams.forEach(function (item) {
+
+        migrated.push({
+            id: newCalendarEventId(),
+            date: item.date || "",
+            time: "",
+            kind: "exam",
+            icon: "",
+            examType: item.type || "提出物",
+            title: item.text || "",
+            done: !!item.done
+        });
+    });
+
+    legacyOther.forEach(function (item) {
+
+        migrated.push({
+            id: newCalendarEventId(),
+            date: "",
+            time: "",
+            kind: "personal",
+            icon: "",
+            examType: "",
+            title: item.text || "",
+            done: !!item.checked
+        });
+    });
+
+    calendarEvents = calendarEvents.concat(migrated);
+
+    saveCalendarEvents();
+
+    localStorage.setItem("patgs27_calendar_migrated", "1");
+}
+
+migrateToCalendarEvents();
+
+function eventsForDate(dateKey) {
+
+    return calendarEvents
+        .filter(function (event) {
+            return event.date === dateKey;
+        })
+        .sort(function (a, b) {
+            return (a.time || "").localeCompare(b.time || "");
+        });
+}
+
+function refreshAllScheduleViews() {
+    renderExams();
+    renderOtherSchedules();
+    renderScheduleSettings();
+    updateSchedule();
+
+    if (typeof renderCalendarAll === "function") {
+        renderCalendarAll();
+    }
+}
+
+
+/* =========================================================
+   テスト・提出物
+   ========================================================= */
 
 function renderExams() {
 
@@ -3136,7 +3450,11 @@ function renderExams() {
 
     list.innerHTML = "";
 
-    exams.forEach(function (exam, index) {
+    const items = calendarEvents.filter(function (event) {
+        return event.kind === "exam";
+    });
+
+    items.forEach(function (event) {
 
         const row = document.createElement("div");
 
@@ -3149,29 +3467,33 @@ function renderExams() {
             type.appendChild(option);
         });
 
-        type.value = exam.type || "提出物";
+        type.value = event.examType || "提出物";
 
         const date = document.createElement("input");
         date.type = "date";
-        date.value = exam.date || "";
+        date.value = event.date || "";
 
         const text = document.createElement("input");
         text.type = "text";
-        text.value = exam.text || "";
+        text.value = event.title || "";
         text.placeholder = "内容";
 
         const done = document.createElement("input");
         done.type = "checkbox";
-        done.checked = !!exam.done;
+        done.checked = !!event.done;
 
         const deleteButton = makeButton("削除", "ghost");
 
         function save() {
-            exam.type = type.value;
-            exam.date = date.value;
-            exam.text = text.value;
-            exam.done = done.checked;
-            saveExams();
+            event.examType = type.value;
+            event.date = date.value;
+            event.title = text.value;
+            event.done = done.checked;
+            saveCalendarEvents();
+
+            if (typeof renderCalendarAll === "function") {
+                renderCalendarAll();
+            }
         }
 
         type.addEventListener("change", save);
@@ -3180,9 +3502,13 @@ function renderExams() {
         done.addEventListener("change", save);
 
         deleteButton.addEventListener("click", function () {
-            exams.splice(index, 1);
-            saveExams();
-            renderExams();
+
+            calendarEvents = calendarEvents.filter(function (item) {
+                return item.id !== event.id;
+            });
+
+            saveCalendarEvents();
+            refreshAllScheduleViews();
         });
 
         row.append(type, date, text, done, document.createTextNode("完了"), deleteButton);
@@ -3192,9 +3518,20 @@ function renderExams() {
 }
 
 $("addExamBtn")?.addEventListener("click", function () {
-    exams.push({ type: "提出物", date: "", text: "", done: false });
-    saveExams();
-    renderExams();
+
+    calendarEvents.push({
+        id: newCalendarEventId(),
+        date: "",
+        time: "",
+        kind: "exam",
+        icon: "",
+        examType: "提出物",
+        title: "",
+        done: false
+    });
+
+    saveCalendarEvents();
+    refreshAllScheduleViews();
 });
 
 
@@ -3266,12 +3603,6 @@ $("addMaterialBtn")?.addEventListener("click", function () {
    学習以外の予定
    ========================================================= */
 
-let otherSchedules = loadJSON("patgs27_other_schedule", []);
-
-function saveOtherSchedules() {
-    saveJSON("patgs27_other_schedule", otherSchedules);
-}
-
 function renderOtherSchedules() {
 
     const list = $("otherScheduleList");
@@ -3282,124 +3613,677 @@ function renderOtherSchedules() {
 
     list.innerHTML = "";
 
-    otherSchedules.forEach(function (item, index) {
+    const items = calendarEvents.filter(function (event) {
+        return event.kind === "personal";
+    });
+
+    items.forEach(function (event) {
 
         const row = document.createElement("div");
 
+        const date = document.createElement("input");
+        date.type = "date";
+        date.value = event.date || "";
+        date.title = "日付（空欄可）";
+
         const check = document.createElement("input");
         check.type = "checkbox";
-        check.checked = !!item.checked;
+        check.checked = !!event.done;
 
         const text = document.createElement("input");
         text.type = "text";
-        text.value = item.text || "";
+        text.value = event.title || "";
         text.placeholder = "予定を入力";
 
         const deleteButton = makeButton("削除", "ghost");
 
-        check.addEventListener("change", function () {
-            otherSchedules[index].checked = check.checked;
-            saveOtherSchedules();
-        });
+        function save() {
+            event.date = date.value;
+            event.done = check.checked;
+            event.title = text.value;
+            saveCalendarEvents();
 
-        text.addEventListener("input", function () {
-            otherSchedules[index].text = text.value;
-            saveOtherSchedules();
-        });
+            if (typeof renderCalendarAll === "function") {
+                renderCalendarAll();
+            }
+        }
+
+        date.addEventListener("change", save);
+        check.addEventListener("change", save);
+        text.addEventListener("input", save);
 
         deleteButton.addEventListener("click", function () {
-            otherSchedules.splice(index, 1);
-            saveOtherSchedules();
-            renderOtherSchedules();
+
+            calendarEvents = calendarEvents.filter(function (item) {
+                return item.id !== event.id;
+            });
+
+            saveCalendarEvents();
+            refreshAllScheduleViews();
         });
 
-        row.append(check, text, deleteButton);
+        row.append(date, check, text, deleteButton);
 
         list.appendChild(row);
     });
 }
 
 $("addOtherScheduleBtn")?.addEventListener("click", function () {
-    otherSchedules.push({ text: "", checked: false });
-    saveOtherSchedules();
-    renderOtherSchedules();
+
+    calendarEvents.push({
+        id: newCalendarEventId(),
+        date: "",
+        time: "",
+        kind: "personal",
+        icon: "",
+        examType: "",
+        title: "",
+        done: false
+    });
+
+    saveCalendarEvents();
+    refreshAllScheduleViews();
 });
 
 
-/* 学習以外の予定：既存の見た目を保ちつつ、日付・時刻・種類を追加してカレンダーと同期 */
-function renderOtherSchedules() {
-    const list = $("otherScheduleList");
-    if (!list) return;
-    list.innerHTML = "";
+/* =========================================================
+   カレンダー（月・週・日表示）
+   ========================================================= */
 
-    otherSchedules.forEach(function (item, index) {
-        if (!item.id) item.id = calendarEventId("other");
+let calCursorDate = todayKey();
+let calSelectedDate = todayKey();
+let calViewMode = "month";
 
-        const row = document.createElement("div");
-        row.className = "schedule-setting-row";
+const CAL_WEEK_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 
-        const check = document.createElement("input");
-        check.type = "checkbox";
-        check.checked = !!item.checked;
-        check.title = "完了";
+function addMonthsToKey(dateKey, delta) {
+    const d = new Date(dateKey + "T00:00:00");
+    d.setDate(1);
+    d.setMonth(d.getMonth() + delta);
+    return dateKeyOf(d);
+}
 
-        const kind = document.createElement("select");
-        [["personal","私用"],["school","学校行事"]].forEach(function (pair) {
-            const option = document.createElement("option");
-            option.value = pair[0];
-            option.textContent = pair[1];
-            kind.appendChild(option);
-        });
-        kind.value = item.kind === "school" ? "school" : "personal";
+function calRangeLabelText() {
 
-        const date = document.createElement("input");
-        date.type = "date";
-        date.value = item.date || "";
+    if (calViewMode === "month") {
+        const d = new Date(calCursorDate + "T00:00:00");
+        return d.getFullYear() + "年" + (d.getMonth() + 1) + "月";
+    }
 
-        const time = document.createElement("input");
-        time.type = "time";
-        time.value = item.time || "";
+    if (calViewMode === "week") {
+        const start = getWeekStartKey(calCursorDate);
+        return formatShortDate(start) + "〜" + formatShortDate(addDaysToKey(start, 6));
+    }
 
-        const icon = document.createElement("input");
-        icon.type = "text";
-        icon.value = item.icon || "📅";
-        icon.placeholder = "📅";
-        icon.style.width = "70px";
+    return formatShortDate(calCursorDate);
+}
 
-        const text = document.createElement("input");
-        text.type = "text";
-        text.value = item.text || "";
-        text.placeholder = "予定を入力";
+function calNavigate(delta) {
 
-        function save() {
-            item.kind = kind.value;
-            item.date = date.value;
-            item.time = time.value;
-            item.icon = icon.value.trim() || "📅";
-            item.text = text.value;
-            item.checked = check.checked;
-            saveOtherSchedules();
-            renderCalendar();
+    if (calViewMode === "month") {
+        calCursorDate = addMonthsToKey(calCursorDate, delta);
+    } else if (calViewMode === "week") {
+        calCursorDate = addDaysToKey(calCursorDate, delta * 7);
+    } else {
+        calCursorDate = addDaysToKey(calCursorDate, delta);
+    }
+
+    calSelectedDate = calCursorDate;
+
+    renderCalendarAll();
+}
+
+function calGoToday() {
+    calCursorDate = todayKey();
+    calSelectedDate = todayKey();
+    renderCalendarAll();
+}
+
+function calSelectDate(dateKey) {
+
+    calSelectedDate = dateKey;
+
+    if ($("calAddDate")) {
+        $("calAddDate").value = dateKey;
+    }
+
+    renderCalendarGrid();
+    renderCalendarDayDetail();
+}
+
+function calDayKomaCount(dateKey) {
+
+    return reservations.filter(function (record) {
+        return record.date === dateKey;
+    }).length;
+}
+
+function buildCalCell(dateKey, options) {
+
+    const settings = options || {};
+
+    const cell = document.createElement("div");
+    cell.className = "cal-cell";
+
+    if (dateKey === todayKey()) {
+        cell.classList.add("is-today");
+    }
+
+    if (dateKey === calSelectedDate) {
+        cell.classList.add("is-selected");
+    }
+
+    const dayNumber = document.createElement("div");
+    dayNumber.className = "cal-day-num";
+    dayNumber.textContent = String(Number(dateKey.split("-")[2]));
+
+    cell.appendChild(dayNumber);
+
+    const events = eventsForDate(dateKey);
+    const limit = settings.limit || 3;
+
+    events.slice(0, limit).forEach(function (event) {
+
+        const pill = document.createElement("div");
+        pill.className = "cal-pill kind-" + event.kind + (event.done ? " is-done" : "");
+        pill.textContent =
+            calendarEventIcon(event) + " " + (event.title || CALENDAR_KIND_LABEL[event.kind]);
+
+        cell.appendChild(pill);
+    });
+
+    if (events.length > limit) {
+        const more = document.createElement("div");
+        more.className = "cal-more";
+        more.textContent = "+" + (events.length - limit);
+        cell.appendChild(more);
+    }
+
+    const komaCount = calDayKomaCount(dateKey);
+
+    if (komaCount > 0) {
+        const badge = document.createElement("div");
+        badge.className = "cal-koma-badge";
+        badge.textContent = "🔷 コマ " + komaCount;
+        cell.appendChild(badge);
+    }
+
+    cell.addEventListener("click", function () {
+        calSelectDate(dateKey);
+    });
+
+    return cell;
+}
+
+function renderCalendarMonthGrid(container) {
+
+    container.className = "cal-grid cal-grid-month";
+    container.innerHTML = "";
+
+    CAL_WEEK_LABELS.forEach(function (label) {
+        const head = document.createElement("div");
+        head.className = "cal-head";
+        head.textContent = label;
+        container.appendChild(head);
+    });
+
+    const first = new Date(calCursorDate + "T00:00:00");
+    first.setDate(1);
+
+    const leading = first.getDay();
+    const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+    const totalCells = Math.ceil((leading + daysInMonth) / 7) * 7;
+
+    for (let i = 0; i < totalCells; i++) {
+
+        const dayNumber = i - leading + 1;
+
+        if (dayNumber < 1 || dayNumber > daysInMonth) {
+            const pad = document.createElement("div");
+            pad.className = "cal-cell cal-cell-pad";
+            container.appendChild(pad);
+            continue;
         }
 
-        [kind, date, time, icon, text].forEach(function (input) {
-            input.addEventListener("input", save);
-            input.addEventListener("change", save);
-        });
-        check.addEventListener("change", save);
+        const dateKey =
+            first.getFullYear() + "-" +
+            pad2(first.getMonth() + 1) + "-" +
+            pad2(dayNumber);
 
-        const deleteButton = makeButton("削除", "ghost");
-        deleteButton.addEventListener("click", function () {
-            otherSchedules.splice(index, 1);
-            saveOtherSchedules();
-            renderOtherSchedules();
-            renderCalendar();
-        });
+        container.appendChild(buildCalCell(dateKey, { limit: 2 }));
+    }
+}
 
-        row.append(check, kind, date, time, icon, text, deleteButton);
-        list.appendChild(row);
+function renderCalendarWeekGrid(container) {
+
+    container.className = "cal-grid cal-grid-week";
+    container.innerHTML = "";
+
+    const start = getWeekStartKey(calCursorDate);
+
+    for (let i = 0; i < 7; i++) {
+
+        const dateKey = addDaysToKey(start, i);
+
+        const head = document.createElement("div");
+        head.className = "cal-head";
+        head.textContent = CAL_WEEK_LABELS[i] + " " + formatShortDate(dateKey).replace(/\(.*\)/, "");
+        container.appendChild(head);
+    }
+
+    for (let i = 0; i < 7; i++) {
+        container.appendChild(buildCalCell(addDaysToKey(start, i), { limit: 4 }));
+    }
+}
+
+function renderCalendarDayGrid(container) {
+
+    container.className = "cal-grid cal-grid-day";
+    container.innerHTML = "";
+
+    const card = document.createElement("div");
+    card.className = "cal-day-big";
+    card.textContent = formatShortDate(calCursorDate);
+
+    container.appendChild(card);
+}
+
+function renderCalendarGrid() {
+
+    const container = $("calGrid");
+
+    if (!container) {
+        return;
+    }
+
+    if (calViewMode === "month") {
+        renderCalendarMonthGrid(container);
+    } else if (calViewMode === "week") {
+        renderCalendarWeekGrid(container);
+    } else {
+        renderCalendarDayGrid(container);
+    }
+
+    if ($("calRangeLabel")) {
+        $("calRangeLabel").textContent = calRangeLabelText();
+    }
+
+    [
+        ["calViewMonthBtn", "month"],
+        ["calViewWeekBtn", "week"],
+        ["calViewDayBtn", "day"]
+    ].forEach(function (pair) {
+
+        if ($(pair[0])) {
+            $(pair[0]).className = "small" + (calViewMode === pair[1] ? " primary" : "");
+        }
     });
 }
+
+function buildEventEditRow(event) {
+
+    const row = document.createElement("div");
+    row.className = "cal-event-row";
+
+    const icon = document.createElement("span");
+    icon.className = "cal-event-icon";
+    icon.textContent = calendarEventIcon(event);
+
+    const kindTag = document.createElement("span");
+    kindTag.className = "koma-tag kind-" + event.kind;
+    kindTag.textContent =
+        CALENDAR_KIND_LABEL[event.kind] + (event.kind === "exam" ? "・" + (event.examType || "") : "");
+
+    const time = document.createElement("input");
+    time.type = "time";
+    time.value = event.time || "";
+
+    const title = document.createElement("input");
+    title.type = "text";
+    title.value = event.title || "";
+    title.placeholder = "内容";
+
+    const done = document.createElement("input");
+    done.type = "checkbox";
+    done.checked = !!event.done;
+
+    function save() {
+        event.time = time.value;
+        event.title = title.value;
+        event.done = done.checked;
+        saveCalendarEvents();
+        refreshAllScheduleViews();
+    }
+
+    time.addEventListener("change", save);
+    title.addEventListener("input", save);
+    done.addEventListener("change", save);
+
+    const deleteButton = makeButton("削除", "ghost");
+
+    deleteButton.addEventListener("click", function () {
+
+        calendarEvents = calendarEvents.filter(function (item) {
+            return item.id !== event.id;
+        });
+
+        saveCalendarEvents();
+        refreshAllScheduleViews();
+    });
+
+    row.append(icon, kindTag, time, title, done, deleteButton);
+
+    return row;
+}
+
+function renderCalendarDayDetail() {
+
+    const container = $("calDayDetail");
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = "";
+
+    const heading = document.createElement("p");
+    heading.className = "sub";
+    heading.textContent =
+        formatShortDate(calSelectedDate) + (calSelectedDate === todayKey() ? "（今日）" : "");
+
+    container.appendChild(heading);
+
+    const eventsHeading = document.createElement("h4");
+    eventsHeading.textContent = "予定";
+    container.appendChild(eventsHeading);
+
+    const events = eventsForDate(calSelectedDate);
+
+    if (events.length === 0) {
+
+        const empty = document.createElement("p");
+        empty.className = "empty-note";
+        empty.textContent = "予定はありません。";
+        container.appendChild(empty);
+
+    } else {
+
+        events.forEach(function (event) {
+            container.appendChild(buildEventEditRow(event));
+        });
+    }
+
+    const komaHeading = document.createElement("h4");
+    komaHeading.textContent = "コマ";
+    container.appendChild(komaHeading);
+
+    const komas = reservations
+        .filter(function (record) {
+            return record.date === calSelectedDate;
+        })
+        .sort(sortByStart);
+
+    if (komas.length === 0) {
+
+        const empty = document.createElement("p");
+        empty.className = "empty-note";
+        empty.textContent = "この日のコマはありません。";
+        container.appendChild(empty);
+
+    } else {
+
+        komas.forEach(function (record) {
+            container.appendChild(buildKomaCard(record, { showMissedTools: record.status === "missed" }));
+        });
+    }
+}
+
+function renderCalendarAll() {
+    renderCalendarGrid();
+    renderCalendarDayDetail();
+}
+
+function syncCalAddKindFields() {
+
+    const kind = $("calAddKind")?.value || "school";
+
+    if ($("calAddExamTypeWrap")) {
+        $("calAddExamTypeWrap").style.display = (kind === "exam") ? "flex" : "none";
+    }
+
+    if ($("calAddIconWrap")) {
+        $("calAddIconWrap").style.display = (kind === "important") ? "flex" : "none";
+    }
+}
+
+function setupCalendar() {
+
+    if ($("calAddDate")) {
+        $("calAddDate").value = calSelectedDate;
+    }
+
+    syncCalAddKindFields();
+
+    $("calPrevBtn")?.addEventListener("click", function () { calNavigate(-1); });
+    $("calNextBtn")?.addEventListener("click", function () { calNavigate(1); });
+    $("calTodayBtn")?.addEventListener("click", calGoToday);
+
+    $("calViewMonthBtn")?.addEventListener("click", function () {
+        calViewMode = "month";
+        renderCalendarGrid();
+    });
+
+    $("calViewWeekBtn")?.addEventListener("click", function () {
+        calViewMode = "week";
+        renderCalendarGrid();
+    });
+
+    $("calViewDayBtn")?.addEventListener("click", function () {
+        calViewMode = "day";
+        calCursorDate = calSelectedDate;
+        renderCalendarGrid();
+    });
+
+    $("calAddKind")?.addEventListener("change", syncCalAddKindFields);
+
+    $("calAddBtn")?.addEventListener("click", function () {
+
+        const date = $("calAddDate")?.value || "";
+        const kind = $("calAddKind")?.value || "school";
+        const title = $("calAddTitle")?.value.trim() || "";
+
+        if (!date || !title) {
+            alert("日付と内容を入力してください。");
+            return;
+        }
+
+        calendarEvents.push({
+            id: newCalendarEventId(),
+            date: date,
+            time: $("calAddTime")?.value || "",
+            kind: kind,
+            icon: kind === "important" ? ($("calAddIcon")?.value.trim() || "📅") : "",
+            examType: kind === "exam" ? ($("calAddExamType")?.value || "提出物") : "",
+            title: title,
+            done: false
+        });
+
+        saveCalendarEvents();
+
+        if ($("calAddTitle")) { $("calAddTitle").value = ""; }
+        if ($("calAddTime")) { $("calAddTime").value = ""; }
+
+        refreshAllScheduleViews();
+    });
+}
+
+
+/* =========================================================
+   PATGS27内蔵タイマー
+   ========================================================= */
+
+const TIMER_QUICK_MINUTES = [3, 5, 10, 30, 50, 60];
+
+let activeTimer = loadJSON("patgs27_active_timer", null);
+
+function saveActiveTimer() {
+
+    if (activeTimer) {
+        saveJSON("patgs27_active_timer", activeTimer);
+    } else {
+        localStorage.removeItem("patgs27_active_timer");
+    }
+}
+
+function startTimer(durationMinutes, label, reservationId) {
+
+    const now = Date.now();
+
+    activeTimer = {
+        id: "timer_" + now,
+        label: label,
+        reservationId: reservationId || null,
+        durationMinutes: durationMinutes,
+        startedAt: now,
+        endsAt: now + durationMinutes * 60000,
+        notifiedEnd: false
+    };
+
+    saveActiveTimer();
+    renderTimer();
+}
+
+function stopTimer() {
+    activeTimer = null;
+    saveActiveTimer();
+    renderTimer();
+}
+
+function formatTimerClock(ms) {
+
+    const totalSeconds = Math.max(0, Math.round(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    return pad2(minutes) + ":" + pad2(seconds);
+}
+
+function openReservationLog(reservationId) {
+
+    expandedLogIds.add(reservationId);
+
+    renderKomaAll();
+
+    setTimeout(function () {
+
+        const target = document.querySelector('[data-res-id="' + reservationId + '"]');
+
+        if (target) {
+            target.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+
+    }, 50);
+}
+
+function renderTimer() {
+
+    const display = $("timerDisplay");
+
+    if (!display) {
+        return;
+    }
+
+    display.innerHTML = "";
+
+    if (!activeTimer) {
+
+        const idle = document.createElement("p");
+        idle.className = "empty-note";
+        idle.textContent = "タイマーは動いていません。下のボタンか、コマの「開始」から始められます。";
+        display.appendChild(idle);
+        return;
+    }
+
+    const remaining = activeTimer.endsAt - Date.now();
+
+    if (remaining > 0) {
+
+        const clock = document.createElement("div");
+        clock.className = "timer-clock";
+        clock.textContent = formatTimerClock(remaining);
+
+        const label = document.createElement("p");
+        label.className = "timer-label";
+        label.textContent = activeTimer.label + "（" + activeTimer.durationMinutes + "分）";
+
+        const stopButton = makeButton("タイマーを止める", "ghost");
+        stopButton.addEventListener("click", stopTimer);
+
+        display.append(clock, label, stopButton);
+
+        return;
+    }
+
+    if (!activeTimer.notifiedEnd) {
+
+        sendPatgsNotification(
+            "⏰ コマ終了の時間です",
+            activeTimer.label + "（" + activeTimer.durationMinutes + "分）が終了しました。"
+        );
+
+        activeTimer.notifiedEnd = true;
+        saveActiveTimer();
+    }
+
+    const doneMessage = document.createElement("div");
+    doneMessage.className = "timer-clock timer-clock-done";
+    doneMessage.textContent = "⏰ 終了";
+
+    const label = document.createElement("p");
+    label.className = "timer-label";
+    label.textContent = activeTimer.label + "（" + activeTimer.durationMinutes + "分）";
+
+    display.append(doneMessage, label);
+
+    if (activeTimer.reservationId) {
+
+        const logButton = makeButton("この学習を記録する", "primary");
+
+        logButton.addEventListener("click", function () {
+            const id = activeTimer.reservationId;
+            stopTimer();
+            openReservationLog(id);
+        });
+
+        display.appendChild(logButton);
+    }
+
+    const closeButton = makeButton("閉じる", "ghost");
+    closeButton.addEventListener("click", stopTimer);
+    display.appendChild(closeButton);
+}
+
+function setupTimer() {
+
+    document.querySelectorAll(".timer-quick").forEach(function (button) {
+
+        button.addEventListener("click", function () {
+
+            const minutes = Number(button.dataset.minutes) || 0;
+
+            if (minutes <= 0) {
+                return;
+            }
+
+            startTimer(minutes, minutes + "分 自由タイマー", null);
+        });
+    });
+
+    renderTimer();
+
+    setInterval(renderTimer, 1000);
+}
+
 
 /* =========================================================
    バックアップ
@@ -4433,25 +5317,6 @@ function renderTodaySummary() {
    重要予定
    ========================================================= */
 
-const DEFAULT_PATGS_SCHEDULE = [
-    { id: "summerVacationEnd", name: "夏休み終了", date: "2026-08-26", icon: "🌻", fixed: true },
-    { id: "mockExam1", name: "第1回模試", date: "", icon: "📝", fixed: false },
-    { id: "regularTest", name: "定期テスト", date: "", icon: "📚", fixed: false },
-    { id: "entranceExam", name: "入試", date: "2027-02-16", icon: "🎓", fixed: true },
-    { id: "resultAnnouncement", name: "合格発表", date: "2027-02-26", icon: "🏆", fixed: true }
-];
-
-let patgsSchedule = loadJSON("patgs27_schedule", null);
-
-if (!Array.isArray(patgsSchedule)) {
-
-    patgsSchedule = DEFAULT_PATGS_SCHEDULE.map(function (item) {
-        return { ...item };
-    });
-
-    saveJSON("patgs27_schedule", patgsSchedule);
-}
-
 function getPATGSToday() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -4510,7 +5375,11 @@ function renderScheduleSettings() {
 
     container.innerHTML = "";
 
-    patgsSchedule.forEach(function (event, index) {
+    const items = calendarEvents.filter(function (event) {
+        return event.kind === "important";
+    });
+
+    items.forEach(function (event) {
 
         const row = document.createElement("div");
         row.className = "schedule-setting-row";
@@ -4522,7 +5391,7 @@ function renderScheduleSettings() {
 
         const name = document.createElement("input");
         name.type = "text";
-        name.value = event.name || "";
+        name.value = event.title || "";
         name.placeholder = "予定名";
 
         const date = document.createElement("input");
@@ -4531,14 +5400,18 @@ function renderScheduleSettings() {
 
         function saveScheduleItem() {
 
-            event.name = name.value.trim();
+            event.title = name.value.trim();
             event.date = date.value;
             event.icon = icon.value.trim() || "📅";
 
-            savePatgsScheduleUnified();
+            saveCalendarEvents();
 
             updatePATGSTodayDate();
             updateSchedule();
+
+            if (typeof renderCalendarAll === "function") {
+                renderCalendarAll();
+            }
         }
 
         name.addEventListener("input", saveScheduleItem);
@@ -4549,18 +5422,18 @@ function renderScheduleSettings() {
 
         deleteButton.addEventListener("click", function () {
 
-            const title = event.name || "この予定";
+            const title = event.title || "この予定";
 
             if (!confirm("「" + title + "」を削除しますか？")) {
                 return;
             }
 
-            patgsSchedule.splice(index, 1);
+            calendarEvents = calendarEvents.filter(function (item) {
+                return item.id !== event.id;
+            });
 
-            savePatgsScheduleUnified();
-
-            renderScheduleSettings();
-            updateSchedule();
+            saveCalendarEvents();
+            refreshAllScheduleViews();
         });
 
         row.append(icon, name, date, deleteButton);
@@ -4571,18 +5444,19 @@ function renderScheduleSettings() {
 
 function addPATGSSchedule() {
 
-    patgsSchedule.push({
-        id: "schedule_" + Date.now(),
-        name: "新しい予定",
+    calendarEvents.push({
+        id: newCalendarEventId(),
         date: "",
+        time: "",
+        kind: "important",
         icon: "📅",
-        fixed: false
+        examType: "",
+        title: "新しい予定",
+        done: false
     });
 
-    savePatgsScheduleUnified();
-
-    renderScheduleSettings();
-    updateSchedule();
+    saveCalendarEvents();
+    refreshAllScheduleViews();
 }
 
 function updateSchedule() {
@@ -4597,9 +5471,9 @@ function updateSchedule() {
 
     const today = getPATGSToday();
 
-    const upcoming = patgsSchedule
+    const upcoming = calendarEvents
         .filter(function (event) {
-            return !!event.date;
+            return event.kind === "important" && !!event.date;
         })
         .map(function (event) {
 
@@ -4639,7 +5513,7 @@ function updateSchedule() {
 
         const name = document.createElement("div");
         name.className = "schedule-name";
-        name.textContent = (event.icon || "📅") + " " + (event.name || "名称未設定");
+        name.textContent = (event.icon || "📅") + " " + (event.title || "名称未設定");
 
         const date = document.createElement("div");
         date.className = "schedule-date";
@@ -4664,926 +5538,10 @@ setInterval(function () {
 
 
 /* =========================================================
-   第六次追加：内蔵カレンダー／学習タイマー／学習結果
-   既存のコマ制度・localStorageを壊さず、上に機能を追加する。
-   ========================================================= */
-
-let calendarEvents = loadJSON("patgs27_calendar_events", []);
-let calendarCursorDate = todayKey();
-let calendarView = "month";
-let editingCalendarEventId = null;
-let pendingStudyRecordId = null;
-
-function saveCalendarEvents() {
-    saveJSON("patgs27_calendar_events", calendarEvents);
-}
-
-function calendarEventId(prefix) {
-    return (prefix || "cal") + "_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
-}
-
-function calendarEventSourceKind(event) {
-    return event.sourceType || "calendar";
-}
-
-function calendarEventLabel(event) {
-    const icons = {
-        school: "🏫",
-        exam: "📝",
-        personal: "🏠",
-        important: "⭐"
-    };
-    return event.icon || icons[event.kind] || "📅";
-}
-
-function calendarEventKindLabel(event) {
-    if (event.kind === "school") return "学校行事";
-    if (event.kind === "exam") return event.examType || "テスト・提出物";
-    if (event.kind === "personal") return "私用";
-    if (event.kind === "important") return "重要予定";
-    return "予定";
-}
-
-function normalizeCalendarEvent(event) {
-    return {
-        id: event.id || calendarEventId("cal"),
-        kind: event.kind || "personal",
-        examType: event.examType || "",
-        date: event.date || "",
-        time: event.time || "",
-        title: event.title || event.text || event.name || "予定",
-        icon: event.icon || "📅",
-        done: !!event.done,
-        fixed: !!event.fixed,
-        sourceType: event.sourceType || "calendar",
-        sourceId: event.sourceId || "",
-        createdAt: event.createdAt || nowText(),
-        updatedAt: event.updatedAt || nowText()
-    };
-}
-
-function findCalendarEvent(id) {
-    return calendarEvents.find(function (event) { return event.id === id; });
-}
-
-function removeCalendarSourceEvents(sourceType) {
-    calendarEvents = calendarEvents.filter(function (event) {
-        return event.sourceType !== sourceType;
-    });
-}
-
-function syncLegacyCalendarEvents() {
-
-    /* 既存のテスト・提出物をカレンダーへ同期 */
-    removeCalendarSourceEvents("legacy-exam");
-    exams.forEach(function (exam) {
-        if (!exam.id) exam.id = calendarEventId("exam");
-        calendarEvents.push(normalizeCalendarEvent({
-            id: "cal_exam_" + exam.id,
-            kind: "exam",
-            examType: exam.type || "提出物",
-            date: exam.date || "",
-            title: exam.text || "テスト・提出物",
-            icon: exam.type === "テスト" || exam.type === "模試" ? "📝" : "📄",
-            done: !!exam.done,
-            sourceType: "legacy-exam",
-            sourceId: String(exam.id)
-        }));
-    });
-
-    /* 既存の学習以外の予定をカレンダーへ同期 */
-    removeCalendarSourceEvents("legacy-other");
-    otherSchedules.forEach(function (item) {
-        if (!item.id) item.id = calendarEventId("other");
-        if (!item.text && !item.date) return;
-        calendarEvents.push(normalizeCalendarEvent({
-            id: "cal_other_" + item.id,
-            kind: item.kind || "personal",
-            date: item.date || "",
-            time: item.time || "",
-            title: item.text || "予定",
-            icon: item.icon || "📅",
-            done: !!item.checked,
-            sourceType: "legacy-other",
-            sourceId: String(item.id)
-        }));
-    });
-
-    /* 既存の重要予定をカレンダーへ同期 */
-    removeCalendarSourceEvents("legacy-important");
-    patgsSchedule.forEach(function (item) {
-        if (!item.id) item.id = calendarEventId("schedule");
-        if (!item.date && !item.name) return;
-        calendarEvents.push(normalizeCalendarEvent({
-            id: "cal_important_" + item.id,
-            kind: "important",
-            date: item.date || "",
-            title: item.name || "重要予定",
-            icon: item.icon || "⭐",
-            fixed: !!item.fixed,
-            sourceType: "legacy-important",
-            sourceId: String(item.id)
-        }));
-    });
-
-    saveJSON("exams", exams);
-    saveJSON("patgs27_other_schedule", otherSchedules);
-    saveJSON("patgs27_schedule", patgsSchedule);
-    saveCalendarEvents();
-}
-
-function ensureCalendarMigration() {
-
-    if (localStorage.getItem("patgs27_calendar_migrated_v1") !== "1") {
-        /* 既存のデータを一度だけカレンダーへ移す。既存データそのものは削除しない。 */
-        syncLegacyCalendarEvents();
-        localStorage.setItem("patgs27_calendar_migrated_v1", "1");
-    } else if (!Array.isArray(calendarEvents)) {
-        calendarEvents = [];
-        saveCalendarEvents();
-    }
-}
-
-function updateLegacyFromCalendarEvent(event) {
-
-    const sourceId = String(event.sourceId || "");
-    if (!sourceId) return;
-
-    if (event.sourceType === "legacy-exam") {
-        const item = exams.find(function (exam) { return String(exam.id) === sourceId; });
-        if (item) {
-            item.type = event.examType || item.type || "提出物";
-            item.date = event.date || "";
-            item.text = event.title || "";
-            item.done = !!event.done;
-            saveJSON("exams", exams);
-        }
-    }
-
-    if (event.sourceType === "legacy-other") {
-        const item = otherSchedules.find(function (schedule) { return String(schedule.id) === sourceId; });
-        if (item) {
-            item.text = event.title || "";
-            item.date = event.date || "";
-            item.time = event.time || "";
-            item.checked = !!event.done;
-            item.kind = event.kind || "personal";
-            item.icon = event.icon || "📅";
-            saveJSON("patgs27_other_schedule", otherSchedules);
-        }
-    }
-
-    if (event.sourceType === "legacy-important") {
-        const item = patgsSchedule.find(function (schedule) { return String(schedule.id) === sourceId; });
-        if (item) {
-            item.name = event.title || "";
-            item.date = event.date || "";
-            item.icon = event.icon || "⭐";
-            saveJSON("patgs27_schedule", patgsSchedule);
-        }
-    }
-}
-
-function addCalendarEventToLegacy(event) {
-
-    if (event.sourceType !== "calendar") return;
-
-    if (event.kind === "exam") {
-        const exam = {
-            id: calendarEventId("exam"),
-            type: event.examType || "提出物",
-            date: event.date || "",
-            text: event.title || "",
-            done: !!event.done
-        };
-        exams.push(exam);
-        event.sourceType = "legacy-exam";
-        event.sourceId = String(exam.id);
-    } else if (event.kind === "school" || event.kind === "personal") {
-        const item = {
-            id: calendarEventId("other"),
-            text: event.title || "",
-            checked: !!event.done,
-            date: event.date || "",
-            time: event.time || "",
-            kind: event.kind,
-            icon: event.icon || "📅"
-        };
-        otherSchedules.push(item);
-        event.sourceType = "legacy-other";
-        event.sourceId = String(item.id);
-    } else if (event.kind === "important") {
-        const item = {
-            id: calendarEventId("schedule"),
-            name: event.title || "",
-            date: event.date || "",
-            icon: event.icon || "⭐",
-            fixed: false
-        };
-        patgsSchedule.push(item);
-        event.sourceType = "legacy-important";
-        event.sourceId = String(item.id);
-    }
-
-    saveJSON("exams", exams);
-    saveJSON("patgs27_other_schedule", otherSchedules);
-    saveJSON("patgs27_schedule", patgsSchedule);
-}
-
-function removeCalendarEvent(event) {
-    if (!event) return;
-
-    if (event.sourceType === "legacy-exam") {
-        exams = exams.filter(function (item) { return String(item.id) !== String(event.sourceId); });
-        saveJSON("exams", exams);
-        renderExams();
-    } else if (event.sourceType === "legacy-other") {
-        otherSchedules = otherSchedules.filter(function (item) { return String(item.id) !== String(event.sourceId); });
-        saveJSON("patgs27_other_schedule", otherSchedules);
-        renderOtherSchedules();
-    } else if (event.sourceType === "legacy-important") {
-        patgsSchedule = patgsSchedule.filter(function (item) { return String(item.id) !== String(event.sourceId); });
-        saveJSON("patgs27_schedule", patgsSchedule);
-        renderScheduleSettings();
-        updateSchedule();
-    }
-
-    calendarEvents = calendarEvents.filter(function (item) { return item.id !== event.id; });
-    saveCalendarEvents();
-    renderCalendar();
-}
-
-function calendarDateLabel(dateKey) {
-    const d = new Date(dateKey + "T00:00:00");
-    return d.getFullYear() + "年" + (d.getMonth() + 1) + "月" + d.getDate() + "日（" + ["日","月","火","水","木","金","土"][d.getDay()] + "）";
-}
-
-function calendarEventsForDate(dateKey) {
-    return calendarEvents.filter(function (event) {
-        return event.date === dateKey;
-    }).sort(function (a, b) {
-        return (a.time || "99:99").localeCompare(b.time || "99:99") || a.title.localeCompare(b.title);
-    });
-}
-
-function calendarKomaForDate(dateKey) {
-    return reservations.filter(function (record) {
-        return record.date === dateKey;
-    }).sort(sortByStart);
-}
-
-function renderCalendarEventChip(event) {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "cal-event-chip cal-event-" + (event.kind || "personal");
-    chip.title = calendarEventKindLabel(event);
-    chip.textContent = (event.time ? event.time + " " : "") + calendarEventLabel(event) + " " + (event.title || "予定");
-    chip.addEventListener("click", function (e) {
-        e.stopPropagation();
-        selectCalendarDate(event.date);
-        beginCalendarEdit(event.id);
-    });
-    return chip;
-}
-
-function renderCalendarDayCell(dateKey, compact) {
-    const cell = document.createElement("div");
-    cell.className = "cal-day-cell" + (dateKey === todayKey() ? " is-today" : "");
-    cell.dataset.date = dateKey;
-
-    const head = document.createElement("div");
-    head.className = "cal-day-head";
-    head.textContent = Number(dateKey.slice(8));
-    cell.appendChild(head);
-
-    const eventsBox = document.createElement("div");
-    eventsBox.className = "cal-events";
-    calendarEventsForDate(dateKey).slice(0, compact ? 4 : 30).forEach(function (event) {
-        eventsBox.appendChild(renderCalendarEventChip(event));
-    });
-
-    if (calendarEventsForDate(dateKey).length > (compact ? 4 : 30)) {
-        const more = document.createElement("span");
-        more.className = "cal-more";
-        more.textContent = "+ もっと";
-        eventsBox.appendChild(more);
-    }
-
-    const komaBox = document.createElement("div");
-    komaBox.className = "cal-koma-list";
-    calendarKomaForDate(dateKey).forEach(function (record) {
-        const chip = document.createElement("div");
-        chip.className = "cal-koma-chip " + (record.status || "reserved");
-        chip.textContent = record.time + "　" + (record.subject || "科目未設定") + "　" + statusLabel(record);
-        chip.title = reservationBody(record);
-        chip.addEventListener("click", function (e) {
-            e.stopPropagation();
-            document.getElementById("nextReservationBox")?.scrollIntoView({behavior:"smooth", block:"center"});
-        });
-        komaBox.appendChild(chip);
-    });
-
-    cell.append(eventsBox, komaBox);
-    cell.addEventListener("click", function () { selectCalendarDate(dateKey); });
-    return cell;
-}
-
-function renderCalendarMonth() {
-    const grid = $("calGrid");
-    if (!grid) return;
-    grid.className = "cal-grid cal-month-grid";
-    grid.innerHTML = "";
-
-    ["日","月","火","水","木","金","土"].forEach(function (label) {
-        const h = document.createElement("div");
-        h.className = "cal-weekday";
-        h.textContent = label;
-        grid.appendChild(h);
-    });
-
-    const d = new Date(calendarCursorDate + "T00:00:00");
-    const first = new Date(d.getFullYear(), d.getMonth(), 1);
-    const start = new Date(first);
-    start.setDate(first.getDate() - first.getDay());
-
-    for (let i = 0; i < 42; i++) {
-        const current = new Date(start);
-        current.setDate(start.getDate() + i);
-        const key = dateKeyOf(current);
-        const cell = renderCalendarDayCell(key, true);
-        if (current.getMonth() !== d.getMonth()) cell.classList.add("is-other-month");
-        grid.appendChild(cell);
-    }
-
-    $("calRangeLabel").textContent = d.getFullYear() + "年" + (d.getMonth() + 1) + "月";
-}
-
-function renderCalendarWeek() {
-    const grid = $("calGrid");
-    if (!grid) return;
-    grid.className = "cal-grid cal-week-grid";
-    grid.innerHTML = "";
-    const startKey = getWeekStartKey(calendarCursorDate);
-    const endKey = addDaysToKey(startKey, 6);
-
-    for (let i = 0; i < 7; i++) {
-        const key = addDaysToKey(startKey, i);
-        const cell = renderCalendarDayCell(key, false);
-        grid.appendChild(cell);
-    }
-
-    $("calRangeLabel").textContent = formatShortDate(startKey) + "〜" + formatShortDate(endKey);
-}
-
-function renderCalendarDay() {
-    const grid = $("calGrid");
-    if (!grid) return;
-    grid.className = "cal-grid cal-day-grid";
-    grid.innerHTML = "";
-    grid.appendChild(renderCalendarDayCell(calendarCursorDate, false));
-    $("calRangeLabel").textContent = calendarDateLabel(calendarCursorDate);
-}
-
-function renderCalendar() {
-    ensureCalendarMigration();
-    if (calendarView === "month") renderCalendarMonth();
-    if (calendarView === "week") renderCalendarWeek();
-    if (calendarView === "day") renderCalendarDay();
-    renderCalendarDayDetail(calendarCursorDate);
-    renderTimerReservationOptions();
-}
-
-function selectCalendarDate(dateKey) {
-    calendarCursorDate = dateKey;
-    if ($("calAddDate")) $("calAddDate").value = dateKey;
-    renderCalendar();
-}
-
-function moveCalendar(amount) {
-    const d = new Date(calendarCursorDate + "T00:00:00");
-    if (calendarView === "month") d.setMonth(d.getMonth() + amount);
-    else if (calendarView === "week") d.setDate(d.getDate() + amount * 7);
-    else d.setDate(d.getDate() + amount);
-    calendarCursorDate = dateKeyOf(d);
-    renderCalendar();
-}
-
-function renderCalendarDayDetail(dateKey) {
-    const box = $("calDayDetail");
-    if (!box) return;
-    box.innerHTML = "";
-
-    const title = document.createElement("strong");
-    title.textContent = calendarDateLabel(dateKey);
-    box.appendChild(title);
-
-    const events = calendarEventsForDate(dateKey);
-    const komas = calendarKomaForDate(dateKey);
-
-    if (!events.length && !komas.length) {
-        const empty = document.createElement("p");
-        empty.className = "empty-note";
-        empty.textContent = "この日の予定・コマはありません。";
-        box.appendChild(empty);
-        return;
-    }
-
-    events.forEach(function (event) {
-        const row = document.createElement("div");
-        row.className = "cal-detail-row cal-detail-event";
-        const text = document.createElement("span");
-        text.textContent = (event.time ? event.time + "　" : "終日　") + calendarEventLabel(event) + " " + event.title + "［" + calendarEventKindLabel(event) + "］";
-        const edit = makeButton("編集");
-        edit.addEventListener("click", function () { beginCalendarEdit(event.id); });
-        const del = makeButton("削除", "ghost");
-        del.addEventListener("click", function () {
-            if (confirm("この予定を削除しますか？")) removeCalendarEvent(event);
-        });
-        row.append(text, edit, del);
-        box.appendChild(row);
-    });
-
-    komas.forEach(function (record) {
-        const row = document.createElement("div");
-        row.className = "cal-detail-row cal-detail-koma";
-        const text = document.createElement("span");
-        text.textContent = record.time + "〜" + minutesToTime(timeToMinutes(record.time) + reservationDuration(record)) + "　📚 " + (record.subject || "科目未設定") + "　" + statusLabel(record);
-        row.appendChild(text);
-        box.appendChild(row);
-    });
-}
-
-function clearCalendarForm() {
-    editingCalendarEventId = null;
-    if ($("calAddDate")) $("calAddDate").value = calendarCursorDate;
-    if ($("calAddKind")) $("calAddKind").value = "school";
-    if ($("calAddExamType")) $("calAddExamType").value = "提出物";
-    if ($("calAddIcon")) $("calAddIcon").value = "📅";
-    if ($("calAddTime")) $("calAddTime").value = "";
-    if ($("calAddTitle")) $("calAddTitle").value = "";
-    if ($("calAddBtn")) $("calAddBtn").textContent = "この内容で追加";
-    if ($("calCancelEditBtn")) $("calCancelEditBtn").style.display = "none";
-}
-
-function beginCalendarEdit(id) {
-    const event = findCalendarEvent(id);
-    if (!event) return;
-    editingCalendarEventId = id;
-    if ($("calAddDate")) $("calAddDate").value = event.date || "";
-    if ($("calAddKind")) $("calAddKind").value = event.kind || "personal";
-    if ($("calAddExamType")) $("calAddExamType").value = event.examType || "提出物";
-    if ($("calAddIcon")) $("calAddIcon").value = event.icon || "📅";
-    if ($("calAddTime")) $("calAddTime").value = event.time || "";
-    if ($("calAddTitle")) $("calAddTitle").value = event.title || "";
-    if ($("calAddBtn")) $("calAddBtn").textContent = "この予定を変更する";
-    if ($("calCancelEditBtn")) $("calCancelEditBtn").style.display = "inline-block";
-    $("calendarPanel")?.scrollIntoView({behavior:"smooth", block:"center"});
-}
-
-function updateCalendarKindUI() {
-    const kind = $("calAddKind")?.value || "school";
-    if ($("calAddExamTypeWrap")) $("calAddExamTypeWrap").style.display = kind === "exam" ? "flex" : "none";
-}
-
-function submitCalendarEvent() {
-    const date = $("calAddDate")?.value || calendarCursorDate;
-    const kind = $("calAddKind")?.value || "personal";
-    const title = $("calAddTitle")?.value.trim() || "予定";
-    const time = $("calAddTime")?.value || "";
-    const icon = $("calAddIcon")?.value.trim() || "📅";
-    const examType = $("calAddExamType")?.value || "提出物";
-
-    if (!date) {
-        alert("日付を選んでください。");
-        return;
-    }
-
-    let event = editingCalendarEventId ? findCalendarEvent(editingCalendarEventId) : null;
-
-    if (!event) {
-        event = normalizeCalendarEvent({
-            id: calendarEventId("cal"),
-            kind: kind,
-            examType: kind === "exam" ? examType : "",
-            date: date,
-            time: time,
-            title: title,
-            icon: icon,
-            sourceType: "calendar"
-        });
-        addCalendarEventToLegacy(event);
-        calendarEvents.push(event);
-    } else {
-        event.kind = kind;
-        event.examType = kind === "exam" ? examType : "";
-        event.date = date;
-        event.time = time;
-        event.title = title;
-        event.icon = icon;
-        event.updatedAt = nowText();
-        updateLegacyFromCalendarEvent(event);
-    }
-
-    saveCalendarEvents();
-    renderExams();
-    renderOtherSchedules();
-    renderScheduleSettings();
-    updateSchedule();
-    clearCalendarForm();
-    calendarCursorDate = date;
-    renderCalendar();
-}
-
-function setupCalendar() {
-    if ($("calAddDate")) $("calAddDate").value = todayKey();
-    $("calPrevBtn")?.addEventListener("click", function () { moveCalendar(-1); });
-    $("calNextBtn")?.addEventListener("click", function () { moveCalendar(1); });
-    $("calTodayBtn")?.addEventListener("click", function () { calendarCursorDate = todayKey(); renderCalendar(); });
-    $("calViewMonthBtn")?.addEventListener("click", function () { calendarView = "month"; renderCalendar(); });
-    $("calViewWeekBtn")?.addEventListener("click", function () { calendarView = "week"; renderCalendar(); });
-    $("calViewDayBtn")?.addEventListener("click", function () { calendarView = "day"; renderCalendar(); });
-    $("calAddKind")?.addEventListener("change", updateCalendarKindUI);
-    $("calAddBtn")?.addEventListener("click", submitCalendarEvent);
-    $("calCancelEditBtn")?.addEventListener("click", clearCalendarForm);
-    updateCalendarKindUI();
-}
-
-/* 既存UIを残しつつ、カレンダーを正本として同期する。 */
-function saveExams() {
-    saveJSON("exams", exams);
-    removeCalendarSourceEvents("legacy-exam");
-    exams.forEach(function (exam) {
-        if (!exam.id) exam.id = calendarEventId("exam");
-        calendarEvents.push(normalizeCalendarEvent({
-            id: "cal_exam_" + exam.id,
-            kind: "exam",
-            examType: exam.type || "提出物",
-            date: exam.date || "",
-            title: exam.text || "テスト・提出物",
-            icon: exam.type === "提出物" ? "📄" : "📝",
-            done: !!exam.done,
-            sourceType: "legacy-exam",
-            sourceId: String(exam.id)
-        }));
-    });
-    saveCalendarEvents();
-}
-
-function saveOtherSchedules() {
-    saveJSON("patgs27_other_schedule", otherSchedules);
-    removeCalendarSourceEvents("legacy-other");
-    otherSchedules.forEach(function (item) {
-        if (!item.id) item.id = calendarEventId("other");
-        if (!item.text && !item.date) return;
-        calendarEvents.push(normalizeCalendarEvent({
-            id: "cal_other_" + item.id,
-            kind: item.kind || "personal",
-            date: item.date || "",
-            time: item.time || "",
-            title: item.text || "予定",
-            icon: item.icon || "📅",
-            done: !!item.checked,
-            sourceType: "legacy-other",
-            sourceId: String(item.id)
-        }));
-    });
-    saveCalendarEvents();
-}
-
-function savePatgsScheduleUnified() {
-    saveJSON("patgs27_schedule", patgsSchedule);
-    removeCalendarSourceEvents("legacy-important");
-    patgsSchedule.forEach(function (item) {
-        if (!item.id) item.id = calendarEventId("schedule");
-        if (!item.date && !item.name) return;
-        calendarEvents.push(normalizeCalendarEvent({
-            id: "cal_important_" + item.id,
-            kind: "important",
-            date: item.date || "",
-            title: item.name || "重要予定",
-            icon: item.icon || "⭐",
-            fixed: !!item.fixed,
-            sourceType: "legacy-important",
-            sourceId: String(item.id)
-        }));
-    });
-    saveCalendarEvents();
-}
-
-/* =========================================================
-   学習タイマー
-   ========================================================= */
-
-let studyTimer = loadJSON("patgs27_study_timer", null);
-let studyTimerTick = null;
-
-function saveStudyTimer() {
-    saveJSON("patgs27_study_timer", studyTimer);
-}
-
-function timerRemainingMs() {
-    if (!studyTimer) return 0;
-    if (studyTimer.running) return Math.max(0, Number(studyTimer.endAt) - Date.now());
-    return Math.max(0, Number(studyTimer.remainingMs) || 0);
-}
-
-function timerText(ms) {
-    const seconds = Math.max(0, Math.ceil(ms / 1000));
-    return pad2(Math.floor(seconds / 60)) + ":" + pad2(seconds % 60);
-}
-
-function renderTimerReservationOptions() {
-    const select = $("studyTimerReservation");
-    if (!select) return;
-    const current = select.value;
-    select.innerHTML = "";
-    const empty = document.createElement("option");
-    empty.value = "";
-    empty.textContent = "コマを選択（任意）";
-    select.appendChild(empty);
-    reservations.filter(function (record) {
-        return record.status === "reserved" || record.status === "running";
-    }).sort(sortByStart).forEach(function (record) {
-        const option = document.createElement("option");
-        option.value = record.id;
-        option.textContent = formatShortDate(record.date) + " " + record.time + "　" + (record.subject || "科目未設定");
-        select.appendChild(option);
-    });
-    if ([...select.options].some(function (o) { return o.value === current; })) select.value = current;
-}
-
-function startStudyTimerForReservation(record) {
-    const minutes = reservationType(record) === "exam" ? 70 : 30;
-    studyTimer = {
-        running: true,
-        durationMinutes: minutes,
-        startedAt: Date.now(),
-        endAt: Date.now() + minutes * 60000,
-        remainingMs: minutes * 60000,
-        reservationId: record.id,
-        notified: false
-    };
-    saveStudyTimer();
-    renderTimerReservationOptions();
-    if ($("studyTimerReservation")) $("studyTimerReservation").value = record.id;
-    renderStudyTimer();
-}
-
-function startManualStudyTimer() {
-    const selectedId = $("studyTimerReservation")?.value || "";
-    const record = selectedId ? findReservation(selectedId) : null;
-    const requested = Number($("studyTimerMinutes")?.value) || 30;
-    const minutes = record && reservationType(record) === "exam" ? 70 : requested;
-
-    studyTimer = {
-        running: true,
-        durationMinutes: minutes,
-        startedAt: Date.now(),
-        endAt: Date.now() + minutes * 60000,
-        remainingMs: minutes * 60000,
-        reservationId: record ? record.id : "",
-        notified: false
-    };
-    saveStudyTimer();
-    renderStudyTimer();
-}
-
-function pauseStudyTimer() {
-    if (!studyTimer || !studyTimer.running) return;
-    studyTimer.remainingMs = timerRemainingMs();
-    studyTimer.running = false;
-    studyTimer.pausedAt = Date.now();
-    saveStudyTimer();
-    renderStudyTimer();
-}
-
-function resetStudyTimer() {
-    studyTimer = null;
-    saveStudyTimer();
-    renderStudyTimer();
-}
-
-function finishStudyTimerNotification() {
-    if (!studyTimer || studyTimer.notified) return;
-    studyTimer.notified = true;
-    studyTimer.running = false;
-    studyTimer.remainingMs = 0;
-    studyTimer.endedAt = Date.now();
-    saveStudyTimer();
-    sendPatgsNotification(
-        "⏱ 学習時間が終了しました",
-        "予約した学習時間が終了しました。必要ならコマを完了して学習結果を記録してください。"
-    );
-}
-
-function renderStudyTimer() {
-    const display = $("studyTimerDisplay");
-    const status = $("studyTimerStatus");
-    if (!display || !status) return;
-
-    if (!studyTimer) {
-        display.textContent = "00:00";
-        status.textContent = "タイマーは停止中です。";
-        return;
-    }
-
-    const remaining = timerRemainingMs();
-    display.textContent = timerText(remaining);
-
-    if (studyTimer.running && remaining <= 0) finishStudyTimerNotification();
-
-    if (studyTimer.running) {
-        status.textContent = (studyTimer.reservationId ? "コマと連動中：" : "手動タイマー：") + studyTimer.durationMinutes + "分";
-    } else if (remaining <= 0) {
-        status.textContent = "終了しました。コマを強制終了はしていません。";
-    } else {
-        status.textContent = "一時停止中：残り " + timerText(remaining);
-    }
-}
-
-function setupStudyTimer() {
-    $("studyTimerStartBtn")?.addEventListener("click", startManualStudyTimer);
-    $("studyTimerPauseBtn")?.addEventListener("click", pauseStudyTimer);
-    $("studyTimerResetBtn")?.addEventListener("click", resetStudyTimer);
-    renderTimerReservationOptions();
-    renderStudyTimer();
-    clearInterval(studyTimerTick);
-    studyTimerTick = setInterval(renderStudyTimer, 500);
-}
-
-/* =========================================================
-   学習終了時の記録・未解決事項
-   ========================================================= */
-
-function unresolvedIssuesForSelect() {
-    const list = [];
-    reservations.forEach(function (record) {
-        (record.studyResult?.unresolvedIssues || []).forEach(function (issue) {
-            if (!issue.resolved) {
-                list.push({ record: record, issue: issue });
-            }
-        });
-    });
-    return list.sort(function (a, b) {
-        return sortByStart(a.record, b.record);
-    });
-}
-
-function finishReservationWithRecord(record) {
-    pendingStudyRecordId = record.id;
-    renderStudyRecordForm(record);
-    $("studyRecordPanel")?.scrollIntoView({behavior:"smooth", block:"center"});
-}
-
-function renderStudyRecordForm(record) {
-    const box = $("studyRecordForm");
-    if (!box) return;
-    box.innerHTML = "";
-
-    const title = document.createElement("h3");
-    title.textContent = formatShortDate(record.date) + " " + record.time + " 「" + (record.subject || "科目未設定") + "」の終了記録";
-    box.appendChild(title);
-
-    const grid = document.createElement("div");
-    grid.className = "form-grid";
-
-    function field(labelText, id, placeholder, rows) {
-        const label = document.createElement("label");
-        label.className = "wide";
-        label.textContent = labelText;
-        const input = rows ? document.createElement("textarea") : document.createElement("input");
-        if (rows) input.rows = rows; else input.type = "text";
-        input.id = id;
-        input.placeholder = placeholder;
-        input.value = record.studyResult?.[id.replace("studyRecord", "").toLowerCase()] || "";
-        label.appendChild(input);
-        grid.appendChild(label);
-    }
-
-    field("今回の学習内容", "studyRecordContent", "例：二次関数 問題1〜10", 2);
-    field("結果", "studyRecordResult", "例：8/10正解", 1);
-    field("分かったこと・できるようになったこと", "studyRecordLearned", "短く入力", 2);
-    field("未解決・まだ分からないこと", "studyRecordUnresolved", "1行1件。例：8番の最大値の求め方", 3);
-
-    const resolveLabel = document.createElement("label");
-    resolveLabel.className = "wide";
-    resolveLabel.textContent = "今回のコマで解決する未解決事項（選択したら自動で解決済み）";
-    const select = document.createElement("select");
-    select.id = "studyRecordResolveIssue";
-    const empty = document.createElement("option");
-    empty.value = "";
-    empty.textContent = "選択しない";
-    select.appendChild(empty);
-    unresolvedIssuesForSelect().filter(function (item) { return item.record.id !== record.id; }).forEach(function (item) {
-        const option = document.createElement("option");
-        option.value = item.record.id + "::" + item.issue.id;
-        option.textContent = formatShortDate(item.record.date) + " " + (item.record.subject || "") + "｜未解決：" + item.issue.text;
-        select.appendChild(option);
-    });
-    resolveLabel.appendChild(select);
-    grid.appendChild(resolveLabel);
-
-    box.appendChild(grid);
-
-    const buttons = document.createElement("div");
-    buttons.className = "btn-row";
-    const save = makeButton("記録してコマを完了", "primary");
-    save.addEventListener("click", function () { saveStudyResultAndComplete(record); });
-    const noRecord = makeButton("記録せず完了", "ghost");
-    noRecord.addEventListener("click", function () {
-        record.status = "done";
-        record.completedAt = nowText();
-        saveReservations();
-        if (studyTimer?.reservationId === record.id) resetStudyTimer();
-        pendingStudyRecordId = null;
-        box.innerHTML = "";
-        renderKomaAll();
-    });
-    const cancel = makeButton("キャンセル", "ghost");
-    cancel.addEventListener("click", function () { pendingStudyRecordId = null; box.innerHTML = ""; });
-    buttons.append(save, noRecord, cancel);
-    box.appendChild(buttons);
-}
-
-function saveStudyResultAndComplete(record) {
-    const content = $("studyRecordContent")?.value.trim() || "";
-    const result = $("studyRecordResult")?.value.trim() || "";
-    const learned = $("studyRecordLearned")?.value.trim() || "";
-    const unresolvedText = $("studyRecordUnresolved")?.value.trim() || "";
-    const resolveValue = $("studyRecordResolveIssue")?.value || "";
-
-    const unresolvedIssues = unresolvedText.split(/\n+/).map(function (text) { return text.trim(); }).filter(Boolean).map(function (text) {
-        return { id: calendarEventId("issue"), text: text, resolved: false, createdAt: nowText() };
-    });
-
-    record.studyResult = {
-        content: content,
-        result: result,
-        learned: learned,
-        unresolvedIssues: unresolvedIssues,
-        updatedAt: nowText()
-    };
-
-    if (resolveValue) {
-        const parts = resolveValue.split("::");
-        const sourceRecord = findReservation(parts[0]);
-        const issueId = parts.slice(1).join("::");
-        const issue = sourceRecord?.studyResult?.unresolvedIssues?.find(function (item) { return item.id === issueId; });
-        if (issue) {
-            issue.resolved = true;
-            issue.resolvedByReservationId = record.id;
-            issue.resolvedAt = nowText();
-            record.studyResult.resolvedIssueId = issue.id;
-            record.studyResult.resolvedIssueSourceReservationId = sourceRecord.id;
-            saveReservations();
-        }
-    }
-
-    record.status = "done";
-    record.completedAt = nowText();
-    saveReservations();
-
-    if (studyTimer?.reservationId === record.id) resetStudyTimer();
-    pendingStudyRecordId = null;
-    $("studyRecordForm").innerHTML = "";
-    renderKomaAll();
-    renderUnresolvedList();
-}
-
-function renderUnresolvedList() {
-    const box = $("unresolvedList");
-    if (!box) return;
-    box.innerHTML = "";
-    const unresolved = unresolvedIssuesForSelect();
-    const h = document.createElement("h3");
-    h.textContent = "未解決事項";
-    box.appendChild(h);
-    if (!unresolved.length) {
-        const p = document.createElement("p");
-        p.className = "empty-note";
-        p.textContent = "未解決事項はありません。";
-        box.appendChild(p);
-        return;
-    }
-    unresolved.forEach(function (item) {
-        const row = document.createElement("div");
-        row.className = "unresolved-item";
-        row.textContent = formatShortDate(item.record.date) + " " + (item.record.subject || "") + "｜" + item.issue.text;
-        box.appendChild(row);
-    });
-}
-
-/* 既存の「完了」関数は互換性のため残す。新UIでは完了・記録を優先する。 */
-
-/* =========================================================
    初期化
    ========================================================= */
 
 function initializePATGS27() {
-
-    ensureCalendarMigration();
-    setupCalendar();
-    setupStudyTimer();
 
     /* コマ制度 */
     setupReservationForm();
@@ -5620,6 +5578,11 @@ function initializePATGS27() {
     updatePATGSTodayDate();
     updateSchedule();
 
+    /* カレンダー・タイマー */
+    setupCalendar();
+    renderCalendarAll();
+    setupTimer();
+
     /* その他 */
     loadPatgsProxy();
     renderSubjectPlan();
@@ -5628,9 +5591,6 @@ function initializePATGS27() {
     renderStudyHeatmap();
     renderTodaySummary();
     renderRandomMessage();
-    renderCalendar();
-    renderUnresolvedList();
-    renderStudyTimer();
 
     console.log("PATGS27 script.js (" + PATGS_VERSION + ") loaded successfully.");
 }
