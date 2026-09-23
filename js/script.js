@@ -20,7 +20,7 @@
    ========================================================= */
 
 
-const PATGS_VERSION = "20260922b";
+const PATGS_VERSION = "20260923a";
 
 
 /* =========================================================
@@ -749,7 +749,14 @@ function completeReservation(record) {
     renderKomaAll();
     renderStudyHeatmap();
     celebrateCompletion();
-    playChime();
+
+    if (typeof growSubject === "function" && reservationType(record) === "normal") {
+        growSubject(record.subject);
+    }
+
+    if (typeof checkBadges === "function") {
+        checkBadges();
+    }
 }
 
 function reopenReservation(record) {
@@ -2450,12 +2457,13 @@ function renderKomaAll() {
     renderWeeklyKomaReport();
     renderTimeOptions();
     renderUnresolvedList();
-    renderGrowth();
-    renderJukenMap();
-    checkBadges();
 
     if (typeof renderCalendarAll === "function") {
         renderCalendarAll();
+    }
+
+    if (typeof renderMapBoard === "function") {
+        renderMapBoard();
     }
 }
 
@@ -3566,7 +3574,6 @@ function saveWeeklyReview() {
     saveWeeklyReviews();
 
     showSave("weeklyReviewSaveStatus", "✓ 保存しました");
-    playChime();
 
     weeklyReviewEditingWeek = null;
 
@@ -3792,7 +3799,6 @@ function refreshAllScheduleViews() {
     renderOtherSchedules();
     renderScheduleSettings();
     updateSchedule();
-    renderJukenMap();
 
     if (typeof renderCalendarAll === "function") {
         renderCalendarAll();
@@ -5907,85 +5913,62 @@ setInterval(function () {
 
 
 /* =========================================================
-   ＋ やる気を高める機能
-   ＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
-   ここから⑥（育成・成長／受験マップ／週次振り返り自動生成／
-   演出音・アニメーション／実績・バッジ）を実装する。
-   すべて既存のreservations・calendarEvents・weekRequiredなど
-   既存データから計算するだけで、新しい入力欄は増やさない。
+   ⑥-1 育成・成長
    ========================================================= */
 
-/* --- ⑥-1 育成・成長系ビジュアル --- */
-
-const GROWTH_STAGE_THRESHOLDS = [0, 5, 15, 30, 60];
-const GROWTH_STAGE_LABELS = ["種", "芽", "若葉", "成長中", "立派"];
-
-const GROWTH_ICON_SETS = {
-    "国語": ["🌰", "🌱", "🌿", "🌸", "🎋"],
-    "数学": ["🌰", "🌱", "🌿", "🌲", "🎄"],
-    "英語": ["🥚", "🐣", "🐤", "🦅", "🦉"],
-    "理科": ["🌰", "🌱", "🌵", "🌴", "🌻"],
-    "社会": ["🥚", "🐢", "🐇", "🦊", "🦁"],
-    "その他": ["🌰", "🌱", "🍄", "🍀", "🌟"]
+const GROWTH_SUBJECT_EMOJI = {
+    "国語": "📖",
+    "数学": "🔢",
+    "英語": "🌍",
+    "理科": "🔬",
+    "社会": "🗺",
+    "その他": "🌾"
 };
 
-function growthPointsForSubject(subject) {
+const GROWTH_STAGES = [
+    { min: 0, icon: "🌰", label: "たね" },
+    { min: 3, icon: "🌱", label: "芽" },
+    { min: 8, icon: "🌿", label: "若葉" },
+    { min: 15, icon: "🌸", label: "花" },
+    { min: 25, icon: "🌳", label: "木" },
+    { min: 40, icon: "🌴", label: "大木" }
+];
 
-    return reservations.reduce(function (sum, record) {
+let growthData = loadJSON("patgs27_growth", {});
 
-        if (record.status !== "done") {
-            return sum;
-        }
-
-        const subj = KOMA_SUBJECTS.includes(record.subject) ? record.subject : "その他";
-
-        if (subj !== subject) {
-            return sum;
-        }
-
-        return sum + komaValue(record);
-
-    }, 0);
+function saveGrowthData() {
+    saveJSON("patgs27_growth", growthData);
 }
 
-function growthStageIndex(points) {
+function growSubject(subject) {
 
-    let index = 0;
+    const key = KOMA_SUBJECTS.includes(subject) ? subject : "その他";
 
-    GROWTH_STAGE_THRESHOLDS.forEach(function (threshold, i) {
-        if (points >= threshold) {
-            index = i;
+    if (!growthData[key]) {
+        growthData[key] = { points: 0, lastGrowDate: "" };
+    }
+
+    growthData[key].points += 1;
+    growthData[key].lastGrowDate = todayKey();
+
+    saveGrowthData();
+    renderGrowthList();
+}
+
+function growthStageFor(points) {
+
+    let stage = GROWTH_STAGES[0];
+
+    GROWTH_STAGES.forEach(function (s) {
+        if (points >= s.min) {
+            stage = s;
         }
     });
 
-    return index;
+    return stage;
 }
 
-function lastStudiedDateForSubject(subject) {
-
-    let last = "";
-
-    reservations.forEach(function (record) {
-
-        if (record.status !== "done") {
-            return;
-        }
-
-        const subj = KOMA_SUBJECTS.includes(record.subject) ? record.subject : "その他";
-
-        if (subj !== subject) {
-            return;
-        }
-
-        if (!last || record.date > last) {
-            last = record.date;
-        }
-    });
-
-    return last;
-}
-
-function renderGrowth() {
+function renderGrowthList() {
 
     const container = $("growthList");
 
@@ -5995,61 +5978,55 @@ function renderGrowth() {
 
     container.innerHTML = "";
 
-    const yesterday = getDateKeyOffset(-1);
-    const today = todayKey();
-
     KOMA_SUBJECTS.forEach(function (subject) {
 
-        const points = growthPointsForSubject(subject);
-        const stage = growthStageIndex(points);
-        const icons = GROWTH_ICON_SETS[subject] || GROWTH_ICON_SETS["その他"];
-        const icon = icons[Math.min(stage, icons.length - 1)];
-        const stageLabel = GROWTH_STAGE_LABELS[Math.min(stage, GROWTH_STAGE_LABELS.length - 1)];
-
-        const lastDate = lastStudiedDateForSubject(subject);
-        const resting = points > 0 && lastDate && lastDate !== today && lastDate !== yesterday;
+        const data = growthData[subject] || { points: 0, lastGrowDate: "" };
+        const stage = growthStageFor(data.points);
 
         const card = document.createElement("div");
         card.className = "growth-card";
 
-        const iconEl = document.createElement("div");
-        iconEl.className = "growth-icon";
-        iconEl.textContent = icon;
+        const icon = document.createElement("div");
+        icon.className = "growth-icon";
+        icon.textContent = stage.icon;
 
-        const subjectEl = document.createElement("div");
-        subjectEl.className = "growth-subject";
-        subjectEl.textContent = subject;
+        const subjectLabel = document.createElement("div");
+        subjectLabel.className = "growth-subject";
+        subjectLabel.textContent = (GROWTH_SUBJECT_EMOJI[subject] || "") + " " + subject;
 
-        const stageEl = document.createElement("div");
-        stageEl.className = "growth-stage";
-        stageEl.textContent = stageLabel + (resting ? "（お休み中）" : "");
+        const stageLabel = document.createElement("div");
+        stageLabel.className = "growth-stage";
+        stageLabel.textContent = stage.label;
 
-        const pointsEl = document.createElement("div");
-        pointsEl.className = "growth-points";
-        pointsEl.textContent = points + "コマ分";
+        const points = document.createElement("div");
+        points.className = "growth-points";
+        points.textContent = data.points + "コマ育成中";
 
-        card.append(iconEl, subjectEl, stageEl, pointsEl);
+        card.append(icon, subjectLabel, stageLabel, points);
         container.appendChild(card);
     });
 }
 
 
-/* --- ⑥-2 受験マップ・すごろく --- */
+/* =========================================================
+   ⑥-2 受験マップ
+   ========================================================= */
 
-function jukenMapGoalOptions() {
+const MAP_PAST_DAYS = 13;
+const MAP_FUTURE_CAP = 30;
 
-    const today = todayKey();
+function mapGoalCandidates() {
 
     return calendarEvents
         .filter(function (event) {
-            return event.kind === "important" && event.date && event.date >= today;
+            return event.kind === "important" && !!event.date && event.date >= todayKey();
         })
         .sort(function (a, b) {
             return a.date.localeCompare(b.date);
         });
 }
 
-function renderJukenMapGoalSelect() {
+function renderMapGoalSelect() {
 
     const select = $("mapGoalSelect");
 
@@ -6057,50 +6034,39 @@ function renderJukenMapGoalSelect() {
         return;
     }
 
-    const options = jukenMapGoalOptions();
-    const saved = localStorage.getItem("patgs27_map_goal") || "";
+    const candidates = mapGoalCandidates();
+    const saved = localStorage.getItem("patgs27_map_goal_id") || "";
 
     select.innerHTML = "";
 
-    if (options.length === 0) {
+    if (candidates.length === 0) {
 
-        const opt = document.createElement("option");
-        opt.value = "";
-        opt.textContent = "目標にできる重要予定がありません";
-        select.appendChild(opt);
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "重要予定に日付を登録してください";
+        select.appendChild(option);
         return;
     }
 
-    options.forEach(function (event) {
+    candidates.forEach(function (event) {
 
-        const opt = document.createElement("option");
-        opt.value = event.id;
-        opt.textContent =
-            (event.icon || "📅") + " " + (event.title || "名称未設定") +
-            "（" + formatShortDate(event.date) + "）";
+        const option = document.createElement("option");
+        option.value = event.id;
+        option.textContent =
+            (event.icon || "📅") + " " + (event.title || "名称未設定") + "（" + event.date + "）";
 
-        select.appendChild(opt);
+        select.appendChild(option);
     });
 
-    if (options.some(function (o) { return o.id === saved; })) {
-        select.value = saved;
-    } else {
-        select.value = options[0].id;
-        localStorage.setItem("patgs27_map_goal", options[0].id);
-    }
+    const preferred =
+        candidates.find(function (e) { return e.id === saved; }) ||
+        candidates.find(function (e) { return (e.title || "").indexOf("入試") !== -1; }) ||
+        candidates[0];
+
+    select.value = preferred.id;
 }
 
-function setupJukenMap() {
-
-    $("mapGoalSelect")?.addEventListener("change", function () {
-        localStorage.setItem("patgs27_map_goal", $("mapGoalSelect").value);
-        renderJukenMap();
-    });
-}
-
-function renderJukenMap() {
-
-    renderJukenMapGoalSelect();
+function renderMapBoard() {
 
     const board = $("mapBoard");
     const summary = $("mapSummary");
@@ -6111,437 +6077,429 @@ function renderJukenMap() {
 
     board.innerHTML = "";
 
-    const goalId = $("mapGoalSelect")?.value || localStorage.getItem("patgs27_map_goal") || "";
+    const goalId = $("mapGoalSelect")?.value || "";
     const goal = calendarEvents.find(function (e) { return e.id === goalId; });
 
-    if (!goal || !goal.date) {
+    if (!goal) {
+
+        board.textContent = "";
+
+        const empty = document.createElement("p");
+        empty.className = "empty-note";
+        empty.textContent = "受験マップを表示するには、重要予定に日付を登録してください。";
+        board.appendChild(empty);
+
         if (summary) {
-            summary.textContent = "上の「目標にする重要予定」を選ぶと、道のりが表示されます。";
+            summary.textContent = "";
         }
+
         return;
     }
 
     const today = todayKey();
-    const trailStart = getDateKeyOffset(-13);
-
-    let dateList = [];
-    let cursor = trailStart;
-
-    while (cursor <= goal.date) {
-        dateList.push(cursor);
-        cursor = addDaysToKey(cursor, 1);
-    }
-
-    const MAX_SQUARES = 40;
-    let displayList = dateList;
-    let hiddenCount = 0;
-
-    if (dateList.length > MAX_SQUARES) {
-
-        const headCount = 16;
-        const tailCount = 14;
-
-        const head = dateList.slice(0, headCount);
-        const tail = dateList.slice(dateList.length - tailCount);
-
-        hiddenCount = dateList.length - headCount - tailCount;
-
-        displayList = head.concat(["__ellipsis__"]).concat(tail);
-    }
-
-    displayList.forEach(function (dateKey) {
-
-        if (dateKey === "__ellipsis__") {
-
-            const sq = document.createElement("div");
-            sq.className = "map-square is-ellipsis";
-            sq.textContent = "+" + hiddenCount;
-            sq.title = "残り " + hiddenCount + " 日";
-            board.appendChild(sq);
-            return;
-        }
-
-        const sq = document.createElement("div");
-        sq.className = "map-square";
-
-        if (dateKey === today) {
-            sq.classList.add("is-today");
-        }
-
-        if (dateKey === goal.date) {
-            sq.classList.add("is-goal");
-        }
-
-        if (dateKey < today && getDoneKomaForDate(dateKey) > 0) {
-            sq.style.background = "#39a637";
-        }
-
-        if (dateKey === goal.date) {
-            sq.textContent = goal.icon || "🎓";
-        } else if (dateKey === today) {
-            sq.textContent = "🏃";
-        }
-
-        sq.title = formatShortDate(dateKey) + (dateKey === goal.date ? "：" + (goal.title || "") : "");
-
-        board.appendChild(sq);
-    });
-
-    const daysLeft = Math.max(
+    const daysUntil = Math.max(
         0,
         Math.round(
-            (new Date(goal.date + "T00:00:00") - new Date(today + "T00:00:00")) /
+            (new Date(goal.date + "T00:00:00").getTime() - new Date(today + "T00:00:00").getTime()) /
             (1000 * 60 * 60 * 24)
         )
     );
 
-    const studiedInTrail = dateList.filter(function (d) {
-        return d < today && d >= trailStart && getDoneKomaForDate(d) > 0;
-    }).length;
+    /* 過去14日分：学習カレンダーと同じ集計を再利用して色付け */
+    for (let i = MAP_PAST_DAYS; i >= 0; i--) {
+
+        const dateKey = getDateKeyOffset(-i);
+        const total = getDoneKomaForDate(dateKey);
+
+        const square = document.createElement("div");
+        square.className = "map-square";
+        square.title = dateKey + "：" + total + "コマ";
+
+        let bg = "#ebedf0";
+
+        if (total >= 6) { bg = "#196127"; }
+        else if (total >= 3) { bg = "#39a637"; }
+        else if (total > 0) { bg = "#9be9a8"; }
+
+        square.style.background = bg;
+
+        if (dateKey === today) {
+            square.classList.add("is-today");
+            square.textContent = "🚩";
+        }
+
+        board.appendChild(square);
+    }
+
+    /* 未来：ゴールまでの日数（長い場合は間を省略） */
+    const futureDays = daysUntil;
+    const showDays = Math.min(futureDays, MAP_FUTURE_CAP);
+
+    for (let i = 1; i <= showDays; i++) {
+
+        const square = document.createElement("div");
+        square.className = "map-square";
+        board.appendChild(square);
+    }
+
+    if (futureDays > MAP_FUTURE_CAP) {
+
+        const ellipsis = document.createElement("div");
+        ellipsis.className = "map-square is-ellipsis";
+        ellipsis.textContent = "…";
+        board.appendChild(ellipsis);
+    }
+
+    const goalSquare = document.createElement("div");
+    goalSquare.className = "map-square is-goal";
+    goalSquare.textContent = goal.icon || "🎓";
+    goalSquare.title = goal.title + "（" + goal.date + "）";
+    board.appendChild(goalSquare);
 
     if (summary) {
         summary.textContent =
-            (goal.title || "目標") + "（" + formatShortDate(goal.date) + "）まで あと " +
-            daysLeft + " 日／直近14日のうち学習した日：" + studiedInTrail + "日";
+            (goal.title || "目標") + "まで、あと " + daysUntil + " 日。" +
+            "🚩が今日の位置、色の濃いマスは学習をよく実施できた日です。";
     }
 }
 
+function renderMapAll() {
+    renderMapGoalSelect();
+    renderMapBoard();
+}
 
-/* --- ⑥-3 週次振り返り自動生成 --- */
+function setupMap() {
 
-let lastGeneratedWeeklyReport = "";
+    $("mapGoalSelect")?.addEventListener("change", function () {
 
-function computeWeeklyReportData() {
+        localStorage.setItem("patgs27_map_goal_id", $("mapGoalSelect").value);
+        renderMapBoard();
+    });
+
+    renderMapAll();
+}
+
+
+/* =========================================================
+   ⑥-3 週次振り返り自動生成
+   ========================================================= */
+
+function getWeekSubjectCounts(weekStartKey) {
+
+    const counts = {};
+
+    KOMA_SUBJECTS.forEach(function (subject) {
+        counts[subject] = 0;
+    });
+
+    getWeekReservations(weekStartKey).forEach(function (record) {
+
+        if (record.status !== "done") {
+            return;
+        }
+
+        const subject = KOMA_SUBJECTS.includes(record.subject) ? record.subject : "その他";
+        counts[subject] += komaValue(record);
+    });
+
+    return counts;
+}
+
+function generateWeeklyReportText() {
 
     const weekStart = getWeekStartKey(todayKey());
     const weekEnd = addDaysToKey(weekStart, 6);
-    const doneList = getWeekReservations(weekStart).filter(function (r) {
-        return r.status === "done";
-    });
-
     const stats = getWeekStats(weekStart);
 
-    const subjectCounts = {};
+    const weekRecords = getWeekReservations(weekStart);
 
-    KOMA_SUBJECTS.forEach(function (subject) {
-        subjectCounts[subject] = 0;
+    const scored = weekRecords.filter(function (r) {
+        return r.log && r.log.totalQuestions > 0;
     });
 
-    doneList.forEach(function (record) {
-        const subj = KOMA_SUBJECTS.includes(record.subject) ? record.subject : "その他";
-        subjectCounts[subj] += komaValue(record);
+    const totalQ = scored.reduce(function (sum, r) { return sum + r.log.totalQuestions; }, 0);
+    const totalC = scored.reduce(function (sum, r) { return sum + r.log.correctCount; }, 0);
+    const rateText = totalQ > 0 ? Math.round((totalC / totalQ) * 100) + "%" : "記録なし";
+
+    const subjectCounts = getWeekSubjectCounts(weekStart);
+    const subjectText = KOMA_SUBJECTS
+        .filter(function (s) { return subjectCounts[s] > 0; })
+        .map(function (s) { return s + " " + subjectCounts[s] + "コマ"; })
+        .join("／") || "記録なし";
+
+    const unresolvedThisWeek = weekRecords.filter(function (r) {
+        return r.log && r.log.unresolved && !r.log.resolved;
     });
 
-    const withScore = doneList.filter(function (r) {
-        return r.log && r.log.rate !== null && r.log.rate !== undefined;
+    const resolvedThisWeek = weekRecords.filter(function (r) {
+        return r.log && r.log.resolvesId;
     });
 
-    const avgRate = withScore.length > 0
-        ? Math.round(withScore.reduce(function (s, r) { return s + r.log.rate; }, 0) / withScore.length)
-        : null;
+    const lines = [
+        "【今週の振り返り（自動生成）】",
+        formatShortDate(weekStart) + "〜" + formatShortDate(weekEnd),
+        "",
+        "・実施コマ数：完了 " + stats.done + " ／ 必要 " + stats.required + " ／ 未実行 " + stats.missed,
+        "・正答率：" + rateText,
+        "・教科ごとの学習状況：" + subjectText,
+        "・未解決問題：" + (
+            unresolvedThisWeek.length === 0
+                ? "なし"
+                : unresolvedThisWeek
+                    .map(function (r) { return (r.subject || "") + "「" + r.log.unresolved + "」"; })
+                    .join("／")
+        ),
+        "・理解・解決した内容：" + (
+            resolvedThisWeek.length === 0
+                ? "なし"
+                : resolvedThisWeek
+                    .map(function (r) { return (r.subject || "") + "「" + (r.log.content || "") + "」"; })
+                    .join("／")
+        ),
+        "・今週の学習成果：" +
+            stats.done + "コマ実施、正答率" + rateText +
+            "、未解決" + unresolvedThisWeek.length + "件、解決" + resolvedThisWeek.length + "件。"
+    ];
 
-    const unresolvedThisWeek = doneList
-        .filter(function (r) { return r.log && r.log.unresolved && !r.log.resolved; })
-        .map(function (r) { return (r.subject || "") + "：" + r.log.unresolved; });
-
-    const resolvedThisWeek = doneList
-        .filter(function (r) { return r.log && r.log.resolvesId; })
-        .map(function (r) {
-            const src = findReservation(r.log.resolvesId);
-            return (r.subject || "") + "：" + (src && src.log ? src.log.unresolved : "");
-        });
-
-    return {
-        weekStart: weekStart,
-        weekEnd: weekEnd,
-        stats: stats,
-        subjectCounts: subjectCounts,
-        avgRate: avgRate,
-        unresolvedThisWeek: unresolvedThisWeek,
-        resolvedThisWeek: resolvedThisWeek
-    };
+    return lines.join("\n");
 }
 
-function generateWeeklyReport() {
-
-    const data = computeWeeklyReportData();
-
-    const lines = [];
-
-    lines.push(
-        "【今週の学習レポート】" + formatShortDate(data.weekStart) +
-        "〜" + formatShortDate(data.weekEnd)
-    );
-
-    lines.push(
-        "実施コマ：" + data.stats.done + "／必要 " + data.stats.required +
-        "（未実行 " + data.stats.missed + "・振替 " + data.stats.moved + "）"
-    );
-
-    if (data.avgRate !== null) {
-        lines.push("平均正答率：" + data.avgRate + "%");
-    }
-
-    const subjLine = KOMA_SUBJECTS
-        .filter(function (s) { return data.subjectCounts[s] > 0; })
-        .map(function (s) { return s + " " + data.subjectCounts[s] + "コマ"; })
-        .join("／");
-
-    lines.push("教科別：" + (subjLine || "記録なし"));
-
-    lines.push(
-        "未解決：" + (data.unresolvedThisWeek.length ? data.unresolvedThisWeek.join("／") : "なし")
-    );
-
-    lines.push(
-        "理解・解決した内容：" +
-        (data.resolvedThisWeek.length ? data.resolvedThisWeek.join("／") : "なし")
-    );
-
-    const text = lines.join("\n");
+function renderWeeklyReportBox(text) {
 
     const box = $("weeklyReportBox");
 
-    if (box) {
-        box.textContent = text;
-        flashElement(box);
+    if (!box) {
+        return;
     }
 
-    lastGeneratedWeeklyReport = text;
-
-    playChime();
-
-    return text;
+    box.style.whiteSpace = "pre-line";
+    box.textContent = text || "「今週のレポートを作る」を押すと、ここに自動で表示されます。";
 }
 
-$("generateWeeklyReportBtn")?.addEventListener("click", generateWeeklyReport);
+function setupWeeklyReport() {
 
-$("copyReportToReviewBtn")?.addEventListener("click", function () {
+    $("generateWeeklyReportBtn")?.addEventListener("click", function () {
+        renderWeeklyReportBox(generateWeeklyReportText());
+    });
 
-    if (!lastGeneratedWeeklyReport) {
-        generateWeeklyReport();
-    }
+    $("copyReportToReviewBtn")?.addEventListener("click", function () {
 
-    if ($("weeklyReviewText")) {
+        const text = generateWeeklyReportText();
 
-        const existing = $("weeklyReviewText").value.trim();
+        renderWeeklyReportBox(text);
 
-        $("weeklyReviewText").value = existing
-            ? existing + "\n\n" + lastGeneratedWeeklyReport
-            : lastGeneratedWeeklyReport;
-
-        $("weeklyReviewText").scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-});
-
-
-/* --- ⑥-4 小さな演出音・アニメーション --- */
-
-let patgsAudioContext = null;
-
-function loadFxPrefs() {
-
-    const soundOn = localStorage.getItem("patgs27_fx_sound") === "1";
-    const animOn = localStorage.getItem("patgs27_fx_animation") !== "0";
-
-    if ($("fxSoundToggle")) { $("fxSoundToggle").checked = soundOn; }
-    if ($("fxAnimationToggle")) { $("fxAnimationToggle").checked = animOn; }
+        if ($("weeklyReviewText")) {
+            $("weeklyReviewText").value = text;
+            $("weeklyReviewText").scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    });
 }
 
-function setupFx() {
 
-    loadFxPrefs();
+/* =========================================================
+   ⑥-4 演出音・アニメーション
+   ========================================================= */
 
-    $("fxSoundToggle")?.addEventListener("change", function () {
-        localStorage.setItem("patgs27_fx_sound", $("fxSoundToggle").checked ? "1" : "0");
-    });
+let fxAudioContext = null;
 
-    $("fxAnimationToggle")?.addEventListener("change", function () {
-        localStorage.setItem("patgs27_fx_animation", $("fxAnimationToggle").checked ? "1" : "0");
-    });
+function fxSoundEnabled() {
+    return localStorage.getItem("patgs27_fx_sound") !== "0";
+}
+
+function fxAnimationEnabled() {
+    return localStorage.getItem("patgs27_fx_animation") !== "0";
 }
 
 function playChime() {
 
-    if (localStorage.getItem("patgs27_fx_sound") !== "1") {
+    if (!fxSoundEnabled()) {
         return;
     }
 
     try {
 
-        if (!patgsAudioContext) {
-
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-
-            if (!AudioCtx) {
-                return;
-            }
-
-            patgsAudioContext = new AudioCtx();
+        if (!fxAudioContext) {
+            fxAudioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
 
-        const ctx = patgsAudioContext;
+        const ctx = fxAudioContext;
+        const now = ctx.currentTime;
+
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
 
         osc.type = "sine";
-        osc.frequency.value = 880;
+        osc.frequency.setValueAtTime(660, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
 
-        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.28);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.15, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
 
         osc.connect(gain);
         gain.connect(ctx.destination);
 
-        osc.start();
-        osc.stop(ctx.currentTime + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.4);
 
     } catch (error) {
-        console.error("効果音の再生に失敗しました:", error);
+        console.error("演出音の再生に失敗しました:", error);
     }
 }
 
-function flashElement(el) {
+function flashSavedElement(element) {
 
-    if (!el) {
+    if (!fxAnimationEnabled() || !element) {
         return;
     }
 
-    if (localStorage.getItem("patgs27_fx_animation") === "0") {
-        return;
-    }
-
-    el.classList.remove("log-saved-flash");
-
-    void el.offsetWidth;
-
-    el.classList.add("log-saved-flash");
+    element.classList.add("log-saved-flash");
 
     setTimeout(function () {
-        el.classList.remove("log-saved-flash");
+        element.classList.remove("log-saved-flash");
     }, 700);
 }
 
+function setupFxToggles() {
 
-/* --- ⑥-5 実績・バッジ --- */
+    if ($("fxSoundToggle")) {
+        $("fxSoundToggle").checked = fxSoundEnabled();
 
-const ALL_BADGES = [
+        $("fxSoundToggle").addEventListener("change", function () {
+            localStorage.setItem("patgs27_fx_sound", $("fxSoundToggle").checked ? "1" : "0");
+        });
+    }
+
+    if ($("fxAnimationToggle")) {
+        $("fxAnimationToggle").checked = fxAnimationEnabled();
+
+        $("fxAnimationToggle").addEventListener("change", function () {
+            localStorage.setItem("patgs27_fx_animation", $("fxAnimationToggle").checked ? "1" : "0");
+        });
+    }
+}
+
+
+/* =========================================================
+   ⑥-5 実績・バッジ
+   ========================================================= */
+
+const BADGE_DEFS = [
     {
-        id: "first_perfect",
-        icon: "💯",
-        label: "はじめての満点",
-        check: function (ctx) { return ctx.hasPerfect; }
+        id: "first_full_score",
+        icon: "🎯",
+        label: "はじめての全問正解",
+        check: function () {
+            return reservations.some(function (r) {
+                return r.log && r.log.totalQuestions > 0 && r.log.correctCount === r.log.totalQuestions;
+            });
+        }
     },
     {
         id: "koma_10",
         icon: "🥉",
-        label: "累計10コマ達成",
-        check: function (ctx) { return ctx.totalDone >= 10; }
+        label: "コマ10回達成",
+        check: function () {
+            return reservations.filter(function (r) { return r.status === "done"; }).length >= 10;
+        }
     },
     {
         id: "koma_50",
         icon: "🥈",
-        label: "累計50コマ達成",
-        check: function (ctx) { return ctx.totalDone >= 50; }
+        label: "コマ50回達成",
+        check: function () {
+            return reservations.filter(function (r) { return r.status === "done"; }).length >= 50;
+        }
     },
     {
         id: "koma_100",
         icon: "🥇",
-        label: "累計100コマ達成",
-        check: function (ctx) { return ctx.totalDone >= 100; }
+        label: "コマ100回達成",
+        check: function () {
+            return reservations.filter(function (r) { return r.status === "done"; }).length >= 100;
+        }
     },
     {
         id: "streak_7",
         icon: "🔥",
         label: "7日連続で開いた",
-        check: function (ctx) { return ctx.bestStreak >= 7; }
+        check: function () {
+            return (Number(localStorage.getItem("patgs27_streak")) || 0) >= 7;
+        }
     },
     {
-        id: "resolve_5",
+        id: "streak_30",
+        icon: "🌟",
+        label: "30日連続で開いた",
+        check: function () {
+            return (Number(localStorage.getItem("patgs27_streak")) || 0) >= 30;
+        }
+    },
+    {
+        id: "first_resolve",
         icon: "🧩",
-        label: "未解決を5件解決",
-        check: function (ctx) { return ctx.resolvedCount >= 5; }
+        label: "はじめて未解決を解決",
+        check: function () {
+            return reservations.some(function (r) {
+                return r.log && r.log.resolved;
+            });
+        }
     },
     {
-        id: "debt_free_week",
-        icon: "🏆",
-        label: "必要コマを達成した週がある",
-        check: function (ctx) { return ctx.hadDebtFreeWeek; }
+        id: "first_memo",
+        icon: "🗒",
+        label: "はじめての学習メモ",
+        check: function () {
+            return studyMemos.length > 0;
+        }
     }
 ];
 
-function computeBadgeContext() {
+let unlockedBadges = loadJSON("patgs27_badges", []);
 
-    const totalDone = reservations
-        .filter(function (r) { return r.status === "done"; })
-        .reduce(function (s, r) { return s + komaValue(r); }, 0);
-
-    const hasPerfect = reservations.some(function (r) {
-        return r.log && r.log.rate === 100;
-    });
-
-    const resolvedCount = reservations.filter(function (r) {
-        return r.log && r.log.resolved;
-    }).length;
-
-    const bestStreak = Number(localStorage.getItem("patgs27_best_streak")) || 0;
-
-    const currentWeek = getWeekStartKey(todayKey());
-
-    const hadDebtFreeWeek = Object.keys(weekRequired).some(function (week) {
-
-        const required = Number(weekRequired[week]) || 0;
-
-        if (required <= 0 || week >= currentWeek) {
-            return false;
-        }
-
-        return getWeekStats(week).shortage === 0;
-    });
-
-    return {
-        totalDone: totalDone,
-        hasPerfect: hasPerfect,
-        resolvedCount: resolvedCount,
-        bestStreak: bestStreak,
-        hadDebtFreeWeek: hadDebtFreeWeek
-    };
-}
-
-function loadEarnedBadges() {
-    return loadJSON("patgs27_badges", []);
-}
-
-function saveEarnedBadges(list) {
-    saveJSON("patgs27_badges", list);
+function saveUnlockedBadges() {
+    saveJSON("patgs27_badges", unlockedBadges);
 }
 
 function checkBadges() {
 
-    const earned = loadEarnedBadges();
-    const earnedIds = earned.map(function (b) { return b.id; });
-    const ctx = computeBadgeContext();
-
     let changed = false;
+    const newlyUnlocked = [];
 
-    ALL_BADGES.forEach(function (badge) {
+    BADGE_DEFS.forEach(function (badge) {
 
-        if (earnedIds.includes(badge.id)) {
+        if (unlockedBadges.includes(badge.id)) {
             return;
         }
 
-        if (badge.check(ctx)) {
-            earned.push({ id: badge.id, earnedAt: nowText() });
+        let achieved = false;
+
+        try {
+            achieved = !!badge.check();
+        } catch (error) {
+            achieved = false;
+        }
+
+        if (achieved) {
+            unlockedBadges.push(badge.id);
+            newlyUnlocked.push(badge);
             changed = true;
         }
     });
 
     if (changed) {
-        saveEarnedBadges(earned);
-    }
 
-    renderBadges();
+        saveUnlockedBadges();
+        renderBadges();
+
+        if (newlyUnlocked.length > 0) {
+
+            playChime();
+
+            const box = $("badgeGrid");
+            flashSavedElement(box);
+        }
+    }
 }
 
 function renderBadges() {
@@ -6554,18 +6512,16 @@ function renderBadges() {
 
     grid.innerHTML = "";
 
-    const earnedIds = loadEarnedBadges().map(function (b) { return b.id; });
+    BADGE_DEFS.forEach(function (badge) {
 
-    ALL_BADGES.forEach(function (badge) {
-
-        const isEarned = earnedIds.includes(badge.id);
+        const unlocked = unlockedBadges.includes(badge.id);
 
         const item = document.createElement("div");
-        item.className = "badge-item" + (isEarned ? "" : " is-locked");
+        item.className = "badge-item" + (unlocked ? "" : " is-locked");
 
         const icon = document.createElement("div");
         icon.className = "badge-icon";
-        icon.textContent = isEarned ? badge.icon : "🔒";
+        icon.textContent = badge.icon;
 
         const label = document.createElement("div");
         label.className = "badge-label";
@@ -6577,11 +6533,29 @@ function renderBadges() {
 }
 
 
-/* --- 「＋」ボタン：やる気を高める機能パネルへスクロール --- */
+/* =========================================================
+   ＋ やる気を高める機能：まとめ
+   ========================================================= */
 
-$("motivationFab")?.addEventListener("click", function () {
-    $("motivationPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
-});
+function renderMotivationAll() {
+    renderGrowthList();
+    renderMapAll();
+    renderBadges();
+}
+
+function setupMotivationHub() {
+
+    setupMap();
+    setupWeeklyReport();
+    setupFxToggles();
+
+    renderGrowthList();
+    renderBadges();
+
+    $("motivationFab")?.addEventListener("click", function () {
+        $("motivationPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+}
 
 
 /* =========================================================
@@ -6624,6 +6598,7 @@ function initializePATGS27() {
     renderScheduleSettings();
     updatePATGSTodayDate();
     updateSchedule();
+    renderMemos();
 
     /* カレンダー・タイマー */
     setupCalendar();
@@ -6638,13 +6613,9 @@ function initializePATGS27() {
     renderStudyHeatmap();
     renderTodaySummary();
     renderRandomMessage();
-    renderMemos();
 
-    /* やる気を高める機能（＋） */
-    setupFx();
-    setupJukenMap();
-    renderGrowth();
-    renderJukenMap();
+    /* ＋ やる気を高める機能 */
+    setupMotivationHub();
     checkBadges();
 
     console.log("PATGS27 script.js (" + PATGS_VERSION + ") loaded successfully.");
