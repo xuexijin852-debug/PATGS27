@@ -6496,21 +6496,24 @@ function checkBadges() {
 
             playChime();
 
-            const box = $("badgeGrid");
-            flashSavedElement(box);
+            flashSavedElement($("badgeGridUnlocked"));
         }
     }
 }
 
 function renderBadges() {
 
-    const grid = $("badgeGrid");
+    const unlockedGrid = $("badgeGridUnlocked");
+    const lockedGrid = $("badgeGridLocked");
 
-    if (!grid) {
+    if (!unlockedGrid || !lockedGrid) {
         return;
     }
 
-    grid.innerHTML = "";
+    unlockedGrid.innerHTML = "";
+    lockedGrid.innerHTML = "";
+
+    let hasUnlocked = false;
 
     BADGE_DEFS.forEach(function (badge) {
 
@@ -6528,8 +6531,21 @@ function renderBadges() {
         label.textContent = badge.label;
 
         item.append(icon, label);
-        grid.appendChild(item);
+
+        if (unlocked) {
+            hasUnlocked = true;
+            unlockedGrid.appendChild(item);
+        } else {
+            lockedGrid.appendChild(item);
+        }
     });
+
+    if (!hasUnlocked) {
+        const empty = document.createElement("p");
+        empty.className = "empty-note";
+        empty.textContent = "まだ獲得したバッジはありません。";
+        unlockedGrid.appendChild(empty);
+    }
 }
 
 
@@ -6551,10 +6567,565 @@ function setupMotivationHub() {
 
     renderGrowthList();
     renderBadges();
+}
+
+
+/* =========================================================
+   ホーム＋専用画面ナビゲーション
+   ========================================================= */
+
+const SCREEN_TITLES = {
+    home: "― 受験管理システム／第五次改革（コマ制度）―",
+    study: "📚 学習",
+    growth: "🌱 成長",
+    map: "🗺️ 受験マップ",
+    week: "📊 今週",
+    unresolved: "❓ 未解決",
+    achievements: "🏆 実績",
+    schedule: "📅 予定",
+    grades: "📊 成績",
+    settings: "⚙️ 設定・その他"
+};
+
+const HOME_CARDS = [
+    { screen: "study", icon: "📚", label: "学習" },
+    { screen: "growth", icon: "🌱", label: "成長" },
+    { screen: "map", icon: "🗺️", label: "受験マップ" },
+    { screen: "week", icon: "📊", label: "今週" },
+    { screen: "unresolved", icon: "❓", label: "未解決" },
+    { screen: "achievements", icon: "🏆", label: "実績" },
+    { screen: "schedule", icon: "📅", label: "予定" },
+    { screen: "grades", icon: "📊", label: "成績" },
+    { screen: "settings", icon: "⚙️", label: "設定・その他" }
+];
+
+let currentScreen = "home";
+
+function showScreen(name) {
+
+    currentScreen = SCREEN_TITLES[name] ? name : "home";
+
+    document.querySelectorAll("[data-screen]").forEach(function (element) {
+        element.classList.toggle("screen-hidden", element.dataset.screen !== currentScreen);
+    });
+
+    if ($("screenTitle")) {
+        $("screenTitle").textContent = SCREEN_TITLES[currentScreen];
+    }
+
+    if ($("backToHomeBtn")) {
+        $("backToHomeBtn").style.display = (currentScreen === "home") ? "none" : "inline-block";
+    }
+
+    if ($("fabMenu")) {
+        $("fabMenu").style.display = "none";
+    }
+
+    window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+}
+
+function renderHomeCards() {
+
+    const container = $("homeCards");
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = "";
+
+    HOME_CARDS.forEach(function (card) {
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "home-card";
+
+        const icon = document.createElement("span");
+        icon.className = "home-card-icon";
+        icon.textContent = card.icon;
+
+        const label = document.createElement("span");
+        label.className = "home-card-label";
+        label.textContent = card.label;
+
+        button.append(icon, label);
+
+        button.addEventListener("click", function () {
+            showScreen(card.screen);
+        });
+
+        container.appendChild(button);
+    });
+}
+
+function renderFabMenu() {
+
+    const menu = $("fabMenu");
+
+    if (!menu) {
+        return;
+    }
+
+    menu.innerHTML = "";
+
+    const quickTargets = [
+        { screen: "growth", icon: "🌱", label: "成長" },
+        { screen: "map", icon: "🗺️", label: "受験マップ" },
+        { screen: "week", icon: "📊", label: "今週" },
+        { screen: "achievements", icon: "🏆", label: "実績" },
+        { screen: "settings", icon: "🔔", label: "演出設定" }
+    ];
+
+    quickTargets.forEach(function (target) {
+
+        const button = makeButton(target.icon + " " + target.label, "ghost small");
+
+        button.addEventListener("click", function () {
+            showScreen(target.screen);
+        });
+
+        menu.appendChild(button);
+    });
+}
+
+function setupScreenNavigation() {
+
+    renderHomeCards();
+    renderFabMenu();
+
+    $("backToHomeBtn")?.addEventListener("click", function () {
+        showScreen("home");
+    });
 
     $("motivationFab")?.addEventListener("click", function () {
-        $("motivationPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+        const menu = $("fabMenu");
+
+        if (!menu) {
+            return;
+        }
+
+        menu.style.display = (menu.style.display === "none") ? "flex" : "none";
     });
+
+    showScreen("home");
+}
+
+function renderHomeExamCountdown() {
+
+    const element = $("homeExamCountdown");
+
+    if (!element) {
+        return;
+    }
+
+    const candidates = typeof mapGoalCandidates === "function" ? mapGoalCandidates() : [];
+    const savedId = localStorage.getItem("patgs27_map_goal_id") || "";
+
+    const goal =
+        candidates.find(function (e) { return e.id === savedId; }) ||
+        candidates.find(function (e) { return (e.title || "").indexOf("入試") !== -1; }) ||
+        candidates[0];
+
+    if (!goal) {
+        element.textContent = "";
+        return;
+    }
+
+    const daysUntil = Math.max(
+        0,
+        Math.round(
+            (new Date(goal.date + "T00:00:00").getTime() - new Date(todayKey() + "T00:00:00").getTime()) /
+            (1000 * 60 * 60 * 24)
+        )
+    );
+
+    element.textContent =
+        "🎓 " + (goal.title || "入試") + "まで、あと " + daysUntil + " 日";
+}
+
+
+/* =========================================================
+   ① 予約不足の段階的介入　② 日タイプ別時刻設定
+   ========================================================= */
+
+const IV_DAY_TYPES = [
+    { id: "weekday", label: "平日" },
+    { id: "holiday", label: "土休日" },
+    { id: "specialHoliday", label: "祝日・休校日" },
+    { id: "longVacation", label: "長期休暇" }
+];
+
+const IV_STAGE_FIELDS = [
+    { id: "preWarning", label: "前日の警告", defaultTime: "20:00" },
+    { id: "alert", label: "当日の警戒", defaultTime: "10:00" },
+    { id: "intervention", label: "強制介入", defaultTime: "11:00" },
+    { id: "critical", label: "重大事象", defaultTime: "12:00" }
+];
+
+function defaultIvTimes() {
+
+    const times = {};
+
+    IV_DAY_TYPES.forEach(function (dt) {
+
+        times[dt.id] = {};
+
+        IV_STAGE_FIELDS.forEach(function (stage) {
+            times[dt.id][stage.id] = stage.defaultTime;
+        });
+    });
+
+    return times;
+}
+
+let ivTimes = loadJSON("patgs27_intervention_times", null);
+
+if (!ivTimes) {
+    ivTimes = defaultIvTimes();
+    saveJSON("patgs27_intervention_times", ivTimes);
+}
+
+let ivDayRanges = loadJSON("patgs27_intervention_day_ranges", []);
+
+function saveIvTimes() {
+    saveJSON("patgs27_intervention_times", ivTimes);
+}
+
+function saveIvDayRanges() {
+    saveJSON("patgs27_intervention_day_ranges", ivDayRanges);
+}
+
+/* 平日／土休日／祝日・休校日／長期休暇 の判定（コマ枠の平日・土休日判定とは別の設定） */
+function interventionDayTypeOf(dateKey) {
+
+    const hit = ivDayRanges.find(function (range) {
+        return dateKey >= range.start && dateKey <= range.end;
+    });
+
+    if (hit) {
+        return hit.type;
+    }
+
+    const day = new Date(dateKey + "T00:00:00").getDay();
+
+    return (day === 0 || day === 6) ? "holiday" : "weekday";
+}
+
+function ivTimeToMinutes(time) {
+    const parts = (time || "00:00").split(":");
+    return Number(parts[0]) * 60 + Number(parts[1]);
+}
+
+function hasReservationOn(dateKey) {
+    return reservations.some(function (record) {
+        return record.date === dateKey;
+    });
+}
+
+function hasCompletedOn(dateKey) {
+    return reservations.some(function (record) {
+        return record.date === dateKey && record.status === "done";
+    });
+}
+
+/*
+   今日を対象日として、今の状態を判定する。
+
+   ・前日20:00〜当日「当日の警戒」時刻の前：明日（＝今日）に予約が無ければ preWarning
+   ・当日「当日の警戒」時刻〜「強制介入」時刻の前：予約も完了も無ければ alert
+   ・当日「強制介入」時刻〜「重大事象」時刻の前：同様に intervention
+   ・当日「重大事象」時刻以降：同様に critical
+*/
+function evaluateInterventionState() {
+
+    const today = todayKey();
+    const yesterday = getDateKeyOffset(-1);
+    const dayType = interventionDayTypeOf(today);
+    const times = ivTimes[dayType] || defaultIvTimes()[dayType];
+
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+    const sufficient = hasReservationOn(today) || hasCompletedOn(today);
+
+    if (sufficient) {
+        return { level: "normal", dayType: dayType, date: today };
+    }
+
+    /* 前日の警告帯（前日の指定時刻〜当日「当日の警戒」時刻の前）は昨日の日タイプの設定時刻を使う */
+    const yesterdayType = interventionDayTypeOf(yesterday);
+    const yesterdayTimes = ivTimes[yesterdayType] || defaultIvTimes()[yesterdayType];
+
+    const preWarningStart = ivTimeToMinutes(yesterdayTimes.preWarning);
+
+    if (nowMinutes < ivTimeToMinutes(times.alert)) {
+
+        /* 当日の警戒時刻より前。前日20:00以降であれば preWarning とみなす。
+           日付を跨いでいるので、今日の0:00〜警戒時刻の間もpreWarningの続きとして扱う。 */
+        return { level: "preWarning", dayType: dayType, date: today };
+    }
+
+    if (nowMinutes < ivTimeToMinutes(times.intervention)) {
+        return { level: "alert", dayType: dayType, date: today };
+    }
+
+    if (nowMinutes < ivTimeToMinutes(times.critical)) {
+        return { level: "intervention", dayType: dayType, date: today };
+    }
+
+    return { level: "critical", dayType: dayType, date: today };
+}
+
+const IV_LEVEL_TEXT = {
+    preWarning: {
+        title: "⚠️ 明日の予約がまだありません",
+        body: "予定がまだ入っていません。早めにコマ予約から予定を入れておきましょう。"
+    },
+    alert: {
+        title: "⚠️ 今日の予約がまだありません",
+        body: "今日の学習がまだ始まっていません。コマ予約から予定を入れましょう。"
+    },
+    intervention: {
+        title: "🚨 強制介入：今日の学習が始まっていません",
+        body: "設定した時刻を過ぎても、今日の予約・実施がありません。今すぐコマを予約するか、状況を記録してください。"
+    },
+    critical: {
+        title: "🆘 重大事象：Gemini判定待ち",
+        body: "長時間、今日の学習が始まっていない状態です。この状態は「重大事象」として記録されます。Geminiへの自動送信は行っていません。必要であれば、下のボタンで状況をコピーして自分でGeminiに伝えてください。"
+    }
+};
+
+function buildInterventionSummaryText(state) {
+
+    return (
+        "PATGS27 状態報告\n" +
+        "日付：" + state.date + "（" +
+        (IV_DAY_TYPES.find(function (d) { return d.id === state.dayType; })?.label || state.dayType) + "）\n" +
+        "レベル：" + state.level + "\n" +
+        "今日の予約：" + (hasReservationOn(state.date) ? "あり" : "なし") + "\n" +
+        "今日の完了コマ：" + (hasCompletedOn(state.date) ? "あり" : "なし")
+    );
+}
+
+function renderInterventionUI() {
+
+    const state = evaluateInterventionState();
+
+    const banner = $("interventionBanner");
+    const overlay = $("interventionModalOverlay");
+    const modalBody = $("interventionModalBody");
+
+    if (banner) {
+
+        if (state.level === "normal") {
+
+            banner.style.display = "none";
+            banner.className = "intervention-banner";
+
+        } else {
+
+            banner.style.display = "block";
+            banner.className = "intervention-banner level-" + state.level;
+            banner.textContent = IV_LEVEL_TEXT[state.level].title;
+        }
+    }
+
+    if (overlay && modalBody) {
+
+        if (state.level === "intervention" || state.level === "critical") {
+
+            overlay.style.display = "flex";
+
+            modalBody.innerHTML = "";
+
+            const title = document.createElement("h3");
+            title.textContent = IV_LEVEL_TEXT[state.level].title;
+
+            const body = document.createElement("p");
+            body.textContent = IV_LEVEL_TEXT[state.level].body;
+
+            modalBody.append(title, body);
+
+            const actions = document.createElement("div");
+            actions.className = "btn-row";
+
+            const bookButton = makeButton("コマを予約する", "primary");
+            bookButton.addEventListener("click", function () {
+                overlay.style.display = "none";
+                showScreen("study");
+            });
+
+            const dismissButton = makeButton("閉じる", "ghost");
+            dismissButton.addEventListener("click", function () {
+                overlay.style.display = "none";
+            });
+
+            actions.append(bookButton, dismissButton);
+            modalBody.appendChild(actions);
+
+            if (state.level === "critical") {
+
+                const copyButton = makeButton("状況をコピーする", "ghost");
+
+                copyButton.addEventListener("click", function () {
+
+                    const text = buildInterventionSummaryText(state);
+
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+
+                        navigator.clipboard.writeText(text).then(function () {
+                            copyButton.textContent = "コピーしました";
+                        }).catch(function () {
+                            copyButton.textContent = "コピーに失敗しました";
+                        });
+
+                    } else {
+                        alert(text);
+                    }
+                });
+
+                modalBody.appendChild(copyButton);
+            }
+
+        } else {
+            overlay.style.display = "none";
+        }
+    }
+
+    /* preWarning / alert は1日1回だけ通知する */
+    if (state.level === "preWarning" || state.level === "alert") {
+
+        const fireKey = state.date + "-" + state.level;
+
+        if (localStorage.getItem("patgs27_iv_last_notified") !== fireKey) {
+
+            sendPatgsNotification(IV_LEVEL_TEXT[state.level].title, IV_LEVEL_TEXT[state.level].body);
+            localStorage.setItem("patgs27_iv_last_notified", fireKey);
+        }
+    }
+}
+
+function renderIvDayTypeSettings() {
+
+    const container = $("interventionDayTypeSettings");
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = "";
+
+    IV_DAY_TYPES.forEach(function (dt) {
+
+        const row = document.createElement("div");
+        row.className = "iv-daytype-row";
+
+        const label = document.createElement("span");
+        label.className = "iv-daytype-label";
+        label.textContent = dt.label;
+
+        row.appendChild(label);
+
+        IV_STAGE_FIELDS.forEach(function (stage) {
+
+            const fieldLabel = document.createElement("label");
+            fieldLabel.textContent = stage.label;
+
+            const input = document.createElement("input");
+            input.type = "time";
+            input.value = (ivTimes[dt.id] && ivTimes[dt.id][stage.id]) || stage.defaultTime;
+
+            input.addEventListener("change", function () {
+
+                if (!ivTimes[dt.id]) {
+                    ivTimes[dt.id] = {};
+                }
+
+                ivTimes[dt.id][stage.id] = input.value;
+                saveIvTimes();
+                renderInterventionUI();
+            });
+
+            fieldLabel.appendChild(input);
+            row.appendChild(fieldLabel);
+        });
+
+        container.appendChild(row);
+    });
+}
+
+function renderIvRangeList() {
+
+    const container = $("ivRangeList");
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = "";
+
+    if (ivDayRanges.length === 0) {
+
+        const empty = document.createElement("p");
+        empty.className = "empty-note";
+        empty.textContent = "登録された特別な日はありません。";
+        container.appendChild(empty);
+        return;
+    }
+
+    ivDayRanges.slice().reverse().forEach(function (range, reverseIndex) {
+
+        const index = ivDayRanges.length - 1 - reverseIndex;
+
+        const row = document.createElement("p");
+        row.className = "sub";
+        row.textContent =
+            range.start + "〜" + range.end + "：" +
+            (IV_DAY_TYPES.find(function (d) { return d.id === range.type; })?.label || range.type);
+
+        const deleteButton = makeButton("削除", "ghost");
+
+        deleteButton.addEventListener("click", function () {
+            ivDayRanges.splice(index, 1);
+            saveIvDayRanges();
+            renderIvRangeList();
+            renderInterventionUI();
+        });
+
+        row.appendChild(deleteButton);
+
+        container.appendChild(row);
+    });
+}
+
+function setupInterventionSystem() {
+
+    renderIvDayTypeSettings();
+    renderIvRangeList();
+
+    $("ivRangeAddBtn")?.addEventListener("click", function () {
+
+        const start = $("ivRangeStart")?.value || "";
+        const end = $("ivRangeEnd")?.value || "";
+        const type = $("ivRangeType")?.value || "specialHoliday";
+
+        if (!start || !end || start > end) {
+            alert("開始日・終了日を正しく入力してください。");
+            return;
+        }
+
+        ivDayRanges.push({ start: start, end: end, type: type });
+
+        saveIvDayRanges();
+
+        renderIvRangeList();
+        renderInterventionUI();
+    });
+
+    renderInterventionUI();
+
+    setInterval(renderInterventionUI, 60 * 1000);
 }
 
 
@@ -6613,6 +7184,13 @@ function initializePATGS27() {
     renderStudyHeatmap();
     renderTodaySummary();
     renderRandomMessage();
+
+    /* ホーム＋専用画面ナビゲーション */
+    setupScreenNavigation();
+    renderHomeExamCountdown();
+
+    /* ①②予約不足の段階的介入・日タイプ別時刻設定 */
+    setupInterventionSystem();
 
     /* ＋ やる気を高める機能 */
     setupMotivationHub();
