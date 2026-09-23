@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PATGS27</title>
 
-    <link rel="stylesheet" href="css/style.css?v=20260922b">
+    <link rel="stylesheet" href="css/style.css?v=20260923a">
 </head>
 
 <body>
@@ -63,6 +63,8 @@
             </button>
 
         </header>
+
+        <button id="motivationFab" class="motivation-fab" title="やる気を高める機能">＋</button>
 
 
         <!-- =================================================
@@ -442,6 +444,46 @@
             </p>
 
             <div id="unresolvedList"></div>
+
+        </section>
+
+
+        <!-- =================================================
+             学習メモ
+        ================================================== -->
+
+        <section class="panel">
+
+            <h2>🗒 学習メモ</h2>
+
+            <p class="sub">
+                難しかった問題、後で確認したいこと、気づいたこと、次回やることなど、
+                短く残しておくためのメモです。
+            </p>
+
+            <div class="form-grid">
+
+                <label>種類
+                    <select id="memoCategory">
+                        <option value="難しかった問題">難しかった問題</option>
+                        <option value="後で確認したいこと">後で確認したいこと</option>
+                        <option value="学習中に気づいたこと">学習中に気づいたこと</option>
+                        <option value="次回やること">次回やること</option>
+                        <option value="その他">その他</option>
+                    </select>
+                </label>
+
+                <label class="wide">内容
+                    <input type="text" id="memoText" placeholder="内容を入力">
+                </label>
+
+            </div>
+
+            <div class="btn-row">
+                <button id="addMemoBtn" class="primary">＋メモを追加</button>
+            </div>
+
+            <div id="memoList"></div>
 
         </section>
 
@@ -872,7 +914,12 @@
 
             <textarea id="weeklyReviewText" rows="8" placeholder="今週の振り返り・改善点など"></textarea>
 
-            <p id="weeklyReviewSaveStatus" class="save-status">自動保存</p>
+            <div class="btn-row">
+                <button id="weeklyReviewSaveBtn" class="primary small">💾 保存</button>
+                <button id="weeklyReviewCancelEditBtn" class="ghost small" style="display:none;">編集をやめる</button>
+            </div>
+
+            <p id="weeklyReviewSaveStatus" class="save-status"></p>
 
             <h3>過去のレビュー</h3>
 
@@ -948,6 +995,79 @@
             <button id="addQuestionBtn">＋追加</button>
 
             <div id="questionList"></div>
+
+        </section>
+
+
+        <!-- =================================================
+             ＋ やる気を高める機能
+        ================================================== -->
+
+        <section class="panel panel-main" id="motivationPanel">
+
+            <h2>✨ やる気を高める機能</h2>
+
+            <p class="sub">
+                学習する → 記録する → 成果が見える → 次の学習へ向かいやすくなる。
+                ここに集めた機能はすべて、既存の学習記録・コマ実績から作られています。
+            </p>
+
+            <h3>🌱 育成・成長</h3>
+
+            <p class="sub">
+                通常学習コマを完了するたびに、その教科の生き物が少しずつ育ちます。
+                学習しない日があっても枯れません。成長が止まるだけです。
+            </p>
+
+            <div id="growthList" class="growth-list"></div>
+
+            <h3>🗺 受験マップ</h3>
+
+            <label class="inline-label">
+                目標にする重要予定：
+                <select id="mapGoalSelect"></select>
+            </label>
+
+            <div id="mapBoard" class="map-board"></div>
+
+            <p id="mapSummary" class="sub"></p>
+
+            <h3>📈 週次振り返り自動生成</h3>
+
+            <p class="sub">
+                今週のデータから、PATGS27が自動でまとめます。
+            </p>
+
+            <div class="btn-row">
+                <button id="generateWeeklyReportBtn" class="primary small">今週のレポートを作る</button>
+                <button id="copyReportToReviewBtn" class="ghost small">週次レビューに転記</button>
+            </div>
+
+            <div id="weeklyReportBox" class="summary-box"></div>
+
+            <h3>🔔 演出</h3>
+
+            <p class="sub">
+                記録した時などに、軽い音とアニメーションでお知らせします。重くしすぎない範囲です。
+            </p>
+
+            <label class="check-label-row">
+                <input type="checkbox" id="fxSoundToggle">
+                保存したときに軽い音を鳴らす
+            </label>
+
+            <label class="check-label-row">
+                <input type="checkbox" id="fxAnimationToggle">
+                保存したときに軽いアニメーションを表示する
+            </label>
+
+            <h3>🏅 実績・バッジ</h3>
+
+            <p class="sub">
+                特定の学習実績を達成すると、バッジが増えていきます。一度獲得したバッジは残ります。
+            </p>
+
+            <div id="badgeGrid" class="badge-grid"></div>
 
         </section>
 
@@ -1202,8 +1322,8 @@
          JavaScript
     ====================================================== -->
 
-    <script src="js/script.js?v=20260922b"></script>
-    <script type="module" src="js/firebase.js?v=20260922b"></script>
+    <script src="js/script.js?v=20260923a"></script>
+    <script type="module" src="js/firebase.js?v=20260923a"></script>
 
 </body>
 
