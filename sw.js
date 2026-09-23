@@ -17,7 +17,8 @@
    通知タップ時に「今日のPATGS」へ移動するようにしている。
    ========================================================= */
 
-const PATGS_SW_VERSION = "20260922b";
+const PATGS_SW_VERSION = "20260923a";
+const PATGS_SITE_URL = "https://xuexijin852-debug.github.io/PATGS27/";
 
 
 self.addEventListener("install", function () {
@@ -34,14 +35,12 @@ self.addEventListener("activate", function (event) {
    通知タップ時の処理
 
    ・既にPATGS27を開いているタブがあればそれを前面に出す
-   ・開いていなければ新しくPATGS27を開く
+   ・開いていなければ、正しいURL（PATGS_SITE_URL）で新しく開く
    ========================================================= */
 
 self.addEventListener("notificationclick", function (event) {
 
     event.notification.close();
-
-    const targetUrl = "/#nextReservationBox";
 
     event.waitUntil(
         clients
@@ -55,13 +54,22 @@ self.addEventListener("notificationclick", function (event) {
 
                     const client = clientList[i];
 
+                    if (client.url.indexOf(PATGS_SITE_URL) === 0 && "focus" in client) {
+                        return client.focus();
+                    }
+                }
+
+                for (let i = 0; i < clientList.length; i++) {
+
+                    const client = clientList[i];
+
                     if ("focus" in client) {
                         return client.focus();
                     }
                 }
 
                 if (clients.openWindow) {
-                    return clients.openWindow(targetUrl);
+                    return clients.openWindow(PATGS_SITE_URL);
                 }
             })
     );
