@@ -749,6 +749,7 @@ function completeReservation(record) {
     renderKomaAll();
     renderStudyHeatmap();
     celebrateCompletion();
+    playChime();
 }
 
 function reopenReservation(record) {
@@ -901,9 +902,62 @@ function buildLogForm(record) {
     content.placeholder = "今回の学習内容（例：二次関数 問題1〜10）";
     content.value = record.log?.content || "";
 
+    const scoreRow = document.createElement("div");
+    scoreRow.className = "koma-log-score-row";
+
+    const totalLabel = document.createElement("label");
+    totalLabel.className = "koma-log-num-label";
+    totalLabel.textContent = "総問題数";
+
+    const total = document.createElement("input");
+    total.type = "number";
+    total.min = "0";
+    total.step = "1";
+    total.value = record.log?.totalQuestions || "";
+
+    totalLabel.appendChild(total);
+
+    const correctLabel = document.createElement("label");
+    correctLabel.className = "koma-log-num-label";
+    correctLabel.textContent = "正解数";
+
+    const correct = document.createElement("input");
+    correct.type = "number";
+    correct.min = "0";
+    correct.step = "1";
+    correct.value = record.log?.correctCount || "";
+
+    correctLabel.appendChild(correct);
+
+    scoreRow.append(totalLabel, correctLabel);
+
+    const rateNote = document.createElement("p");
+    rateNote.className = "sub koma-log-rate-note";
+
+    function updateRateNote() {
+
+        const t = Number(total.value) || 0;
+        const c = Number(correct.value) || 0;
+
+        if (t <= 0) {
+            rateNote.textContent = "";
+            return;
+        }
+
+        const rate = Math.round((c / t) * 100);
+
+        rateNote.textContent =
+            "正答率 " + rate + "%" +
+            (rate < 60 ? "（60%未満のため、理解・解決が必要な状態として判定されます）" : "");
+    }
+
+    total.addEventListener("input", updateRateNote);
+    correct.addEventListener("input", updateRateNote);
+    updateRateNote();
+
     const result = document.createElement("input");
     result.type = "text";
-    result.placeholder = "結果（例：8/10正解）";
+    result.placeholder = "結果（例：8/10正解。空欄なら上の数字から自動作成）";
     result.value = record.log?.result || "";
 
     const learned = document.createElement("textarea");
@@ -951,9 +1005,25 @@ function buildLogForm(record) {
 
         const resolvesId = resolveSelect.value || null;
 
+        const totalQuestions = Number(total.value) || 0;
+        const correctCount = Number(correct.value) || 0;
+        const hasScore = totalQuestions > 0;
+        const rate = hasScore ? Math.round((correctCount / totalQuestions) * 100) : null;
+        const needsReview = hasScore ? rate < 60 : false;
+
+        let resultText = result.value.trim();
+
+        if (!resultText && hasScore) {
+            resultText = correctCount + "/" + totalQuestions + "正解（" + rate + "%）";
+        }
+
         record.log = {
             content: content.value.trim(),
-            result: result.value.trim(),
+            totalQuestions: totalQuestions,
+            correctCount: correctCount,
+            rate: rate,
+            needsReview: needsReview,
+            result: resultText,
             learned: learned.value.trim(),
             unresolved: unresolved.value.trim(),
             resolved: record.log?.resolved || false,
@@ -967,11 +1037,30 @@ function buildLogForm(record) {
 
             if (target && target.log) {
                 target.log.resolved = true;
+
+                if (typeof checkBadges === "function") {
+                    checkBadges();
+                }
             }
         }
 
         saveReservations();
+
+        if (typeof playChime === "function") {
+            playChime("save");
+        }
+
+        if (typeof checkBadges === "function") {
+            checkBadges();
+        }
+
         expandedLogIds.delete(record.id);
+
+        /* 通常演習コマで結果を入力した場合は、保存後に進行選択を出す */
+        if (reservationType(record) === "normal" && hasScore) {
+            postSaveChoiceId = record.id;
+        }
+
         renderKomaAll();
     });
 
@@ -980,7 +1069,7 @@ function buildLogForm(record) {
         renderKomaAll();
     });
 
-    form.append(content, result, learned, unresolved, resolveSelect);
+    form.append(content, scoreRow, rateNote, result, learned, unresolved, resolveSelect);
 
     const btnRow = document.createElement("div");
     btnRow.className = "btn-row";
@@ -989,6 +1078,86 @@ function buildLogForm(record) {
     form.appendChild(btnRow);
 
     return form;
+}
+
+
+/* =========================================================
+   結果判定後の進行選択（理解・解決枠へ／次へ／同じ内容を再予約）
+   ========================================================= */
+
+let postSaveChoiceId = null;
+
+function prefillReservationForm(subject, material, content, range, goal) {
+
+    if ($("resSubject")) { $("resSubject").value = subject || ""; }
+    if ($("resMaterial")) { $("resMaterial").value = material || ""; }
+    if ($("resContent")) { $("resContent").value = content || ""; }
+    if ($("resRange")) { $("resRange").value = range || ""; }
+    if ($("resGoal")) { $("resGoal").value = goal || ""; }
+
+    setFormStatus("日時を選んで予約してください。", false);
+
+    $("resDate")?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function buildPostSaveChoice(record) {
+
+    const box = document.createElement("div");
+    box.className = "koma-post-choice";
+
+    const needsReview = !!record.log?.needsReview;
+
+    const heading = document.createElement("p");
+    heading.className = "sub";
+    heading.textContent = needsReview
+        ? "正答率60%未満でした。理解・解決枠へ進むのがおすすめです。"
+        : "結果を記録しました。次の行動を選んでください。";
+
+    box.appendChild(heading);
+
+    const actions = document.createElement("div");
+    actions.className = "btn-row";
+
+    const reviewButton = makeButton("理解・解決枠へ進む", needsReview ? "primary" : "");
+    reviewButton.addEventListener("click", function () {
+
+        prefillReservationForm(
+            record.subject,
+            record.material,
+            "理解・解決：" + (record.log?.content || record.content || ""),
+            record.range,
+            "未解決（" + (record.log?.unresolved || "") + "）を解決する"
+        );
+
+        postSaveChoiceId = null;
+        renderKomaAll();
+    });
+
+    const nextButton = makeButton("次に進む", needsReview ? "" : "primary");
+    nextButton.addEventListener("click", function () {
+        postSaveChoiceId = null;
+        renderKomaAll();
+    });
+
+    const rebookButton = makeButton("同じ内容を再度予約する");
+    rebookButton.addEventListener("click", function () {
+
+        prefillReservationForm(
+            record.subject,
+            record.material,
+            record.content,
+            record.range,
+            record.goal
+        );
+
+        postSaveChoiceId = null;
+        renderKomaAll();
+    });
+
+    actions.append(reviewButton, nextButton, rebookButton);
+    box.appendChild(actions);
+
+    return box;
 }
 
 
@@ -1220,6 +1389,17 @@ function buildKomaCard(record, options) {
 
         logSection.appendChild(summary);
 
+        if (record.log.rate !== null && record.log.rate !== undefined) {
+
+            const rateTag = document.createElement("span");
+            rateTag.className = "koma-tag" + (record.log.needsReview ? " kind-exam" : " kind-personal");
+            rateTag.textContent =
+                "正答率 " + record.log.rate + "%" +
+                (record.log.needsReview ? "・理解解決が必要" : "");
+
+            logSection.appendChild(rateTag);
+        }
+
         if (record.log.resolvesId) {
 
             const source = findReservation(record.log.resolvesId);
@@ -1235,6 +1415,10 @@ function buildKomaCard(record, options) {
                 logSection.appendChild(refTag);
             }
         }
+    }
+
+    if (postSaveChoiceId === record.id) {
+        logSection.appendChild(buildPostSaveChoice(record));
     }
 
     const logToggle = makeButton(
@@ -2151,6 +2335,104 @@ function renderUnresolvedList() {
     });
 }
 
+
+/* =========================================================
+   学習メモ
+   ========================================================= */
+
+let studyMemos = loadJSON("patgs27_study_memos", []);
+
+function saveStudyMemos() {
+    saveJSON("patgs27_study_memos", studyMemos);
+}
+
+function renderMemos() {
+
+    const list = $("memoList");
+
+    if (!list) {
+        return;
+    }
+
+    list.innerHTML = "";
+
+    if (studyMemos.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "empty-note";
+        empty.textContent = "メモはまだありません。";
+        list.appendChild(empty);
+        return;
+    }
+
+    studyMemos.slice().reverse().forEach(function (item, reverseIndex) {
+
+        const index = studyMemos.length - 1 - reverseIndex;
+
+        const row = document.createElement("div");
+        row.className = "koma";
+
+        const head = document.createElement("div");
+        head.className = "koma-head";
+
+        const tag = document.createElement("span");
+        tag.className = "koma-tag";
+        tag.textContent = item.category || "その他";
+
+        const dateTag = document.createElement("span");
+        dateTag.className = "sub";
+        dateTag.textContent = clockOnly(item.dateTime);
+
+        head.append(tag, dateTag);
+
+        const text = document.createElement("p");
+        text.className = "koma-detail";
+        text.textContent = item.text || "";
+
+        const deleteButton = makeButton("削除", "ghost");
+
+        deleteButton.addEventListener("click", function () {
+            studyMemos.splice(index, 1);
+            saveStudyMemos();
+            renderMemos();
+        });
+
+        row.append(head, text, deleteButton);
+
+        list.appendChild(row);
+    });
+}
+
+$("addMemoBtn")?.addEventListener("click", function () {
+
+    const category = $("memoCategory")?.value || "その他";
+    const text = $("memoText")?.value.trim() || "";
+
+    if (!text) {
+        alert("内容を入力してください。");
+        return;
+    }
+
+    studyMemos.push({
+        category: category,
+        text: text,
+        dateTime: nowText()
+    });
+
+    saveStudyMemos();
+
+    if ($("memoText")) { $("memoText").value = ""; }
+
+    renderMemos();
+
+    if (typeof playChime === "function") {
+        playChime("save");
+    }
+
+    if (typeof checkBadges === "function") {
+        checkBadges();
+    }
+});
+
 function renderKomaAll() {
 
     closeFinishedWeeks();
@@ -2168,6 +2450,9 @@ function renderKomaAll() {
     renderWeeklyKomaReport();
     renderTimeOptions();
     renderUnresolvedList();
+    renderGrowth();
+    renderJukenMap();
+    checkBadges();
 
     if (typeof renderCalendarAll === "function") {
         renderCalendarAll();
@@ -2338,7 +2623,7 @@ if ("serviceWorker" in navigator) {
     const patgsHadController = !!navigator.serviceWorker.controller;
 
     patgsServiceWorkerReady = navigator.serviceWorker
-        .register("/sw.js?v=" + PATGS_VERSION)
+        .register("sw.js?v=" + PATGS_VERSION)
         .then(function (registration) {
             return registration;
         })
@@ -3224,12 +3509,26 @@ $("addViolationBtn")?.addEventListener("click", function () {
    ========================================================= */
 
 let weeklyReviews = loadJSON("patgs27_weekly_reviews", []);
+let weeklyReviewEditingWeek = null;
 
 function saveWeeklyReviews() {
     saveJSON("patgs27_weekly_reviews", weeklyReviews);
 }
 
+/* "YYYY/MM/DD HH:MM" から時刻部分だけを取り出す（例：20:00） */
+function clockOnly(text) {
+
+    if (!text) {
+        return "";
+    }
+
+    const parts = text.split(" ");
+    return parts[parts.length - 1] || text;
+}
+
 function loadWeeklyReview() {
+
+    weeklyReviewEditingWeek = null;
 
     const current = weeklyReviews.find(function (item) {
         return item.week === todayKey();
@@ -3237,6 +3536,10 @@ function loadWeeklyReview() {
 
     if ($("weeklyReviewText")) {
         $("weeklyReviewText").value = current?.text || "";
+    }
+
+    if ($("weeklyReviewCancelEditBtn")) {
+        $("weeklyReviewCancelEditBtn").style.display = "none";
     }
 }
 
@@ -3246,7 +3549,7 @@ function saveWeeklyReview() {
         return;
     }
 
-    const key = todayKey();
+    const key = weeklyReviewEditingWeek || todayKey();
 
     let current = weeklyReviews.find(function (item) {
         return item.week === key;
@@ -3262,7 +3565,48 @@ function saveWeeklyReview() {
 
     saveWeeklyReviews();
 
-    showSave("weeklyReviewSaveStatus");
+    showSave("weeklyReviewSaveStatus", "✓ 保存しました");
+    playChime();
+
+    weeklyReviewEditingWeek = null;
+
+    if ($("weeklyReviewCancelEditBtn")) {
+        $("weeklyReviewCancelEditBtn").style.display = "none";
+    }
+
+    loadWeeklyReview();
+    renderWeeklyReviews();
+}
+
+function editWeeklyReview(item) {
+
+    weeklyReviewEditingWeek = item.week;
+
+    if ($("weeklyReviewText")) {
+        $("weeklyReviewText").value = item.text || "";
+        $("weeklyReviewText").scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    if ($("weeklyReviewCancelEditBtn")) {
+        $("weeklyReviewCancelEditBtn").style.display = "inline-block";
+    }
+}
+
+function deleteWeeklyReview(item) {
+
+    if (!confirm("このレビューを削除しますか？")) {
+        return;
+    }
+
+    weeklyReviews = weeklyReviews.filter(function (i) {
+        return i.week !== item.week;
+    });
+
+    saveWeeklyReviews();
+
+    if (weeklyReviewEditingWeek === item.week) {
+        loadWeeklyReview();
+    }
 
     renderWeeklyReviews();
 }
@@ -3283,19 +3627,38 @@ function renderWeeklyReviews() {
         box.className = "koma";
 
         const title = document.createElement("strong");
-        title.textContent = item.week + "｜" + (item.updatedAt || item.dateTime || "");
+        title.textContent = item.week + "｜" + clockOnly(item.updatedAt || item.dateTime || "");
 
         const text = document.createElement("p");
         text.className = "koma-detail";
         text.textContent = item.text || "（未入力）";
 
-        box.append(title, text);
+        const actions = document.createElement("div");
+        actions.className = "koma-actions";
+
+        const editButton = makeButton("編集", "ghost");
+        editButton.addEventListener("click", function () {
+            editWeeklyReview(item);
+        });
+
+        const deleteButton = makeButton("削除", "ghost");
+        deleteButton.addEventListener("click", function () {
+            deleteWeeklyReview(item);
+        });
+
+        actions.append(editButton, deleteButton);
+
+        box.append(title, text, actions);
 
         list.appendChild(box);
     });
 }
 
-$("weeklyReviewText")?.addEventListener("input", saveWeeklyReview);
+$("weeklyReviewSaveBtn")?.addEventListener("click", saveWeeklyReview);
+
+$("weeklyReviewCancelEditBtn")?.addEventListener("click", function () {
+    loadWeeklyReview();
+});
 
 
 /* =========================================================
@@ -3429,6 +3792,7 @@ function refreshAllScheduleViews() {
     renderOtherSchedules();
     renderScheduleSettings();
     updateSchedule();
+    renderJukenMap();
 
     if (typeof renderCalendarAll === "function") {
         renderCalendarAll();
@@ -5543,6 +5907,684 @@ setInterval(function () {
 
 
 /* =========================================================
+   ＋ やる気を高める機能
+   ＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
+   ここから⑥（育成・成長／受験マップ／週次振り返り自動生成／
+   演出音・アニメーション／実績・バッジ）を実装する。
+   すべて既存のreservations・calendarEvents・weekRequiredなど
+   既存データから計算するだけで、新しい入力欄は増やさない。
+   ========================================================= */
+
+/* --- ⑥-1 育成・成長系ビジュアル --- */
+
+const GROWTH_STAGE_THRESHOLDS = [0, 5, 15, 30, 60];
+const GROWTH_STAGE_LABELS = ["種", "芽", "若葉", "成長中", "立派"];
+
+const GROWTH_ICON_SETS = {
+    "国語": ["🌰", "🌱", "🌿", "🌸", "🎋"],
+    "数学": ["🌰", "🌱", "🌿", "🌲", "🎄"],
+    "英語": ["🥚", "🐣", "🐤", "🦅", "🦉"],
+    "理科": ["🌰", "🌱", "🌵", "🌴", "🌻"],
+    "社会": ["🥚", "🐢", "🐇", "🦊", "🦁"],
+    "その他": ["🌰", "🌱", "🍄", "🍀", "🌟"]
+};
+
+function growthPointsForSubject(subject) {
+
+    return reservations.reduce(function (sum, record) {
+
+        if (record.status !== "done") {
+            return sum;
+        }
+
+        const subj = KOMA_SUBJECTS.includes(record.subject) ? record.subject : "その他";
+
+        if (subj !== subject) {
+            return sum;
+        }
+
+        return sum + komaValue(record);
+
+    }, 0);
+}
+
+function growthStageIndex(points) {
+
+    let index = 0;
+
+    GROWTH_STAGE_THRESHOLDS.forEach(function (threshold, i) {
+        if (points >= threshold) {
+            index = i;
+        }
+    });
+
+    return index;
+}
+
+function lastStudiedDateForSubject(subject) {
+
+    let last = "";
+
+    reservations.forEach(function (record) {
+
+        if (record.status !== "done") {
+            return;
+        }
+
+        const subj = KOMA_SUBJECTS.includes(record.subject) ? record.subject : "その他";
+
+        if (subj !== subject) {
+            return;
+        }
+
+        if (!last || record.date > last) {
+            last = record.date;
+        }
+    });
+
+    return last;
+}
+
+function renderGrowth() {
+
+    const container = $("growthList");
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = "";
+
+    const yesterday = getDateKeyOffset(-1);
+    const today = todayKey();
+
+    KOMA_SUBJECTS.forEach(function (subject) {
+
+        const points = growthPointsForSubject(subject);
+        const stage = growthStageIndex(points);
+        const icons = GROWTH_ICON_SETS[subject] || GROWTH_ICON_SETS["その他"];
+        const icon = icons[Math.min(stage, icons.length - 1)];
+        const stageLabel = GROWTH_STAGE_LABELS[Math.min(stage, GROWTH_STAGE_LABELS.length - 1)];
+
+        const lastDate = lastStudiedDateForSubject(subject);
+        const resting = points > 0 && lastDate && lastDate !== today && lastDate !== yesterday;
+
+        const card = document.createElement("div");
+        card.className = "growth-card";
+
+        const iconEl = document.createElement("div");
+        iconEl.className = "growth-icon";
+        iconEl.textContent = icon;
+
+        const subjectEl = document.createElement("div");
+        subjectEl.className = "growth-subject";
+        subjectEl.textContent = subject;
+
+        const stageEl = document.createElement("div");
+        stageEl.className = "growth-stage";
+        stageEl.textContent = stageLabel + (resting ? "（お休み中）" : "");
+
+        const pointsEl = document.createElement("div");
+        pointsEl.className = "growth-points";
+        pointsEl.textContent = points + "コマ分";
+
+        card.append(iconEl, subjectEl, stageEl, pointsEl);
+        container.appendChild(card);
+    });
+}
+
+
+/* --- ⑥-2 受験マップ・すごろく --- */
+
+function jukenMapGoalOptions() {
+
+    const today = todayKey();
+
+    return calendarEvents
+        .filter(function (event) {
+            return event.kind === "important" && event.date && event.date >= today;
+        })
+        .sort(function (a, b) {
+            return a.date.localeCompare(b.date);
+        });
+}
+
+function renderJukenMapGoalSelect() {
+
+    const select = $("mapGoalSelect");
+
+    if (!select) {
+        return;
+    }
+
+    const options = jukenMapGoalOptions();
+    const saved = localStorage.getItem("patgs27_map_goal") || "";
+
+    select.innerHTML = "";
+
+    if (options.length === 0) {
+
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "目標にできる重要予定がありません";
+        select.appendChild(opt);
+        return;
+    }
+
+    options.forEach(function (event) {
+
+        const opt = document.createElement("option");
+        opt.value = event.id;
+        opt.textContent =
+            (event.icon || "📅") + " " + (event.title || "名称未設定") +
+            "（" + formatShortDate(event.date) + "）";
+
+        select.appendChild(opt);
+    });
+
+    if (options.some(function (o) { return o.id === saved; })) {
+        select.value = saved;
+    } else {
+        select.value = options[0].id;
+        localStorage.setItem("patgs27_map_goal", options[0].id);
+    }
+}
+
+function setupJukenMap() {
+
+    $("mapGoalSelect")?.addEventListener("change", function () {
+        localStorage.setItem("patgs27_map_goal", $("mapGoalSelect").value);
+        renderJukenMap();
+    });
+}
+
+function renderJukenMap() {
+
+    renderJukenMapGoalSelect();
+
+    const board = $("mapBoard");
+    const summary = $("mapSummary");
+
+    if (!board) {
+        return;
+    }
+
+    board.innerHTML = "";
+
+    const goalId = $("mapGoalSelect")?.value || localStorage.getItem("patgs27_map_goal") || "";
+    const goal = calendarEvents.find(function (e) { return e.id === goalId; });
+
+    if (!goal || !goal.date) {
+        if (summary) {
+            summary.textContent = "上の「目標にする重要予定」を選ぶと、道のりが表示されます。";
+        }
+        return;
+    }
+
+    const today = todayKey();
+    const trailStart = getDateKeyOffset(-13);
+
+    let dateList = [];
+    let cursor = trailStart;
+
+    while (cursor <= goal.date) {
+        dateList.push(cursor);
+        cursor = addDaysToKey(cursor, 1);
+    }
+
+    const MAX_SQUARES = 40;
+    let displayList = dateList;
+    let hiddenCount = 0;
+
+    if (dateList.length > MAX_SQUARES) {
+
+        const headCount = 16;
+        const tailCount = 14;
+
+        const head = dateList.slice(0, headCount);
+        const tail = dateList.slice(dateList.length - tailCount);
+
+        hiddenCount = dateList.length - headCount - tailCount;
+
+        displayList = head.concat(["__ellipsis__"]).concat(tail);
+    }
+
+    displayList.forEach(function (dateKey) {
+
+        if (dateKey === "__ellipsis__") {
+
+            const sq = document.createElement("div");
+            sq.className = "map-square is-ellipsis";
+            sq.textContent = "+" + hiddenCount;
+            sq.title = "残り " + hiddenCount + " 日";
+            board.appendChild(sq);
+            return;
+        }
+
+        const sq = document.createElement("div");
+        sq.className = "map-square";
+
+        if (dateKey === today) {
+            sq.classList.add("is-today");
+        }
+
+        if (dateKey === goal.date) {
+            sq.classList.add("is-goal");
+        }
+
+        if (dateKey < today && getDoneKomaForDate(dateKey) > 0) {
+            sq.style.background = "#39a637";
+        }
+
+        if (dateKey === goal.date) {
+            sq.textContent = goal.icon || "🎓";
+        } else if (dateKey === today) {
+            sq.textContent = "🏃";
+        }
+
+        sq.title = formatShortDate(dateKey) + (dateKey === goal.date ? "：" + (goal.title || "") : "");
+
+        board.appendChild(sq);
+    });
+
+    const daysLeft = Math.max(
+        0,
+        Math.round(
+            (new Date(goal.date + "T00:00:00") - new Date(today + "T00:00:00")) /
+            (1000 * 60 * 60 * 24)
+        )
+    );
+
+    const studiedInTrail = dateList.filter(function (d) {
+        return d < today && d >= trailStart && getDoneKomaForDate(d) > 0;
+    }).length;
+
+    if (summary) {
+        summary.textContent =
+            (goal.title || "目標") + "（" + formatShortDate(goal.date) + "）まで あと " +
+            daysLeft + " 日／直近14日のうち学習した日：" + studiedInTrail + "日";
+    }
+}
+
+
+/* --- ⑥-3 週次振り返り自動生成 --- */
+
+let lastGeneratedWeeklyReport = "";
+
+function computeWeeklyReportData() {
+
+    const weekStart = getWeekStartKey(todayKey());
+    const weekEnd = addDaysToKey(weekStart, 6);
+    const doneList = getWeekReservations(weekStart).filter(function (r) {
+        return r.status === "done";
+    });
+
+    const stats = getWeekStats(weekStart);
+
+    const subjectCounts = {};
+
+    KOMA_SUBJECTS.forEach(function (subject) {
+        subjectCounts[subject] = 0;
+    });
+
+    doneList.forEach(function (record) {
+        const subj = KOMA_SUBJECTS.includes(record.subject) ? record.subject : "その他";
+        subjectCounts[subj] += komaValue(record);
+    });
+
+    const withScore = doneList.filter(function (r) {
+        return r.log && r.log.rate !== null && r.log.rate !== undefined;
+    });
+
+    const avgRate = withScore.length > 0
+        ? Math.round(withScore.reduce(function (s, r) { return s + r.log.rate; }, 0) / withScore.length)
+        : null;
+
+    const unresolvedThisWeek = doneList
+        .filter(function (r) { return r.log && r.log.unresolved && !r.log.resolved; })
+        .map(function (r) { return (r.subject || "") + "：" + r.log.unresolved; });
+
+    const resolvedThisWeek = doneList
+        .filter(function (r) { return r.log && r.log.resolvesId; })
+        .map(function (r) {
+            const src = findReservation(r.log.resolvesId);
+            return (r.subject || "") + "：" + (src && src.log ? src.log.unresolved : "");
+        });
+
+    return {
+        weekStart: weekStart,
+        weekEnd: weekEnd,
+        stats: stats,
+        subjectCounts: subjectCounts,
+        avgRate: avgRate,
+        unresolvedThisWeek: unresolvedThisWeek,
+        resolvedThisWeek: resolvedThisWeek
+    };
+}
+
+function generateWeeklyReport() {
+
+    const data = computeWeeklyReportData();
+
+    const lines = [];
+
+    lines.push(
+        "【今週の学習レポート】" + formatShortDate(data.weekStart) +
+        "〜" + formatShortDate(data.weekEnd)
+    );
+
+    lines.push(
+        "実施コマ：" + data.stats.done + "／必要 " + data.stats.required +
+        "（未実行 " + data.stats.missed + "・振替 " + data.stats.moved + "）"
+    );
+
+    if (data.avgRate !== null) {
+        lines.push("平均正答率：" + data.avgRate + "%");
+    }
+
+    const subjLine = KOMA_SUBJECTS
+        .filter(function (s) { return data.subjectCounts[s] > 0; })
+        .map(function (s) { return s + " " + data.subjectCounts[s] + "コマ"; })
+        .join("／");
+
+    lines.push("教科別：" + (subjLine || "記録なし"));
+
+    lines.push(
+        "未解決：" + (data.unresolvedThisWeek.length ? data.unresolvedThisWeek.join("／") : "なし")
+    );
+
+    lines.push(
+        "理解・解決した内容：" +
+        (data.resolvedThisWeek.length ? data.resolvedThisWeek.join("／") : "なし")
+    );
+
+    const text = lines.join("\n");
+
+    const box = $("weeklyReportBox");
+
+    if (box) {
+        box.textContent = text;
+        flashElement(box);
+    }
+
+    lastGeneratedWeeklyReport = text;
+
+    playChime();
+
+    return text;
+}
+
+$("generateWeeklyReportBtn")?.addEventListener("click", generateWeeklyReport);
+
+$("copyReportToReviewBtn")?.addEventListener("click", function () {
+
+    if (!lastGeneratedWeeklyReport) {
+        generateWeeklyReport();
+    }
+
+    if ($("weeklyReviewText")) {
+
+        const existing = $("weeklyReviewText").value.trim();
+
+        $("weeklyReviewText").value = existing
+            ? existing + "\n\n" + lastGeneratedWeeklyReport
+            : lastGeneratedWeeklyReport;
+
+        $("weeklyReviewText").scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+});
+
+
+/* --- ⑥-4 小さな演出音・アニメーション --- */
+
+let patgsAudioContext = null;
+
+function loadFxPrefs() {
+
+    const soundOn = localStorage.getItem("patgs27_fx_sound") === "1";
+    const animOn = localStorage.getItem("patgs27_fx_animation") !== "0";
+
+    if ($("fxSoundToggle")) { $("fxSoundToggle").checked = soundOn; }
+    if ($("fxAnimationToggle")) { $("fxAnimationToggle").checked = animOn; }
+}
+
+function setupFx() {
+
+    loadFxPrefs();
+
+    $("fxSoundToggle")?.addEventListener("change", function () {
+        localStorage.setItem("patgs27_fx_sound", $("fxSoundToggle").checked ? "1" : "0");
+    });
+
+    $("fxAnimationToggle")?.addEventListener("change", function () {
+        localStorage.setItem("patgs27_fx_animation", $("fxAnimationToggle").checked ? "1" : "0");
+    });
+}
+
+function playChime() {
+
+    if (localStorage.getItem("patgs27_fx_sound") !== "1") {
+        return;
+    }
+
+    try {
+
+        if (!patgsAudioContext) {
+
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+
+            if (!AudioCtx) {
+                return;
+            }
+
+            patgsAudioContext = new AudioCtx();
+        }
+
+        const ctx = patgsAudioContext;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = "sine";
+        osc.frequency.value = 880;
+
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.28);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start();
+        osc.stop(ctx.currentTime + 0.3);
+
+    } catch (error) {
+        console.error("効果音の再生に失敗しました:", error);
+    }
+}
+
+function flashElement(el) {
+
+    if (!el) {
+        return;
+    }
+
+    if (localStorage.getItem("patgs27_fx_animation") === "0") {
+        return;
+    }
+
+    el.classList.remove("log-saved-flash");
+
+    void el.offsetWidth;
+
+    el.classList.add("log-saved-flash");
+
+    setTimeout(function () {
+        el.classList.remove("log-saved-flash");
+    }, 700);
+}
+
+
+/* --- ⑥-5 実績・バッジ --- */
+
+const ALL_BADGES = [
+    {
+        id: "first_perfect",
+        icon: "💯",
+        label: "はじめての満点",
+        check: function (ctx) { return ctx.hasPerfect; }
+    },
+    {
+        id: "koma_10",
+        icon: "🥉",
+        label: "累計10コマ達成",
+        check: function (ctx) { return ctx.totalDone >= 10; }
+    },
+    {
+        id: "koma_50",
+        icon: "🥈",
+        label: "累計50コマ達成",
+        check: function (ctx) { return ctx.totalDone >= 50; }
+    },
+    {
+        id: "koma_100",
+        icon: "🥇",
+        label: "累計100コマ達成",
+        check: function (ctx) { return ctx.totalDone >= 100; }
+    },
+    {
+        id: "streak_7",
+        icon: "🔥",
+        label: "7日連続で開いた",
+        check: function (ctx) { return ctx.bestStreak >= 7; }
+    },
+    {
+        id: "resolve_5",
+        icon: "🧩",
+        label: "未解決を5件解決",
+        check: function (ctx) { return ctx.resolvedCount >= 5; }
+    },
+    {
+        id: "debt_free_week",
+        icon: "🏆",
+        label: "必要コマを達成した週がある",
+        check: function (ctx) { return ctx.hadDebtFreeWeek; }
+    }
+];
+
+function computeBadgeContext() {
+
+    const totalDone = reservations
+        .filter(function (r) { return r.status === "done"; })
+        .reduce(function (s, r) { return s + komaValue(r); }, 0);
+
+    const hasPerfect = reservations.some(function (r) {
+        return r.log && r.log.rate === 100;
+    });
+
+    const resolvedCount = reservations.filter(function (r) {
+        return r.log && r.log.resolved;
+    }).length;
+
+    const bestStreak = Number(localStorage.getItem("patgs27_best_streak")) || 0;
+
+    const currentWeek = getWeekStartKey(todayKey());
+
+    const hadDebtFreeWeek = Object.keys(weekRequired).some(function (week) {
+
+        const required = Number(weekRequired[week]) || 0;
+
+        if (required <= 0 || week >= currentWeek) {
+            return false;
+        }
+
+        return getWeekStats(week).shortage === 0;
+    });
+
+    return {
+        totalDone: totalDone,
+        hasPerfect: hasPerfect,
+        resolvedCount: resolvedCount,
+        bestStreak: bestStreak,
+        hadDebtFreeWeek: hadDebtFreeWeek
+    };
+}
+
+function loadEarnedBadges() {
+    return loadJSON("patgs27_badges", []);
+}
+
+function saveEarnedBadges(list) {
+    saveJSON("patgs27_badges", list);
+}
+
+function checkBadges() {
+
+    const earned = loadEarnedBadges();
+    const earnedIds = earned.map(function (b) { return b.id; });
+    const ctx = computeBadgeContext();
+
+    let changed = false;
+
+    ALL_BADGES.forEach(function (badge) {
+
+        if (earnedIds.includes(badge.id)) {
+            return;
+        }
+
+        if (badge.check(ctx)) {
+            earned.push({ id: badge.id, earnedAt: nowText() });
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        saveEarnedBadges(earned);
+    }
+
+    renderBadges();
+}
+
+function renderBadges() {
+
+    const grid = $("badgeGrid");
+
+    if (!grid) {
+        return;
+    }
+
+    grid.innerHTML = "";
+
+    const earnedIds = loadEarnedBadges().map(function (b) { return b.id; });
+
+    ALL_BADGES.forEach(function (badge) {
+
+        const isEarned = earnedIds.includes(badge.id);
+
+        const item = document.createElement("div");
+        item.className = "badge-item" + (isEarned ? "" : " is-locked");
+
+        const icon = document.createElement("div");
+        icon.className = "badge-icon";
+        icon.textContent = isEarned ? badge.icon : "🔒";
+
+        const label = document.createElement("div");
+        label.className = "badge-label";
+        label.textContent = badge.label;
+
+        item.append(icon, label);
+        grid.appendChild(item);
+    });
+}
+
+
+/* --- 「＋」ボタン：やる気を高める機能パネルへスクロール --- */
+
+$("motivationFab")?.addEventListener("click", function () {
+    $("motivationPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+
+/* =========================================================
    初期化
    ========================================================= */
 
@@ -5596,6 +6638,14 @@ function initializePATGS27() {
     renderStudyHeatmap();
     renderTodaySummary();
     renderRandomMessage();
+    renderMemos();
+
+    /* やる気を高める機能（＋） */
+    setupFx();
+    setupJukenMap();
+    renderGrowth();
+    renderJukenMap();
+    checkBadges();
 
     console.log("PATGS27 script.js (" + PATGS_VERSION + ") loaded successfully.");
 }
