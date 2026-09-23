@@ -1181,3 +1181,205 @@ canvas {
     gap: 6px;
     margin-top: 8px;
 }
+
+.koma-log-score-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.koma-log-num-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    font-weight: 600;
+}
+
+.koma-log-num-label input {
+    width: 70px;
+}
+
+.koma-log-rate-note {
+    margin: 0;
+}
+
+.koma-post-choice {
+    margin: 8px 0;
+    padding: 10px;
+    border-radius: var(--radius-sm);
+    background: #fff5f2;
+    border: 1px solid #ffd9cc;
+}
+
+
+/* =========================================================
+   ＋ やる気を高める機能
+   ========================================================= */
+
+.motivation-fab {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 40;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    padding: 0;
+    font-size: 26px;
+    line-height: 1;
+    background: linear-gradient(120deg, var(--indigo) 0%, var(--coral) 130%);
+    color: #fff;
+    border: none;
+    box-shadow: 0 8px 20px rgba(76, 41, 196, 0.35);
+}
+
+.motivation-fab:hover {
+    transform: translateY(-2px) scale(1.03);
+}
+
+.check-label-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    margin: 8px 0;
+}
+
+.check-label-row input {
+    width: auto;
+}
+
+/* 育成・成長 */
+
+.growth-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.growth-card {
+    text-align: center;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 10px 6px;
+    background: #fff;
+}
+
+.growth-icon {
+    font-size: 32px;
+    line-height: 1.2;
+}
+
+.growth-subject {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink-soft);
+}
+
+.growth-stage {
+    font-size: 11px;
+    color: var(--green-deep);
+    font-weight: 700;
+}
+
+.growth-points {
+    font-size: 10px;
+    color: var(--ink-soft);
+}
+
+/* 受験マップ */
+
+.map-board {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin: 10px 0;
+    max-height: 140px;
+    overflow-y: auto;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: #fbfaf7;
+}
+
+.map-square {
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    background: #ebedf0;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.map-square.is-today {
+    outline: 2px solid var(--coral);
+}
+
+.map-square.is-goal {
+    background: linear-gradient(120deg, var(--indigo), var(--violet));
+}
+
+.map-square.is-ellipsis {
+    background: transparent;
+    color: var(--ink-soft);
+    width: auto;
+    padding: 0 2px;
+}
+
+/* バッジ */
+
+.badge-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.badge-item {
+    text-align: center;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 10px 6px;
+    background: #fff;
+}
+
+.badge-item.is-locked {
+    opacity: 0.4;
+}
+
+.badge-icon {
+    font-size: 26px;
+}
+
+.badge-label {
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+}
+
+/* 保存フラッシュ演出 */
+
+@keyframes log-saved-flash {
+    0%   { box-shadow: 0 0 0 0 rgba(15, 157, 88, 0.35); }
+    100% { box-shadow: 0 0 0 8px rgba(15, 157, 88, 0); }
+}
+
+.log-saved-flash {
+    animation: log-saved-flash 0.6s ease;
+}
+
+@media (max-width: 600px) {
+
+    .motivation-fab {
+        right: 12px;
+        bottom: 12px;
+        width: 46px;
+        height: 46px;
+        font-size: 22px;
+    }
+}
