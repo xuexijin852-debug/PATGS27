@@ -46,9 +46,11 @@
 
             <div class="patgs-header-title">
 
+                <button id="backToHomeBtn" class="back-button" style="display:none;">← ホーム</button>
+
                 <h1>PATGS27</h1>
 
-                <p class="patgs-subtitle">
+                <p class="patgs-subtitle" id="screenTitle">
                     ― 受験管理システム／第五次改革（コマ制度）―
                 </p>
 
@@ -64,14 +66,28 @@
 
         </header>
 
-        <button id="motivationFab" class="motivation-fab" title="やる気を高める機能">＋</button>
+        <div id="interventionBanner" class="intervention-banner" style="display:none;"></div>
+
+        <div id="interventionModalOverlay" class="intervention-overlay" style="display:none;">
+            <div class="intervention-modal">
+                <div id="interventionModalBody"></div>
+            </div>
+        </div>
+
+        <div class="fab-wrap">
+
+            <div id="fabMenu" class="fab-menu" style="display:none;"></div>
+
+            <button id="motivationFab" class="motivation-fab" title="クイックランチャー">＋</button>
+
+        </div>
 
 
         <!-- =================================================
              今日のPATGS
         ================================================== -->
 
-        <section class="panel panel-main">
+        <section data-screen="home" class="panel panel-main">
 
             <h2>🗓 今日のPATGS</h2>
 
@@ -136,6 +152,17 @@
 
             <p class="sub" id="randomMessage"></p>
 
+            <p class="sub" id="homeExamCountdown"></p>
+
+        </section>
+
+
+        <section data-screen="home" class="panel">
+
+            <h2>📋 主要機能</h2>
+
+            <div id="homeCards" class="home-cards"></div>
+
         </section>
 
 
@@ -143,7 +170,7 @@
              今後の重要予定（上部に配置）
         ================================================== -->
 
-        <section class="panel panel-main">
+        <section data-screen="schedule" class="panel panel-main">
 
             <h2>📅 今後の重要予定</h2>
 
@@ -156,7 +183,7 @@
              PATGS27内蔵カレンダー
         ================================================== -->
 
-        <section class="panel panel-main" id="calendarPanel">
+        <section data-screen="schedule" class="panel panel-main" id="calendarPanel">
 
             <h2>🗓 カレンダー</h2>
 
@@ -250,7 +277,7 @@
              コマ予約
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="study" class="panel">
 
             <h2>📌 コマ予約</h2>
 
@@ -349,7 +376,7 @@
              PATGS27内蔵タイマー
         ================================================== -->
 
-        <section class="panel" id="timerPanel">
+        <section data-screen="study" class="panel" id="timerPanel">
 
             <h2>⏱ 学習タイマー</h2>
 
@@ -377,7 +404,7 @@
              空き枠検索
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="study" class="panel">
 
             <h2>🔍 空き枠検索</h2>
 
@@ -414,7 +441,7 @@
              未実行コマ
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="study" class="panel">
 
             <h2>⏳ 未実行コマ</h2>
 
@@ -434,13 +461,17 @@
              未解決事項
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="unresolved" class="panel">
 
             <h2>🧩 未解決事項</h2>
 
             <p class="sub">
                 コマ終了時の記録で「未解決」に書いた内容がここに並びます。
                 理解・解決コマの記録画面で、この一覧から選んで紐付けられます。
+            </p>
+
+            <p class="flow-note">
+                通常演習 → 結果入力 → 正答率60%未満 → 理解・解決枠へ進む、という流れで未解決が生まれます。
             </p>
 
             <div id="unresolvedList"></div>
@@ -452,7 +483,7 @@
              学習メモ
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="study" class="panel">
 
             <h2>🗒 学習メモ</h2>
 
@@ -492,7 +523,7 @@
              取り消しの記録
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="study" class="panel">
 
             <h2>🗂 取り消し・変更の記録</h2>
 
@@ -513,7 +544,7 @@
              債務
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="study" class="panel">
 
             <h2>🧾 債務</h2>
 
@@ -531,7 +562,7 @@
              LS記録
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="study" class="panel">
 
             <h2>🔥 LS記録（30分を超えた学習）</h2>
 
@@ -580,7 +611,7 @@
              週間コマ管理
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="week" class="panel">
 
             <h2>📊 週間コマ管理</h2>
 
@@ -607,7 +638,7 @@
              今日の目標・予定・一言・実績
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="study" class="panel">
 
             <h2>🎯 今日の目標</h2>
 
@@ -616,7 +647,7 @@
         </section>
 
 
-        <section class="panel">
+        <section data-screen="study" class="panel">
 
             <h2>📋 今日の予定</h2>
 
@@ -633,7 +664,7 @@
         </section>
 
 
-        <section class="panel">
+        <section data-screen="study" class="panel">
 
             <h2>💬 今日の一言</h2>
 
@@ -642,7 +673,7 @@
         </section>
 
 
-        <section class="panel">
+        <section data-screen="study" class="panel">
 
             <h2>📝 今日の実績</h2>
 
@@ -655,7 +686,7 @@
              生活リズム
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="settings" class="panel">
 
             <h2>🕐 生活リズム</h2>
 
@@ -695,7 +726,7 @@
              日付・予定設定
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="schedule" class="panel">
 
             <h2>⚙️ 日付・予定設定</h2>
 
@@ -712,7 +743,7 @@
              教科別 学習法メモ
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="study" class="panel">
 
             <h2>📚 教科別 学習法メモ</h2>
 
@@ -732,7 +763,7 @@
              学習カレンダー
         ================================================== -->
 
-        <section class="panel panel-quiet">
+        <section data-screen="week" class="panel panel-quiet">
 
             <h2>📅 学習カレンダー（過去30日）</h2>
 
@@ -754,7 +785,7 @@
              誘惑報告
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="settings" class="panel">
 
             <h2>⚠️ 誘惑報告</h2>
 
@@ -773,7 +804,7 @@
              模試結果
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="grades" class="panel">
 
             <h2>📊 模試結果</h2>
 
@@ -794,7 +825,7 @@
              過去問記録
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="grades" class="panel">
 
             <h2>📚 過去問記録</h2>
 
@@ -827,7 +858,7 @@
              内申点
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="grades" class="panel">
 
             <h2>📊 内申点管理</h2>
 
@@ -844,7 +875,7 @@
              弱点単元
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="grades" class="panel">
 
             <h2>📌 弱点単元・要復習リスト</h2>
 
@@ -875,7 +906,7 @@
              違反ログ
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="settings" class="panel">
 
             <h2>⚖️ 違反ログ</h2>
 
@@ -904,7 +935,7 @@
              週次レビュー
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="week" class="panel">
 
             <h2>📅 週次レビュー</h2>
 
@@ -932,7 +963,7 @@
              テスト・提出物／教材／学習以外の予定
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="schedule" class="panel">
 
             <h2>📅 テスト・提出物</h2>
 
@@ -943,7 +974,7 @@
         </section>
 
 
-        <section class="panel">
+        <section data-screen="study" class="panel">
 
             <h2>📚 教材</h2>
 
@@ -954,7 +985,7 @@
         </section>
 
 
-        <section class="panel">
+        <section data-screen="schedule" class="panel">
 
             <h2>📅 学習以外の予定</h2>
 
@@ -969,7 +1000,7 @@
              質問メモ
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="study" class="panel">
 
             <h2>❓ 質問・確認事項メモ</h2>
 
@@ -1003,25 +1034,28 @@
              ＋ やる気を高める機能
         ================================================== -->
 
-        <section class="panel panel-main" id="motivationPanel">
+        <section class="panel panel-main" data-screen="growth" id="growthPanel">
 
-            <h2>✨ やる気を高める機能</h2>
-
-            <p class="sub">
-                学習する → 記録する → 成果が見える → 次の学習へ向かいやすくなる。
-                ここに集めた機能はすべて、既存の学習記録・コマ実績から作られています。
-            </p>
-
-            <h3>🌱 育成・成長</h3>
+            <h2>🌱 成長</h2>
 
             <p class="sub">
                 通常学習コマを完了するたびに、その教科の生き物が少しずつ育ちます。
                 学習しない日があっても枯れません。成長が止まるだけです。
+                種 → 芽 → 若葉 → 花 → 木 → 大木、の順で育ちます。
             </p>
 
             <div id="growthList" class="growth-list"></div>
 
-            <h3>🗺 受験マップ</h3>
+        </section>
+
+
+        <section class="panel panel-main" data-screen="map" id="mapPanel">
+
+            <h2>🗺️ 受験マップ</h2>
+
+            <p class="sub">
+                入試までの道のりを可視化します。実際の学習記録（完了コマ）と連動しています。
+            </p>
 
             <label class="inline-label">
                 目標にする重要予定：
@@ -1032,7 +1066,12 @@
 
             <p id="mapSummary" class="sub"></p>
 
-            <h3>📈 週次振り返り自動生成</h3>
+        </section>
+
+
+        <section class="panel panel-main" data-screen="week" id="weeklyReportPanel">
+
+            <h2>📈 週次振り返り自動生成</h2>
 
             <p class="sub">
                 今週のデータから、PATGS27が自動でまとめます。
@@ -1045,7 +1084,12 @@
 
             <div id="weeklyReportBox" class="summary-box"></div>
 
-            <h3>🔔 演出</h3>
+        </section>
+
+
+        <section class="panel" data-screen="settings" id="fxSettingsPanel">
+
+            <h2>🔔 演出</h2>
 
             <p class="sub">
                 記録した時などに、軽い音とアニメーションでお知らせします。重くしすぎない範囲です。
@@ -1061,13 +1105,75 @@
                 保存したときに軽いアニメーションを表示する
             </label>
 
-            <h3>🏅 実績・バッジ</h3>
+        </section>
+
+
+        <section class="panel panel-main" data-screen="achievements" id="achievementsPanel">
+
+            <h2>🏆 実績</h2>
 
             <p class="sub">
                 特定の学習実績を達成すると、バッジが増えていきます。一度獲得したバッジは残ります。
+                バッジ集め自体が目的ではないので、気楽に眺めてください。
             </p>
 
-            <div id="badgeGrid" class="badge-grid"></div>
+            <h3>獲得済み</h3>
+            <div id="badgeGridUnlocked" class="badge-grid"></div>
+
+            <h3>未獲得</h3>
+            <div id="badgeGridLocked" class="badge-grid"></div>
+
+        </section>
+
+
+        <!-- =================================================
+             予約不足の段階的介入・設定
+        ================================================== -->
+
+        <section data-screen="settings" class="panel">
+
+            <h2>⏰ 予約不足の段階的介入</h2>
+
+            <p class="sub">
+                その日の予約が無いまま時間が過ぎると、段階的に警戒レベルが上がります。
+                前日の警告 → 当日の警戒 → 強制介入画面 → 重大事象（Gemini判定待ち）の順です。
+                予約が入れば、次に開いたときに自動で通常状態へ戻ります。
+                Geminiへの自動送信は行いません（状態遷移のみです）。
+            </p>
+
+            <div id="interventionDayTypeSettings"></div>
+
+            <h3>特別な日の登録（祝日・休校日／長期休暇）</h3>
+
+            <p class="sub">
+                期間を指定して「祝日・休校日」「長期休暇」を登録できます。指定のない日は、
+                土日を「土休日」、それ以外を「平日」として自動判定します。
+            </p>
+
+            <div class="form-grid">
+
+                <label>開始日
+                    <input type="date" id="ivRangeStart">
+                </label>
+
+                <label>終了日
+                    <input type="date" id="ivRangeEnd">
+                </label>
+
+                <label>種類
+                    <select id="ivRangeType">
+                        <option value="specialHoliday">祝日・休校日</option>
+                        <option value="longVacation">長期休暇</option>
+                    </select>
+                </label>
+
+            </div>
+
+            <div class="btn-row">
+                <button id="ivRangeAddBtn" class="primary small">この期間を登録</button>
+            </div>
+
+            <div id="ivRangeList"></div>
 
         </section>
 
@@ -1076,7 +1182,7 @@
              通知設定
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="settings" class="panel">
 
             <h2>🔔 通知設定</h2>
 
@@ -1101,7 +1207,7 @@
              バックアップ
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="settings" class="panel">
 
             <h2>💾 データのバックアップ</h2>
 
@@ -1125,7 +1231,7 @@
              PATGS27憲法
         ================================================== -->
 
-        <section class="panel panel-law">
+        <section data-screen="settings" class="panel panel-law">
 
             <h2>📜 PATGS27憲法</h2>
 
@@ -1268,7 +1374,7 @@
              PATGS代理ローテーション
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="settings" class="panel">
 
             <h2>🔄 PATGS代理ローテーション</h2>
 
@@ -1293,7 +1399,7 @@
              受験リンク集
         ================================================== -->
 
-        <section class="panel">
+        <section data-screen="settings" class="panel">
 
             <h2>🔗 受験リンク集</h2>
 
