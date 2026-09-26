@@ -217,10 +217,26 @@ function saveJSON(key, data) {
 
 let patgsSyncTimer = null;
 
+/* 画面上の「クラウド同期の状態」に、今何が起きているかを表示する。
+   devtoolsを開けなくても、実際に出ているエラーがその場でわかるようにする。 */
+function patgsSetSyncStatus(text) {
+
+    const element = $("cloudSyncStatus");
+
+    if (element) {
+        element.textContent = text;
+    }
+}
+
 /* 保存のたびに毎回すぐ送るのではなく、少し待ってまとめて送る。 */
 function patgsScheduleSync() {
 
-    if (!PATGS_UID || !window.PATGS_SUPABASE) {
+    if (!PATGS_UID) {
+        return;
+    }
+
+    if (!window.PATGS_SUPABASE) {
+        patgsSetSyncStatus("⚠ Supabaseクライアントが読み込まれていません（firebase.jsの読み込みエラーの可能性があります。devtoolsのConsoleを確認してください）。");
         return;
     }
 
@@ -249,9 +265,16 @@ function patgsCollectAllLocalDataForSync() {
 
 async function patgsPushToSupabase() {
 
-    if (!PATGS_UID || !window.PATGS_SUPABASE) {
+    if (!PATGS_UID) {
         return;
     }
+
+    if (!window.PATGS_SUPABASE) {
+        patgsSetSyncStatus("⚠ Supabaseクライアントが読み込まれていません（firebase.jsの読み込みエラーの可能性があります）。");
+        return;
+    }
+
+    patgsSetSyncStatus("⏳ 送信中…");
 
     const payload = patgsCollectAllLocalDataForSync();
     const nowIso = new Date().toISOString();
@@ -263,13 +286,24 @@ async function patgsPushToSupabase() {
             .upsert({ user_id: PATGS_UID, data: payload, updated_at: nowIso });
 
         if (!error) {
+
             localStorage.setItem(patgsNamespacedKey("patgs27_cloud_synced_at"), nowIso);
+            patgsSetSyncStatus("✓ " + nowText() + " に送信しました。");
+
         } else {
+
             console.error("Supabase同期エラー(push):", error);
+            patgsSetSyncStatus(
+                "✗ 送信に失敗しました：" +
+                (error.message || JSON.stringify(error)) +
+                (error.code ? "（code: " + error.code + "）" : "")
+            );
         }
 
     } catch (error) {
+
         console.error("Supabase同期エラー(push):", error);
+        patgsSetSyncStatus("✗ 送信に失敗しました：" + (error.message || String(error)));
     }
 }
 
@@ -278,9 +312,16 @@ async function patgsPushToSupabase() {
    （最終更新優先・項目ごとのマージはしない）。 */
 async function patgsPullFromSupabaseAndMerge(uid) {
 
-    if (!uid || !window.PATGS_SUPABASE) {
+    if (!uid) {
         return;
     }
+
+    if (!window.PATGS_SUPABASE) {
+        patgsSetSyncStatus("⚠ Supabaseクライアントが読み込まれていません（firebase.jsの読み込みエラーの可能性があります）。");
+        return;
+    }
+
+    patgsSetSyncStatus("⏳ クラウドのデータを確認中…");
 
     try {
 
@@ -290,7 +331,21 @@ async function patgsPullFromSupabaseAndMerge(uid) {
             .eq("user_id", uid)
             .maybeSingle();
 
-        if (error || !row) {
+        if (error) {
+
+            console.error("Supabase同期エラー(pull):", error);
+            patgsSetSyncStatus(
+                "✗ クラウドの読み込みに失敗しました：" +
+                (error.message || JSON.stringify(error)) +
+                (error.code ? "（code: " + error.code + "）" : "") +
+                "／RLSまたはThird-Party Auth設定を確認してください。"
+            );
+
+            return;
+        }
+
+        if (!row) {
+            patgsSetSyncStatus("この端末が最新です（クラウドにまだデータがありません）。");
             return;
         }
 
@@ -308,12 +363,30 @@ async function patgsPullFromSupabaseAndMerge(uid) {
             });
 
             localStorage.setItem(patgsNamespacedKey("patgs27_cloud_synced_at"), cloudUpdatedAt);
+            patgsSetSyncStatus("✓ クラウドの新しいデータを取り込みました（" + cloudUpdatedAt + "）。");
+
+        } else {
+            patgsSetSyncStatus("この端末が最新です（最終同期：" + (localSyncedAt || "なし") + "）。");
         }
 
     } catch (error) {
+
         console.error("Supabase同期エラー(pull):", error);
+        patgsSetSyncStatus("✗ クラウドの読み込みに失敗しました：" + (error.message || String(error)));
     }
 }
+
+/* 「今すぐ同期する」ボタン：手動でpush→pullを試し、結果をその場で表示する。 */
+$("cloudSyncNowBtn")?.addEventListener("click", async function () {
+
+    if (!PATGS_UID) {
+        patgsSetSyncStatus("ログインしてから試してください。");
+        return;
+    }
+
+    await patgsPushToSupabase();
+    await patgsPullFromSupabaseAndMerge(PATGS_UID);
+});
 
 function showSave(id, text = "✓ 自動保存") {
 
