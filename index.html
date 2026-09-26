@@ -7,9 +7,6 @@
     <title>PATGS27</title>
 
     <link rel="stylesheet" href="css/style.css?v=20260923a">
-
-    <!-- クラウド同期（Supabase）用SDK。既存機能・UIには影響しません。 -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 
 <body>
@@ -45,6 +42,22 @@
         </button>
 
         <p id="emailAuthStatus"></p>
+        <!-- 追加ここまで -->
+
+        <!-- ここから追加：学校用ログイン（ID＋パスワード）。
+             Googleアカウントもメールアドレスも使いません。既存要素は変更していません。 -->
+        <hr>
+
+        <p>学校用ログイン（ID＋パスワード）</p>
+
+        <input type="text" id="schoolIdInput" placeholder="学校用ID">
+        <input type="password" id="schoolPasswordInput" placeholder="パスワード">
+
+        <button id="schoolLoginBtn">
+            学校用IDでログイン
+        </button>
+
+        <p id="schoolAuthStatus"></p>
         <!-- 追加ここまで -->
 
         <p id="userName">
@@ -1438,6 +1451,33 @@
             </button>
 
             <p id="linkEmailStatus"></p>
+
+        </section>
+
+
+        <!-- =================================================
+             学校用ログインの追加（追加：既存パネルは変更していません）
+        ================================================== -->
+
+        <section data-screen="settings" class="panel">
+
+            <h2>🏫 学校用ログインの追加</h2>
+
+            <p class="sub">
+                今Googleでログインしているアカウントに、学校のPCでも使える
+                「ID＋パスワード」ログインを追加します。学校PCでは、ログイン画面の
+                「学校用ログイン」欄でこのIDとパスワードを使ってください
+                （Googleアカウントもメールアドレスも使いません）。
+            </p>
+
+            <input type="text" id="linkSchoolIdInput" placeholder="学校用ID（好きな文字列）">
+            <input type="password" id="linkSchoolPasswordInput" placeholder="パスワード">
+
+            <button id="linkSchoolBtn">
+                このアカウントに学校用ログインを追加する
+            </button>
+
+            <p id="linkSchoolStatus"></p>
 
         </section>
 
