@@ -9,7 +9,9 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   linkWithCredential,
-  EmailAuthProvider
+  EmailAuthProvider,
+  updateEmail,
+  updatePassword
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 
 /* Supabase SDK。UMDのグローバル変数（window.supabase）には頼らず、
@@ -136,6 +138,42 @@ function patgsSchoolIdToPseudoEmail(rawId) {
   return "school-" + cleaned + "@patgs27-school.invalid";
 }
 
+/* Firebaseは1アカウントにつき「メール/パスワード」の紐付けを
+   1つしか持てない。そのため「メールログインの追加」と
+   「学校用ログインの追加」は同じ枠を取り合う。
+   既に片方が紐付け済みの状態でもう片方を追加しようとすると
+   linkWithCredential は auth/provider-already-linked で
+   失敗するので、その場合は新しい方でメール/パスワードを
+   上書きする（updateEmail + updatePassword）。
+   uidは変わらないので、Supabase側のデータはそのまま引き継がれる。 */
+async function patgsLinkOrReplacePasswordCredential(email, password) {
+
+  const hasPasswordProvider = (auth.currentUser?.providerData || [])
+    .some(function (p) { return p.providerId === "password"; });
+
+  if (!hasPasswordProvider) {
+
+    const credential = EmailAuthProvider.credential(email, password);
+    await linkWithCredential(auth.currentUser, credential);
+    return;
+  }
+
+  try {
+    await updateEmail(auth.currentUser, email);
+    await updatePassword(auth.currentUser, password);
+  } catch (error) {
+
+    if (error.code === "auth/requires-recent-login") {
+      throw new Error(
+        "セキュリティ上の理由で、この操作には最近のログインが必要です。" +
+        "一度ログアウトしてGoogleで再ログインしてから、もう一度お試しください。"
+      );
+    }
+
+    throw error;
+  }
+}
+
 loginBtn.addEventListener(
   "click",
   async function(){
@@ -225,7 +263,7 @@ emailSignupBtn?.addEventListener("click", async function () {
 });
 
 /* 追加：Googleでログイン中のアカウントに、メール/パスワードのログイン方法を
-   紐付ける（Firebase標準のlinkWithCredentialを使用。uidは変わらない）。 */
+   紐付ける（既に学校用ログインが紐付け済みなら、そちらを上書きする）。 */
 linkEmailBtn?.addEventListener("click", async function () {
 
   if (linkEmailStatus) {
@@ -243,12 +281,10 @@ linkEmailBtn?.addEventListener("click", async function () {
 
   try {
 
-    const credential = EmailAuthProvider.credential(
+    await patgsLinkOrReplacePasswordCredential(
       linkEmailInput?.value || "",
       linkPasswordInput?.value || ""
     );
-
-    await linkWithCredential(auth.currentUser, credential);
 
     if (linkEmailStatus) {
       linkEmailStatus.textContent = "✓ このアカウントにメールログインを追加しました。";
@@ -332,12 +368,10 @@ linkSchoolBtn?.addEventListener("click", async function () {
 
   try {
 
-    const credential = EmailAuthProvider.credential(
+    await patgsLinkOrReplacePasswordCredential(
       pseudoEmail,
       linkSchoolPasswordInput?.value || ""
     );
-
-    await linkWithCredential(auth.currentUser, credential);
 
     if (linkSchoolStatus) {
       linkSchoolStatus.textContent = "✓ このアカウントに学校用ログインを追加しました。";
