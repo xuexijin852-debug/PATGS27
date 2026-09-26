@@ -12,6 +12,11 @@ import {
   EmailAuthProvider
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 
+/* Supabase SDK。UMDのグローバル変数（window.supabase）には頼らず、
+   このモジュール内で直接importする（読み込み失敗時にコンソールへ
+   明確なエラーが出るようにするため）。 */
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
 const firebaseConfig = {
   apiKey: "AIzaSyB5ZwOyYeqsPQR3wqTWNaHUGagp2NjHA04",
   authDomain: "project-summer-2026-12de8.firebaseapp.com",
@@ -24,55 +29,45 @@ const firebaseConfig = {
 /* =========================================================
    Supabase（クラウド同期）
    =========================================================
-   ここのURLとanon keyは、Supabaseダッシュボードの
-   Project Settings → API に表示されているものに置き換えてください。
-   anon keyは公開して問題のないキーです（service_role keyは
-   絶対にここに置かないでください）。
+   Supabaseダッシュボード → Project Settings → API に表示されている
+   URLとpublishable key（anon key）です。service_role keyは
+   絶対にここに置かないでください。
 
    ダッシュボード側で一度だけ、Authentication → Sign In / Providers
-   → Third-Party Auth に、このFirebaseプロジェクトを
-   「Firebase」として登録してください（コード側の作業は不要です）。
+   → Third-Party Auth に、このFirebaseプロジェクト
+   （project-summer-2026-12de8）を登録しておく必要があります
+   （コード側の作業は不要です）。
    ========================================================= */
 
 const SUPABASE_URL = "https://xxvgihckwbbsuutqziev.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_Oji_H5UskIO2HBEIExzJbw_1DAJC-Bx";
-
-let supabaseClient = null;
-
-if (window.supabase && typeof window.supabase.createClient === "function") {
-
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    accessToken: async () => {
-
-      const auth = getAuth();
-
-      if (!auth.currentUser) {
-        return null;
-      }
-
-      try {
-        return await auth.currentUser.getIdToken();
-      } catch (error) {
-        console.error("Firebase IDトークンの取得に失敗しました:", error);
-        return null;
-      }
-    }
-  });
-
-  /* script.js側から window.PATGS_SUPABASE として参照する。 */
-  window.PATGS_SUPABASE = supabaseClient;
-
-} else {
-
-  console.error("Supabase SDKが読み込まれていません。クラウド同期は無効になります。");
-
-}
 
 const app = initializeApp(firebaseConfig);
 
 const auth = getAuth(app);
 
 const provider = new GoogleAuthProvider();
+
+/* auth が確定した後にSupabaseクライアントを作る。
+   accessTokenには、そのつどFirebaseの最新のIDトークンを返す。 */
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  accessToken: async () => {
+
+    if (!auth.currentUser) {
+      return null;
+    }
+
+    try {
+      return await auth.currentUser.getIdToken();
+    } catch (error) {
+      console.error("Firebase IDトークンの取得に失敗しました:", error);
+      return null;
+    }
+  }
+});
+
+/* script.js側から window.PATGS_SUPABASE として参照する。 */
+window.PATGS_SUPABASE = supabaseClient;
 
 const loginBtn =
 document.getElementById("loginBtn");
@@ -108,6 +103,38 @@ const linkEmailInput = document.getElementById("linkEmailInput");
 const linkPasswordInput = document.getElementById("linkPasswordInput");
 const linkEmailBtn = document.getElementById("linkEmailBtn");
 const linkEmailStatus = document.getElementById("linkEmailStatus");
+
+/* 追加：学校用ログイン（ID＋パスワード）。
+   Googleアカウントもメールアドレスも生徒には見せない・使わせない。 */
+const schoolIdInput = document.getElementById("schoolIdInput");
+const schoolPasswordInput = document.getElementById("schoolPasswordInput");
+const schoolLoginBtn = document.getElementById("schoolLoginBtn");
+const schoolAuthStatus = document.getElementById("schoolAuthStatus");
+
+/* 追加：Googleでログイン中のアカウントに、学校用ID＋パスワードを
+   紐付けるための要素（設定画面）。 */
+const linkSchoolIdInput = document.getElementById("linkSchoolIdInput");
+const linkSchoolPasswordInput = document.getElementById("linkSchoolPasswordInput");
+const linkSchoolBtn = document.getElementById("linkSchoolBtn");
+const linkSchoolStatus = document.getElementById("linkSchoolStatus");
+
+/* 学校用の「ID」を、Firebaseのメール/パスワード認証が要求する
+   「メール形式の文字列」に変換する。実在しないことが保証された
+   .invalid ドメイン（RFC 2606で予約済み）を使うため、
+   本物のメールアドレスは一切必要にならない。 */
+function patgsSchoolIdToPseudoEmail(rawId) {
+
+  const cleaned = (rawId || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, "");
+
+  if (!cleaned) {
+    return null;
+  }
+
+  return "school-" + cleaned + "@patgs27-school.invalid";
+}
 
 loginBtn.addEventListener(
   "click",
@@ -233,6 +260,95 @@ linkEmailBtn?.addEventListener("click", async function () {
 
     if (linkEmailStatus) {
       linkEmailStatus.textContent = "追加に失敗しました：" + error.message;
+    }
+  }
+});
+
+/* 追加：学校用ID＋パスワードでログイン（内部的にはメール/パスワード認証を
+   ダミーのメールアドレスで使っているだけ。生徒にはID/パスワードにしか見えない）。 */
+schoolLoginBtn?.addEventListener("click", async function () {
+
+  if (schoolAuthStatus) {
+    schoolAuthStatus.textContent = "";
+  }
+
+  const pseudoEmail = patgsSchoolIdToPseudoEmail(schoolIdInput?.value);
+
+  if (!pseudoEmail) {
+
+    if (schoolAuthStatus) {
+      schoolAuthStatus.textContent = "IDを入力してください。";
+    }
+
+    return;
+  }
+
+  try {
+
+    await signInWithEmailAndPassword(
+      auth,
+      pseudoEmail,
+      schoolPasswordInput?.value || ""
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    if (schoolAuthStatus) {
+      schoolAuthStatus.textContent = "ログインに失敗しました：" + error.message;
+    }
+  }
+});
+
+/* 追加：Googleでログイン中のアカウントに、学校用ID＋パスワードを紐付ける。
+   これで学校用IDでログインしても、家のGoogleアカウントと
+   完全に同じFirebaseユーザー（同じuid・同じSupabaseデータ）になる。 */
+linkSchoolBtn?.addEventListener("click", async function () {
+
+  if (linkSchoolStatus) {
+    linkSchoolStatus.textContent = "";
+  }
+
+  if (!auth.currentUser) {
+
+    if (linkSchoolStatus) {
+      linkSchoolStatus.textContent = "先にログインしてから行ってください。";
+    }
+
+    return;
+  }
+
+  const pseudoEmail = patgsSchoolIdToPseudoEmail(linkSchoolIdInput?.value);
+
+  if (!pseudoEmail) {
+
+    if (linkSchoolStatus) {
+      linkSchoolStatus.textContent = "IDを入力してください。";
+    }
+
+    return;
+  }
+
+  try {
+
+    const credential = EmailAuthProvider.credential(
+      pseudoEmail,
+      linkSchoolPasswordInput?.value || ""
+    );
+
+    await linkWithCredential(auth.currentUser, credential);
+
+    if (linkSchoolStatus) {
+      linkSchoolStatus.textContent = "✓ このアカウントに学校用ログインを追加しました。";
+    }
+
+  } catch (error) {
+
+    console.error(error);
+
+    if (linkSchoolStatus) {
+      linkSchoolStatus.textContent = "追加に失敗しました：" + error.message;
     }
   }
 });
