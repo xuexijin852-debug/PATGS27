@@ -19,6 +19,11 @@ import {
    明確なエラーが出るようにするため）。 */
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
+/* Supabase側が要求する role: "authenticated" カスタムクレームを
+   FirebaseのIDトークンに付与するためのCloud Functions呼び出し用。
+   setCustomUserClaims自体はサーバー側（functions/index.js）でのみ実行する。 */
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-functions.js";
+
 const firebaseConfig = {
   apiKey: "AIzaSyB5ZwOyYeqsPQR3wqTWNaHUGagp2NjHA04",
   authDomain: "project-summer-2026-12de8.firebaseapp.com",
@@ -50,8 +55,36 @@ const auth = getAuth(app);
 
 const provider = new GoogleAuthProvider();
 
-/* auth が確定した後にSupabaseクライアントを作る。
-   accessTokenには、そのつどFirebaseの最新のIDトークンを返す。 */
+const functionsInstance = getFunctions(app);
+const ensureSupabaseRoleClaimFn = httpsCallable(functionsInstance, "ensureSupabaseRoleClaim");
+
+/* ログインのたびに呼ぶ。role: "authenticated" クレームが無ければ
+   Cloud Functions側で付与してもらい、その後IDトークンを強制的に
+   更新して、新しいクレームを含むトークンをSupabaseへ渡せるようにする。
+   （このtry/catchの中身が失敗しても、以降の処理は続行する＝
+   Googleログイン自体は絶対に壊れない。） */
+async function patgsEnsureSupabaseRole(user) {
+
+  try {
+
+    const idTokenResult = await user.getIdTokenResult();
+
+    if (idTokenResult.claims && idTokenResult.claims.role === "authenticated") {
+      return;
+    }
+
+    await ensureSupabaseRoleClaimFn();
+    await user.getIdToken(true);
+
+  } catch (error) {
+    console.error("Supabase用のroleクレーム付与に失敗しました（Supabase同期のみ影響します）:", error);
+  }
+}
+
+/* script.js側から window.PATGS_SUPABASE として参照する。
+   accessTokenには、そのつどFirebaseの最新のIDトークンを返す
+   （role: "authenticated" クレーム付きのものが渡るよう、
+   ログイン直後に patgsEnsureSupabaseRole で強制更新している）。 */
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   accessToken: async () => {
 
@@ -68,7 +101,6 @@ const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   }
 });
 
-/* script.js側から window.PATGS_SUPABASE として参照する。 */
 window.PATGS_SUPABASE = supabaseClient;
 
 const loginBtn =
@@ -387,7 +419,7 @@ linkSchoolBtn?.addEventListener("click", async function () {
   }
 });
 
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
 
   if (user) {
 
@@ -405,6 +437,11 @@ onAuthStateChanged(auth, (user) => {
     }
 
     patgsPreviousUid = user.uid;
+
+    /* Supabase同期に必要な role: "authenticated" クレームを
+       確実に持たせてから（＝PATGS_BOOTより先に）起動する。
+       ここが失敗してもGoogleログイン自体は継続する。 */
+    await patgsEnsureSupabaseRole(user);
 
     /* script.js側で定義される起動関数。user.uidを渡すことで、
        PATGS27のlocalStorageデータをアカウントごとに分離し、
