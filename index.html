@@ -569,6 +569,50 @@
 
 
         <!-- =================================================
+             ロードマップ作成（第五次改革・追加機能）
+             ※ 既存の「受験マップ」（mapPanel）とは別画面・別データ。
+        ================================================== -->
+
+        <section data-screen="roadmap" class="panel panel-main" id="roadmapPanel">
+
+            <h2>🛤 ロードマップ作成</h2>
+
+            <p class="sub">
+                受験までの計画を、日付ごとの項目として自由に登録できます。
+                既存の「受験マップ」とは別の機能で、データも独立しています。
+            </p>
+
+            <div class="form-grid">
+
+                <label>日付
+                    <input type="date" id="roadmapAddDate">
+                </label>
+
+                <label class="wide">タイトル
+                    <input type="text" id="roadmapAddTitle" placeholder="例：過去問1周目を終える">
+                </label>
+
+                <label class="wide">内容
+                    <textarea id="roadmapAddContent" rows="2" placeholder="内容を入力（任意）"></textarea>
+                </label>
+
+                <label class="wide">付箋メモ
+                    <input type="text" id="roadmapAddSticky" placeholder="ちょっとしたメモ（任意）">
+                </label>
+
+            </div>
+
+            <div class="btn-row">
+                <button id="roadmapAddBtn" class="primary">＋ ロードマップに追加</button>
+                <button id="roadmapSortToggleBtn" class="ghost">日付順：古い→新しい</button>
+            </div>
+
+            <div id="roadmapList"></div>
+
+        </section>
+
+
+        <!-- =================================================
              取り消しの記録
         ================================================== -->
 
@@ -727,6 +771,59 @@
             <h2>📝 今日の実績</h2>
 
             <textarea id="resultText" rows="5" placeholder="今日の学習実績"></textarea>
+
+        </section>
+
+
+        <!-- =================================================
+             ログイン方法の追加（アカウント連携）
+        ================================================== -->
+
+        <section data-screen="settings" class="panel">
+
+            <h2>🔗 ログイン方法の追加</h2>
+
+            <p class="sub">
+                今ログイン中のこのアカウントに、メールアドレス＋パスワード、
+                または学校用ID＋パスワードでもログインできるように追加できます。
+                追加後は、どちらの方法でログインしても同じデータになります。
+            </p>
+
+            <div class="form-grid">
+
+                <label class="wide">メールアドレス
+                    <input type="text" id="linkEmailInput" placeholder="例：student@example.com">
+                </label>
+
+                <label class="wide">パスワード
+                    <input type="password" id="linkPasswordInput" placeholder="パスワード">
+                </label>
+
+            </div>
+
+            <div class="btn-row">
+                <button id="linkEmailBtn" class="primary">＋ メールログインを追加</button>
+            </div>
+
+            <p class="sub" id="linkEmailStatus"></p>
+
+            <div class="form-grid">
+
+                <label class="wide">学校用ID
+                    <input type="text" id="linkSchoolIdInput" placeholder="例：学籍番号など">
+                </label>
+
+                <label class="wide">パスワード
+                    <input type="password" id="linkSchoolPasswordInput" placeholder="パスワード">
+                </label>
+
+            </div>
+
+            <div class="btn-row">
+                <button id="linkSchoolBtn" class="primary">＋ 学校IDログインを追加</button>
+            </div>
+
+            <p class="sub" id="linkSchoolStatus"></p>
 
         </section>
 
