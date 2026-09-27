@@ -22,84 +22,6 @@
 
 const PATGS_VERSION = "20260923a";
 
-/* =========================================================
-   アカウントごとのデータ分離（Firebase Authのuser.uidに基づく）
-   =========================================================
-   firebase.js が Google ログインでユーザーを確定すると
-   window.PATGS_BOOT(uid) を呼び出す。それまでは
-   PATGS_UID は null のままで、画面もまだ描画されない。
-   ========================================================= */
-
-let PATGS_UID = null;
-
-function patgsNamespacedKey(rawKey) {
-    if (!PATGS_UID) {
-        return rawKey;
-    }
-    return "patgs27_u_" + PATGS_UID + "__" + rawKey;
-}
-
-function patgsHasNamespacedData(uid) {
-
-    const prefix = "patgs27_u_" + uid + "__";
-
-    for (let i = 0; i < localStorage.length; i++) {
-        if ((localStorage.key(i) || "").indexOf(prefix) === 0) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-/* 旧・共有（アカウント分離前）のデータは、最初にログインした
-   1アカウントだけに一度だけ引き継ぐ。それ以降に初めてログインする
-   別アカウントは、古いデータを勝手に受け取らず空の状態から始まる
-   （クラウド同期があるので、以後は各アカウントがSupabase上に
-   自分のデータを持つ）。
-   元のキーは削除しない。 */
-const PATGS_LEGACY_MIGRATION_FLAG = "patgs27_legacy_migration_done";
-
-function patgsMigrateLegacyDataForUser(uid) {
-
-    if (!uid || patgsHasNamespacedData(uid)) {
-        return;
-    }
-
-    if (localStorage.getItem(PATGS_LEGACY_MIGRATION_FLAG)) {
-        /* 既に別のアカウントが旧データを引き継ぎ済み。
-           このアカウントは空の状態から始める。 */
-        return;
-    }
-
-    const ownedPrefix = "patgs27_u_";
-    const keysToCopy = [];
-
-    for (let i = 0; i < localStorage.length; i++) {
-
-        const key = localStorage.key(i);
-
-        if (!key || key.indexOf(ownedPrefix) === 0 || key === PATGS_LEGACY_MIGRATION_FLAG) {
-            continue;
-        }
-
-        keysToCopy.push(key);
-    }
-
-    keysToCopy.forEach(function (key) {
-
-        const value = localStorage.getItem(key);
-
-        if (value !== null) {
-            localStorage.setItem("patgs27_u_" + uid + "__" + key, value);
-        }
-    });
-
-    /* 旧データが1件もなくても、二度と別アカウントへコピーしないよう
-       必ずフラグを立てる。 */
-    localStorage.setItem(PATGS_LEGACY_MIGRATION_FLAG, "1");
-}
-
 
 /* =========================================================
    共通関数
@@ -186,7 +108,7 @@ function minutesToTime(minutes) {
 
 function loadJSON(key, fallback) {
     try {
-        const data = localStorage.getItem(patgsNamespacedKey(key));
+        const data = localStorage.getItem(key);
 
         if (data === null) {
             return fallback;
@@ -202,191 +124,11 @@ function loadJSON(key, fallback) {
 
 function saveJSON(key, data) {
     try {
-        localStorage.setItem(patgsNamespacedKey(key), JSON.stringify(data));
-        patgsScheduleSync();
+        localStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
         console.error("保存エラー:", key, error);
     }
 }
-
-
-/* =========================================================
-   Supabaseへのクラウド同期（既存のUI・機能・データ構造には
-   影響しません。localStorageの読み書きはこれまで通りです）
-   ========================================================= */
-
-let patgsSyncTimer = null;
-
-/* 画面上の「クラウド同期の状態」に、今何が起きているかを表示する。
-   devtoolsを開けなくても、実際に出ているエラーがその場でわかるようにする。 */
-function patgsSetSyncStatus(text) {
-
-    const element = $("cloudSyncStatus");
-
-    if (element) {
-        element.textContent = text;
-    }
-}
-
-/* 保存のたびに毎回すぐ送るのではなく、少し待ってまとめて送る。 */
-function patgsScheduleSync() {
-
-    if (!PATGS_UID) {
-        return;
-    }
-
-    if (!window.PATGS_SUPABASE) {
-        patgsSetSyncStatus("⚠ Supabaseクライアントが読み込まれていません（firebase.jsの読み込みエラーの可能性があります。devtoolsのConsoleを確認してください）。");
-        return;
-    }
-
-    clearTimeout(patgsSyncTimer);
-    patgsSyncTimer = setTimeout(patgsPushToSupabase, 2000);
-}
-
-/* 現在ログイン中のアカウントに属するlocalStorageデータだけを
-   1つのオブジェクトにまとめる（exportAllDataと同じ絞り込み）。 */
-function patgsCollectAllLocalDataForSync() {
-
-    const data = {};
-    const ownPrefix = patgsNamespacedKey("");
-
-    for (let i = 0; i < localStorage.length; i++) {
-
-        const key = localStorage.key(i);
-
-        if (key && key.indexOf(ownPrefix) === 0) {
-            data[key] = localStorage.getItem(key);
-        }
-    }
-
-    return data;
-}
-
-async function patgsPushToSupabase() {
-
-    if (!PATGS_UID) {
-        return;
-    }
-
-    if (!window.PATGS_SUPABASE) {
-        patgsSetSyncStatus("⚠ Supabaseクライアントが読み込まれていません（firebase.jsの読み込みエラーの可能性があります）。");
-        return;
-    }
-
-    patgsSetSyncStatus("⏳ 送信中…");
-
-    const payload = patgsCollectAllLocalDataForSync();
-    const nowIso = new Date().toISOString();
-
-    try {
-
-        const { error } = await window.PATGS_SUPABASE
-            .from("patgs27_user_data")
-            .upsert({ user_id: PATGS_UID, data: payload, updated_at: nowIso });
-
-        if (!error) {
-
-            localStorage.setItem(patgsNamespacedKey("patgs27_cloud_synced_at"), nowIso);
-            patgsSetSyncStatus("✓ " + nowText() + " に送信しました。");
-
-        } else {
-
-            console.error("Supabase同期エラー(push):", error);
-            patgsSetSyncStatus(
-                "✗ 送信に失敗しました：" +
-                (error.message || JSON.stringify(error)) +
-                (error.code ? "（code: " + error.code + "）" : "")
-            );
-        }
-
-    } catch (error) {
-
-        console.error("Supabase同期エラー(push):", error);
-        patgsSetSyncStatus("✗ 送信に失敗しました：" + (error.message || String(error)));
-    }
-}
-
-/* ログイン直後に一度だけ呼ばれる。クラウド側の方が新しければ、
-   クラウドのデータでlocalStorageを上書きしてから起動する
-   （最終更新優先・項目ごとのマージはしない）。 */
-async function patgsPullFromSupabaseAndMerge(uid) {
-
-    if (!uid) {
-        return;
-    }
-
-    if (!window.PATGS_SUPABASE) {
-        patgsSetSyncStatus("⚠ Supabaseクライアントが読み込まれていません（firebase.jsの読み込みエラーの可能性があります）。");
-        return;
-    }
-
-    patgsSetSyncStatus("⏳ クラウドのデータを確認中…");
-
-    try {
-
-        const { data: row, error } = await window.PATGS_SUPABASE
-            .from("patgs27_user_data")
-            .select("data, updated_at")
-            .eq("user_id", uid)
-            .maybeSingle();
-
-        if (error) {
-
-            console.error("Supabase同期エラー(pull):", error);
-            patgsSetSyncStatus(
-                "✗ クラウドの読み込みに失敗しました：" +
-                (error.message || JSON.stringify(error)) +
-                (error.code ? "（code: " + error.code + "）" : "") +
-                "／RLSまたはThird-Party Auth設定を確認してください。"
-            );
-
-            return;
-        }
-
-        if (!row) {
-            patgsSetSyncStatus("この端末が最新です（クラウドにまだデータがありません）。");
-            return;
-        }
-
-        const localSyncedAt = localStorage.getItem(patgsNamespacedKey("patgs27_cloud_synced_at")) || "";
-        const cloudUpdatedAt = row.updated_at || "";
-
-        if (cloudUpdatedAt && cloudUpdatedAt > localSyncedAt) {
-
-            const cloudData = row.data || {};
-
-            Object.keys(cloudData).forEach(function (key) {
-                if (cloudData[key] !== null && cloudData[key] !== undefined) {
-                    localStorage.setItem(key, cloudData[key]);
-                }
-            });
-
-            localStorage.setItem(patgsNamespacedKey("patgs27_cloud_synced_at"), cloudUpdatedAt);
-            patgsSetSyncStatus("✓ クラウドの新しいデータを取り込みました（" + cloudUpdatedAt + "）。");
-
-        } else {
-            patgsSetSyncStatus("この端末が最新です（最終同期：" + (localSyncedAt || "なし") + "）。");
-        }
-
-    } catch (error) {
-
-        console.error("Supabase同期エラー(pull):", error);
-        patgsSetSyncStatus("✗ クラウドの読み込みに失敗しました：" + (error.message || String(error)));
-    }
-}
-
-/* 「今すぐ同期する」ボタン：手動でpush→pullを試し、結果をその場で表示する。 */
-$("cloudSyncNowBtn")?.addEventListener("click", async function () {
-
-    if (!PATGS_UID) {
-        patgsSetSyncStatus("ログインしてから試してください。");
-        return;
-    }
-
-    await patgsPushToSupabase();
-    await patgsPullFromSupabaseAndMerge(PATGS_UID);
-});
 
 function showSave(id, text = "✓ 自動保存") {
 
@@ -3054,7 +2796,7 @@ function checkHourlyNotifications() {
     const hour = now.getHours();
     const fireKey = todayKey() + "-" + hour;
 
-    if (localStorage.getItem(patgsNamespacedKey("patgs27_last_hourly")) === fireKey) {
+    if (localStorage.getItem("patgs27_last_hourly") === fireKey) {
         return;
     }
 
@@ -3066,7 +2808,7 @@ function checkHourlyNotifications() {
             "今週の必要・完了・未実行・振替・債務を確認しましょう。"
         );
 
-        localStorage.setItem(patgsNamespacedKey("patgs27_last_hourly"), fireKey);
+        localStorage.setItem("patgs27_last_hourly", fireKey);
         return;
     }
 
@@ -3094,7 +2836,7 @@ function checkHourlyNotifications() {
             : "次の予約はありません。空き枠検索から入れられます。")
     );
 
-    localStorage.setItem(patgsNamespacedKey("patgs27_last_hourly"), fireKey);
+    localStorage.setItem("patgs27_last_hourly", fireKey);
 }
 
 
@@ -3173,9 +2915,9 @@ function dailyKey() {
 function loadDaily() {
 
     const oldData = {
-        goal: localStorage.getItem(patgsNamespacedKey("goalText")) || "",
-        message: localStorage.getItem(patgsNamespacedKey("messageText")) || "",
-        result: localStorage.getItem(patgsNamespacedKey("resultText")) || ""
+        goal: localStorage.getItem("goalText") || "",
+        message: localStorage.getItem("messageText") || "",
+        result: localStorage.getItem("resultText") || ""
     };
 
     const data = loadJSON(dailyKey(), oldData);
@@ -3195,11 +2937,10 @@ function saveDaily() {
 
     saveJSON(dailyKey(), data);
 
-    localStorage.setItem(patgsNamespacedKey("goalText"), data.goal);
-    localStorage.setItem(patgsNamespacedKey("messageText"), data.message);
-    localStorage.setItem(patgsNamespacedKey("resultText"), data.result);
+    localStorage.setItem("goalText", data.goal);
+    localStorage.setItem("messageText", data.message);
+    localStorage.setItem("resultText", data.result);
 
-    patgsScheduleSync();
     renderTodaySummary();
 }
 
@@ -3981,7 +3722,7 @@ function saveCalendarEvents() {
 
 function migrateToCalendarEvents() {
 
-    if (localStorage.getItem(patgsNamespacedKey("patgs27_calendar_migrated"))) {
+    if (localStorage.getItem("patgs27_calendar_migrated")) {
         return;
     }
 
@@ -4037,8 +3778,10 @@ function migrateToCalendarEvents() {
 
     saveCalendarEvents();
 
-    localStorage.setItem(patgsNamespacedKey("patgs27_calendar_migrated"), "1");
+    localStorage.setItem("patgs27_calendar_migrated", "1");
 }
+
+migrateToCalendarEvents();
 
 function eventsForDate(dateKey) {
 
@@ -4763,7 +4506,7 @@ function saveActiveTimer() {
     if (activeTimer) {
         saveJSON("patgs27_active_timer", activeTimer);
     } else {
-        localStorage.removeItem(patgsNamespacedKey("patgs27_active_timer"));
+        localStorage.removeItem("patgs27_active_timer");
     }
 }
 
@@ -4924,23 +4667,10 @@ function setupTimer() {
 function exportAllData() {
 
     const data = {};
-    const ownPrefix = PATGS_UID ? patgsNamespacedKey("") : "";
 
     for (let i = 0; i < localStorage.length; i++) {
-
         const key = localStorage.key(i);
-
-        if (!key) {
-            continue;
-        }
-
-        if (PATGS_UID) {
-            if (key.indexOf(ownPrefix) === 0) {
-                data[key] = localStorage.getItem(key);
-            }
-        } else {
-            data[key] = localStorage.getItem(key);
-        }
+        data[key] = localStorage.getItem(key);
     }
 
     const blob = new Blob(
@@ -5732,7 +5462,7 @@ function updatePatgsProxyResult() {
 
 function loadPatgsProxy() {
 
-    const saved = localStorage.getItem(patgsNamespacedKey("patgs27_proxy_selection")) || "";
+    const saved = localStorage.getItem("patgs27_proxy_selection") || "";
 
     if ($("patgsProxySelect")) {
         $("patgsProxySelect").value = saved;
@@ -5743,8 +5473,7 @@ function loadPatgsProxy() {
 
 $("patgsProxySelect")?.addEventListener("change", function () {
 
-    localStorage.setItem(patgsNamespacedKey("patgs27_proxy_selection"), $("patgsProxySelect").value);
-    patgsScheduleSync();
+    localStorage.setItem("patgs27_proxy_selection", $("patgsProxySelect").value);
 
     updatePatgsProxyResult();
 });
@@ -5867,30 +5596,28 @@ function updateStreak() {
 
     const today = todayKey();
     const yesterday = getDateKeyOffset(-1);
-    const lastOpened = localStorage.getItem(patgsNamespacedKey("patgs27_last_opened")) || "";
+    const lastOpened = localStorage.getItem("patgs27_last_opened") || "";
 
-    let streak = Number(localStorage.getItem(patgsNamespacedKey("patgs27_streak"))) || 0;
+    let streak = Number(localStorage.getItem("patgs27_streak")) || 0;
 
     if (lastOpened === today) {
         /* 今日は記録済み */
     } else if (lastOpened === yesterday) {
         streak += 1;
-        localStorage.setItem(patgsNamespacedKey("patgs27_last_opened"), today);
-        localStorage.setItem(patgsNamespacedKey("patgs27_streak"), String(streak));
+        localStorage.setItem("patgs27_last_opened", today);
+        localStorage.setItem("patgs27_streak", String(streak));
     } else {
         streak = 1;
-        localStorage.setItem(patgsNamespacedKey("patgs27_last_opened"), today);
-        localStorage.setItem(patgsNamespacedKey("patgs27_streak"), String(streak));
+        localStorage.setItem("patgs27_last_opened", today);
+        localStorage.setItem("patgs27_streak", String(streak));
     }
 
-    let bestStreak = Number(localStorage.getItem(patgsNamespacedKey("patgs27_best_streak"))) || 0;
+    let bestStreak = Number(localStorage.getItem("patgs27_best_streak")) || 0;
 
     if (streak > bestStreak) {
         bestStreak = streak;
-        localStorage.setItem(patgsNamespacedKey("patgs27_best_streak"), String(bestStreak));
+        localStorage.setItem("patgs27_best_streak", String(bestStreak));
     }
-
-    patgsScheduleSync();
 
     recordOpenedDate(today);
 
@@ -6308,7 +6035,7 @@ function renderMapGoalSelect() {
     }
 
     const candidates = mapGoalCandidates();
-    const saved = localStorage.getItem(patgsNamespacedKey("patgs27_map_goal_id")) || "";
+    const saved = localStorage.getItem("patgs27_map_goal_id") || "";
 
     select.innerHTML = "";
 
@@ -6445,8 +6172,7 @@ function setupMap() {
 
     $("mapGoalSelect")?.addEventListener("change", function () {
 
-        localStorage.setItem(patgsNamespacedKey("patgs27_map_goal_id"), $("mapGoalSelect").value);
-        patgsScheduleSync();
+        localStorage.setItem("patgs27_map_goal_id", $("mapGoalSelect").value);
         renderMapBoard();
     });
 
@@ -6577,11 +6303,11 @@ function setupWeeklyReport() {
 let fxAudioContext = null;
 
 function fxSoundEnabled() {
-    return localStorage.getItem(patgsNamespacedKey("patgs27_fx_sound")) !== "0";
+    return localStorage.getItem("patgs27_fx_sound") !== "0";
 }
 
 function fxAnimationEnabled() {
-    return localStorage.getItem(patgsNamespacedKey("patgs27_fx_animation")) !== "0";
+    return localStorage.getItem("patgs27_fx_animation") !== "0";
 }
 
 function playChime() {
@@ -6640,8 +6366,7 @@ function setupFxToggles() {
         $("fxSoundToggle").checked = fxSoundEnabled();
 
         $("fxSoundToggle").addEventListener("change", function () {
-            localStorage.setItem(patgsNamespacedKey("patgs27_fx_sound"), $("fxSoundToggle").checked ? "1" : "0");
-            patgsScheduleSync();
+            localStorage.setItem("patgs27_fx_sound", $("fxSoundToggle").checked ? "1" : "0");
         });
     }
 
@@ -6649,8 +6374,7 @@ function setupFxToggles() {
         $("fxAnimationToggle").checked = fxAnimationEnabled();
 
         $("fxAnimationToggle").addEventListener("change", function () {
-            localStorage.setItem(patgsNamespacedKey("patgs27_fx_animation"), $("fxAnimationToggle").checked ? "1" : "0");
-            patgsScheduleSync();
+            localStorage.setItem("patgs27_fx_animation", $("fxAnimationToggle").checked ? "1" : "0");
         });
     }
 }
@@ -6700,7 +6424,7 @@ const BADGE_DEFS = [
         icon: "🔥",
         label: "7日連続で開いた",
         check: function () {
-            return (Number(localStorage.getItem(patgsNamespacedKey("patgs27_streak"))) || 0) >= 7;
+            return (Number(localStorage.getItem("patgs27_streak")) || 0) >= 7;
         }
     },
     {
@@ -6708,7 +6432,7 @@ const BADGE_DEFS = [
         icon: "🌟",
         label: "30日連続で開いた",
         check: function () {
-            return (Number(localStorage.getItem(patgsNamespacedKey("patgs27_streak"))) || 0) >= 30;
+            return (Number(localStorage.getItem("patgs27_streak")) || 0) >= 30;
         }
     },
     {
@@ -6996,7 +6720,7 @@ function renderHomeExamCountdown() {
     }
 
     const candidates = typeof mapGoalCandidates === "function" ? mapGoalCandidates() : [];
-    const savedId = localStorage.getItem(patgsNamespacedKey("patgs27_map_goal_id")) || "";
+    const savedId = localStorage.getItem("patgs27_map_goal_id") || "";
 
     const goal =
         candidates.find(function (e) { return e.id === savedId; }) ||
@@ -7274,10 +6998,10 @@ function renderInterventionUI() {
 
         const fireKey = state.date + "-" + state.level;
 
-        if (localStorage.getItem(patgsNamespacedKey("patgs27_iv_last_notified")) !== fireKey) {
+        if (localStorage.getItem("patgs27_iv_last_notified") !== fireKey) {
 
             sendPatgsNotification(IV_LEVEL_TEXT[state.level].title, IV_LEVEL_TEXT[state.level].body);
-            localStorage.setItem(patgsNamespacedKey("patgs27_iv_last_notified"), fireKey);
+            localStorage.setItem("patgs27_iv_last_notified", fireKey);
         }
     }
 }
@@ -7475,91 +7199,4 @@ function initializePATGS27() {
     console.log("PATGS27 script.js (" + PATGS_VERSION + ") loaded successfully.");
 }
 
-
-/* =========================================================
-   アカウントごとの起動
-   ========================================================= 
-   firebase.js が Google ログインで user.uid を確定させたときに
-   window.PATGS_BOOT(uid) を呼び出す。それより前は、上の
-   トップレベルの let 変数はすべて名前空間なし（PATGS_UID = null）
-   の状態で一度読み込まれているだけで、画面はまだ何も描画されない
-   （initializePATGS27() をまだ呼んでいないため）。
-   ========================================================= */
-
-let patgsBooted = false;
-
-function patgsReloadAllState() {
-
-    reservations = loadJSON("patgs27_reservations", []);
-    weekRequired = loadJSON("patgs27_week_required", {});
-    debts = loadJSON("patgs27_debts", []);
-    lsRecords = loadJSON("patgs27_ls_records", []);
-    changeLogs = loadJSON("patgs27_change_logs", []);
-    cancelLogs = loadJSON("patgs27_cancel_logs", []);
-    dayTypeOverrides = loadJSON("patgs27_day_type_overrides", {});
-
-    studyMemos = loadJSON("patgs27_study_memos", []);
-    temptations = loadJSON("patgs27_temptations", []);
-    mockExams = loadJSON("patgs27_mock_exams", []);
-    publicPast = loadJSON("patgs27_public_past", []);
-    privatePast = loadJSON("patgs27_private_past", []);
-    violations = loadJSON("patgs27_violations", []);
-    weeklyReviews = loadJSON("patgs27_weekly_reviews", []);
-
-    calendarEvents = loadJSON("patgs27_calendar_events", []);
-    migrateToCalendarEvents();
-
-    activeTimer = loadJSON("patgs27_active_timer", null);
-
-    naishinData = loadJSON("patgs27_naishin", {});
-    weakPoints = loadJSON("patgs27_weak_points", []);
-    questionNotes = loadJSON("patgs27_questions", []);
-    subjectPlanNotes = loadJSON("patgs27_subject_notes", {});
-    growthData = loadJSON("patgs27_growth", {});
-    unlockedBadges = loadJSON("patgs27_badges", []);
-
-    ivTimes = loadJSON("patgs27_intervention_times", null);
-
-    if (!ivTimes) {
-        ivTimes = defaultIvTimes();
-        saveJSON("patgs27_intervention_times", ivTimes);
-    }
-
-    ivDayRanges = loadJSON("patgs27_intervention_day_ranges", []);
-
-    materials = loadJSON("materials", []);
-
-    todos = loadJSON(todoKey(), null);
-
-    if (!Array.isArray(todos)) {
-        todos = loadJSON("todos", []);
-    }
-}
-
-/* firebase.js から、ログインユーザー（user.uid）が確定した時点で
-   呼び出される。既存データは削除せず、そのアカウントの専用領域が
-   まだ無い場合のみ、旧・共有データをコピーして初期値にする。 */
-window.PATGS_BOOT = async function (uid) {
-
-    if (patgsBooted) {
-        return;
-    }
-
-    patgsBooted = true;
-
-    PATGS_UID = uid || null;
-
-    patgsMigrateLegacyDataForUser(PATGS_UID);
-
-    /* クラウド（Supabase）の方が新しければ、先にlocalStorageへ反映する。
-       通信できない・失敗した場合は何もせずローカルのデータで続行する。 */
-    await patgsPullFromSupabaseAndMerge(PATGS_UID);
-
-    patgsReloadAllState();
-
-    initializePATGS27();
-
-    /* ログイン直後の状態を必ずクラウド側にも反映しておく
-      （初回ログインでの旧データ引き継ぎ分もここで最初の同期がかかる）。 */
-    patgsScheduleSync();
-};
+initializePATGS27();
