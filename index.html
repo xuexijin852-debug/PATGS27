@@ -29,6 +29,51 @@
             未ログイン
         </p>
 
+        <hr>
+
+        <h3>メールアドレスでログイン</h3>
+
+        <div class="form-grid">
+
+            <label class="wide">メールアドレス
+                <input type="text" id="emailInput" placeholder="メールアドレス">
+            </label>
+
+            <label class="wide">パスワード
+                <input type="password" id="passwordInput" placeholder="パスワード">
+            </label>
+
+        </div>
+
+        <div class="btn-row">
+            <button id="emailLoginBtn" class="primary">ログイン</button>
+            <button id="emailSignupBtn" class="ghost">新規登録</button>
+        </div>
+
+        <p class="sub" id="emailAuthStatus"></p>
+
+        <hr>
+
+        <h3>学校用IDでログイン</h3>
+
+        <div class="form-grid">
+
+            <label class="wide">学校用ID
+                <input type="text" id="schoolIdInput" placeholder="学校用ID">
+            </label>
+
+            <label class="wide">パスワード
+                <input type="password" id="schoolPasswordInput" placeholder="パスワード">
+            </label>
+
+        </div>
+
+        <div class="btn-row">
+            <button id="schoolLoginBtn" class="primary">ログイン</button>
+        </div>
+
+        <p class="sub" id="schoolAuthStatus"></p>
+
     </div>
 
 
@@ -56,6 +101,10 @@
 
                 <p class="patgs-today">
                     今日：<span id="todayDate">-</span>
+                </p>
+
+                <p class="patgs-today">
+                    クラウド同期：<span id="cloudSyncStatus">-</span>
                 </p>
 
             </div>
