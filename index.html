@@ -25,41 +25,6 @@
             Googleでログイン
         </button>
 
-        <!-- ここから追加：メール/パスワードログイン（既存要素は変更していません） -->
-        <hr>
-
-        <p>メールアドレスでログイン／新規登録</p>
-
-        <input type="email" id="emailInput" placeholder="メールアドレス">
-        <input type="password" id="passwordInput" placeholder="パスワード">
-
-        <button id="emailLoginBtn">
-            メールでログイン
-        </button>
-
-        <button id="emailSignupBtn">
-            メールで新規登録
-        </button>
-
-        <p id="emailAuthStatus"></p>
-        <!-- 追加ここまで -->
-
-        <!-- ここから追加：学校用ログイン（ID＋パスワード）。
-             Googleアカウントもメールアドレスも使いません。既存要素は変更していません。 -->
-        <hr>
-
-        <p>学校用ログイン（ID＋パスワード）</p>
-
-        <input type="text" id="schoolIdInput" placeholder="学校用ID">
-        <input type="password" id="schoolPasswordInput" placeholder="パスワード">
-
-        <button id="schoolLoginBtn">
-            学校用IDでログイン
-        </button>
-
-        <p id="schoolAuthStatus"></p>
-        <!-- 追加ここまで -->
-
         <p id="userName">
             未ログイン
         </p>
@@ -1431,78 +1396,6 @@
 
 
         <!-- =================================================
-             アカウント連携（追加：既存パネルは変更していません）
-        ================================================== -->
-
-        <section data-screen="settings" class="panel">
-
-            <h2>🔗 メールログインの追加</h2>
-
-            <p class="sub">
-                今Googleでログインしているアカウントに、メールアドレス＋パスワードでも
-                ログインできるようにします。別端末でメールログインする場合などに使えます。
-            </p>
-
-            <input type="email" id="linkEmailInput" placeholder="メールアドレス">
-            <input type="password" id="linkPasswordInput" placeholder="パスワード">
-
-            <button id="linkEmailBtn">
-                このアカウントにメールログインを追加する
-            </button>
-
-            <p id="linkEmailStatus"></p>
-
-        </section>
-
-
-        <!-- =================================================
-             学校用ログインの追加（追加：既存パネルは変更していません）
-        ================================================== -->
-
-        <section data-screen="settings" class="panel">
-
-            <h2>🏫 学校用ログインの追加</h2>
-
-            <p class="sub">
-                今Googleでログインしているアカウントに、学校のPCでも使える
-                「ID＋パスワード」ログインを追加します。学校PCでは、ログイン画面の
-                「学校用ログイン」欄でこのIDとパスワードを使ってください
-                （Googleアカウントもメールアドレスも使いません）。
-            </p>
-
-            <input type="text" id="linkSchoolIdInput" placeholder="学校用ID（好きな文字列）">
-            <input type="password" id="linkSchoolPasswordInput" placeholder="パスワード">
-
-            <button id="linkSchoolBtn">
-                このアカウントに学校用ログインを追加する
-            </button>
-
-            <p id="linkSchoolStatus"></p>
-
-        </section>
-
-
-        <!-- =================================================
-             クラウド同期の状態（追加：既存パネルは変更していません）
-        ================================================== -->
-
-        <section data-screen="settings" class="panel">
-
-            <h2>☁️ クラウド同期の状態</h2>
-
-            <p class="sub">
-                Supabaseとの同期状況を表示します。他の端末にデータが反映されない場合は、
-                ここに出るエラー文言を確認してください。
-            </p>
-
-            <p id="cloudSyncStatus">まだ同期していません。</p>
-
-            <button id="cloudSyncNowBtn">今すぐ同期する</button>
-
-        </section>
-
-
-        <!-- =================================================
              受験リンク集
         ================================================== -->
 
@@ -1535,6 +1428,7 @@
          JavaScript
     ====================================================== -->
 
+    <script src="js/patgs27-storage-guard.js?v=20260926a"></script>
     <script src="js/script.js?v=20260923a"></script>
     <script type="module" src="js/firebase.js?v=20260923a"></script>
 
