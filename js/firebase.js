@@ -25,6 +25,16 @@ import "./firebase.sync.js";
 const firebaseConfig = {
   apiKey: "AIzaSyB5ZwOyYeqsPQR3wqTWNaHUGagp2NjHA04",
   authDomain: "project-summer-2026-12de8.firebaseapp.com",
+  /* ★同期不具合の本命修正★
+     ここに databaseURL が無いと、getDatabase(app) が実際に作成した
+     Realtime Database インスタンス（東京リージョン等）を正しく指せず、
+     読み書きが失敗する（＝同じ端末内では localStorage がそのまま見えるので
+     「同期できている」ように見えるが、実際は別端末には何も届いていない、
+     という今回の症状と一致する）。
+     Firebase Console → Realtime Database の画面上部に表示されている
+     URL（例: https://project-summer-2026-12de8-default-rtdb.asia-southeast1.firebasedatabase.app）
+     をそのままコピーして、下の値を必ず実際の値に置き換えること。 */
+  databaseURL: "https://project-summer-2026-12de8-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "project-summer-2026-12de8",
   storageBucket: "project-summer-2026-12de8.firebasestorage.app",
   messagingSenderId: "88294145095",
