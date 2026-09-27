@@ -6579,6 +6579,7 @@ const SCREEN_TITLES = {
     study: "📚 学習",
     growth: "🌱 成長",
     map: "🗺️ 受験マップ",
+    roadmap: "🛤 ロードマップ作成",
     week: "📊 今週",
     unresolved: "❓ 未解決",
     achievements: "🏆 実績",
@@ -6671,6 +6672,7 @@ function renderFabMenu() {
     const quickTargets = [
         { screen: "growth", icon: "🌱", label: "成長" },
         { screen: "map", icon: "🗺️", label: "受験マップ" },
+        { screen: "roadmap", icon: "🛤", label: "ロードマップ作成" },
         { screen: "week", icon: "📊", label: "今週" },
         { screen: "achievements", icon: "🏆", label: "実績" },
         { screen: "settings", icon: "🔔", label: "演出設定" }
@@ -7133,6 +7135,190 @@ function setupInterventionSystem() {
    初期化
    ========================================================= */
 
+/* =========================================================
+   ロードマップ作成（＋メニュー機能・第五次改革の追加機能）
+   ※ 既存の「受験マップ」（mapPanel 関連の関数・データ）とは
+     完全に別のデータ・別の画面。干渉しない。
+   ========================================================= */
+
+let roadmapItems = loadJSON("patgs27_roadmap_items", []);
+let roadmapSortAscending = true;
+
+function saveRoadmapItems() {
+    saveJSON("patgs27_roadmap_items", roadmapItems);
+}
+
+function makeRoadmapId() {
+    return "roadmap_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+}
+
+function sortedRoadmapItems() {
+    const items = roadmapItems.slice();
+
+    items.sort(function (a, b) {
+        const dateA = a.date || "";
+        const dateB = b.date || "";
+
+        if (dateA === dateB) {
+            return 0;
+        }
+
+        if (roadmapSortAscending) {
+            return dateA < dateB ? -1 : 1;
+        }
+
+        return dateA > dateB ? -1 : 1;
+    });
+
+    return items;
+}
+
+function renderRoadmap() {
+
+    const list = $("roadmapList");
+
+    if (!list) {
+        return;
+    }
+
+    list.innerHTML = "";
+
+    const items = sortedRoadmapItems();
+
+    if (items.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "empty-note";
+        empty.textContent = "ロードマップはまだ登録されていません。";
+        list.appendChild(empty);
+        return;
+    }
+
+    items.forEach(function (item) {
+
+        const row = document.createElement("div");
+        row.className = "koma" + (item.completed ? " done" : "");
+
+        const head = document.createElement("div");
+        head.className = "koma-head";
+
+        const dateTag = document.createElement("span");
+        dateTag.className = "koma-tag";
+        dateTag.textContent = formatShortDate(item.date);
+
+        const title = document.createElement("span");
+        title.className = "koma-subject";
+        title.textContent = item.title || "（無題）";
+
+        head.append(dateTag, title);
+        row.appendChild(head);
+
+        if (item.content) {
+            const content = document.createElement("p");
+            content.className = "koma-detail";
+            content.textContent = item.content;
+            row.appendChild(content);
+        }
+
+        if (item.memo) {
+            const memo = document.createElement("p");
+            memo.className = "koma-detail";
+            memo.textContent = "📌 " + item.memo;
+            row.appendChild(memo);
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "koma-actions";
+
+        const completeButton = makeButton(
+            item.completed ? "✓ 完了済み" : "完了にする",
+            item.completed ? "ghost" : "primary"
+        );
+
+        completeButton.addEventListener("click", function () {
+            item.completed = !item.completed;
+            saveRoadmapItems();
+            renderRoadmap();
+        });
+
+        const deleteButton = makeButton("削除", "ghost");
+
+        deleteButton.addEventListener("click", function () {
+            roadmapItems = roadmapItems.filter(function (entry) {
+                return entry.id !== item.id;
+            });
+            saveRoadmapItems();
+            renderRoadmap();
+        });
+
+        actions.append(completeButton, deleteButton);
+        row.appendChild(actions);
+
+        list.appendChild(row);
+    });
+}
+
+function setupRoadmap() {
+
+    $("roadmapAddBtn")?.addEventListener("click", function () {
+
+        const date = $("roadmapAddDate")?.value || "";
+        const title = $("roadmapAddTitle")?.value.trim() || "";
+        const content = $("roadmapAddContent")?.value.trim() || "";
+        const memo = $("roadmapAddSticky")?.value.trim() || "";
+
+        if (!date) {
+            alert("日付を入力してください。");
+            return;
+        }
+
+        if (!title) {
+            alert("タイトルを入力してください。");
+            return;
+        }
+
+        roadmapItems.push({
+            id: makeRoadmapId(),
+            date: date,
+            title: title,
+            content: content,
+            memo: memo,
+            completed: false,
+            createdAt: nowText()
+        });
+
+        saveRoadmapItems();
+
+        if ($("roadmapAddTitle")) { $("roadmapAddTitle").value = ""; }
+        if ($("roadmapAddContent")) { $("roadmapAddContent").value = ""; }
+        if ($("roadmapAddSticky")) { $("roadmapAddSticky").value = ""; }
+
+        renderRoadmap();
+
+        if (typeof playChime === "function") {
+            playChime("save");
+        }
+
+        if (typeof checkBadges === "function") {
+            checkBadges();
+        }
+    });
+
+    $("roadmapSortToggleBtn")?.addEventListener("click", function () {
+
+        roadmapSortAscending = !roadmapSortAscending;
+
+        if ($("roadmapSortToggleBtn")) {
+            $("roadmapSortToggleBtn").textContent =
+                roadmapSortAscending ? "日付順：古い→新しい" : "日付順：新しい→古い";
+        }
+
+        renderRoadmap();
+    });
+
+    renderRoadmap();
+}
+
+
 function initializePATGS27() {
 
     /* コマ制度 */
@@ -7195,6 +7381,9 @@ function initializePATGS27() {
     /* ＋ やる気を高める機能 */
     setupMotivationHub();
     checkBadges();
+
+    /* ＋ ロードマップ作成（第五次改革・追加機能） */
+    setupRoadmap();
 
     console.log("PATGS27 script.js (" + PATGS_VERSION + ") loaded successfully.");
 }
