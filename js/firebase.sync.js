@@ -72,6 +72,23 @@ function patgsGuardStillActiveFor(uid) {
   return window.PATGS_STORAGE_GUARD.getActiveUid() === uid;
 }
 
+/* =========================================================
+   画面上の同期状態表示（既存 UI/CSS は変更せず、
+   index.html に追加した #cloudSyncStatus に文字を入れるだけ）
+   ========================================================= */
+
+function patgsNowHHMM() {
+  const d = new Date();
+  return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+
+function patgsSetSyncStatusText(text) {
+  const el = document.getElementById("cloudSyncStatus");
+  if (el) {
+    el.textContent = text;
+  }
+}
+
 /* Realtime Database のキーとして使えない文字（. # $ [ ]）を含むキーは
    安全のため同期対象から除外する（script.js の既存キーには通常出現しない）。 */
 function patgsIsRtdbSafeKey(key) {
@@ -264,6 +281,7 @@ async function patgsApplyReconcilePlan(uid, db, plan) {
         "Realtime DB へのアップロードに失敗しました（オフライン？）:",
         error
       );
+      patgsSetSyncStatusText("オフライン（同期待ち）");
       // ここで失敗しても lastSyncedSnapshot は更新しない。
       // 次回のポーリング／再読み込みで再試行される。
       return;
@@ -274,6 +292,7 @@ async function patgsApplyReconcilePlan(uid, db, plan) {
   const finalLocalData = patgsGetAllLocalData();
   patgsSyncState.lastLocalSnapshot = finalLocalData;
   patgsSaveLastSyncedSnapshot(uid, finalLocalData);
+  patgsSetSyncStatusText("同期済み（" + patgsNowHHMM() + "）");
 }
 
 /* =========================================================
@@ -333,12 +352,14 @@ async function patgsUploadChangesToRealtimeDB(uid, db) {
     // ★同期ループ防止★：アップロードした内容を基準点として確定
     patgsSyncState.lastLocalSnapshot = currentLocalData;
     patgsSaveLastSyncedSnapshot(uid, currentLocalData);
+    patgsSetSyncStatusText("同期済み（" + patgsNowHHMM() + "）");
 
   } catch (error) {
     console.error(
       "Realtime DB へのアップロードに失敗しました（オフライン？）:",
       error
     );
+    patgsSetSyncStatusText("オフライン（同期待ち）");
     // オフライン時はここで失敗しても localStorage は使えるので
     // アプリは継続動作する。次回のポーリングで再試行される。
   } finally {
@@ -393,6 +414,7 @@ function patgsApplyRealtimeSnapshot(uid, remoteData) {
   const finalLocalData = patgsGetAllLocalData();
   patgsSyncState.lastLocalSnapshot = finalLocalData;
   patgsSaveLastSyncedSnapshot(uid, finalLocalData);
+  patgsSetSyncStatusText("同期済み（" + patgsNowHHMM() + "）");
 }
 
 function patgsStartListeningToRealtimeChanges(uid, db) {
@@ -425,6 +447,7 @@ function patgsStartListeningToRealtimeChanges(uid, db) {
         "Realtime DB のリッスン中にエラーが発生しました:",
         error
       );
+      patgsSetSyncStatusText("オフライン（同期待ち）");
     }
   );
 
@@ -466,6 +489,7 @@ async function patgsInitializeRealtimeSync(uid, app, db) {
 
   patgsSyncState.currentUserUid = uid;
   patgsSyncState.pendingLocalDeletionKeys = new Set();
+  patgsSetSyncStatusText("同期中…");
 
   try {
     const userRef = ref(db, "users/" + uid);
@@ -505,6 +529,7 @@ async function patgsInitializeRealtimeSync(uid, app, db) {
 
   } catch (error) {
     console.error("Realtime DB 同期の初期化に失敗しました:", error);
+    patgsSetSyncStatusText("オフライン（同期待ち）");
     // エラーが発生してもアプリケーションは継続する
     // （localStorage はそのまま使えるので、オフラインモードとして動作）
   }
@@ -531,6 +556,7 @@ function patgsCleanupRealtimeSync() {
   patgsSyncState.isInitialized = false;
   patgsSyncState.lastLocalSnapshot = {};
   patgsSyncState.pendingLocalDeletionKeys = new Set();
+  patgsSetSyncStatusText("-");
 }
 
 window.patgsInitializeRealtimeSync = patgsInitializeRealtimeSync;
