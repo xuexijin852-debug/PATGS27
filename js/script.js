@@ -7143,6 +7143,9 @@ function setupInterventionSystem() {
 
 let roadmapItems = loadJSON("patgs27_roadmap_items", []);
 let roadmapSortAscending = true;
+let roadmapSelectedColor = "yellow";
+
+const ROADMAP_COLORS = ["yellow", "pink", "blue", "green", "orange", "purple"];
 
 function saveRoadmapItems() {
     saveJSON("patgs27_roadmap_items", roadmapItems);
@@ -7173,6 +7176,71 @@ function sortedRoadmapItems() {
     return items;
 }
 
+function groupRoadmapItemsByDate(items) {
+    const groups = [];
+    const indexByDate = {};
+
+    items.forEach(function (item) {
+        const key = item.date || "（日付未設定）";
+
+        if (!(key in indexByDate)) {
+            indexByDate[key] = groups.length;
+            groups.push({ date: key, items: [] });
+        }
+
+        groups[indexByDate[key]].items.push(item);
+    });
+
+    return groups;
+}
+
+function makeRoadmapStickyNote(item) {
+
+    const note = document.createElement("div");
+    note.className = "roadmap-sticky color-" + (item.color || "yellow") + (item.completed ? " done" : "");
+
+    const title = document.createElement("div");
+    title.className = "roadmap-sticky-title";
+    title.textContent = item.title || "（無題）";
+    note.appendChild(title);
+
+    if (item.content) {
+        const content = document.createElement("div");
+        content.className = "roadmap-sticky-content";
+        content.textContent = item.content;
+        note.appendChild(content);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "roadmap-sticky-actions";
+
+    const completeButton = makeButton(
+        item.completed ? "✓ 完了" : "完了にする",
+        item.completed ? "ghost" : "primary"
+    );
+
+    completeButton.addEventListener("click", function () {
+        item.completed = !item.completed;
+        saveRoadmapItems();
+        renderRoadmap();
+    });
+
+    const deleteButton = makeButton("削除", "ghost");
+
+    deleteButton.addEventListener("click", function () {
+        roadmapItems = roadmapItems.filter(function (entry) {
+            return entry.id !== item.id;
+        });
+        saveRoadmapItems();
+        renderRoadmap();
+    });
+
+    actions.append(completeButton, deleteButton);
+    note.appendChild(actions);
+
+    return note;
+}
+
 function renderRoadmap() {
 
     const list = $("roadmapList");
@@ -7188,83 +7256,59 @@ function renderRoadmap() {
     if (items.length === 0) {
         const empty = document.createElement("p");
         empty.className = "empty-note";
-        empty.textContent = "ロードマップはまだ登録されていません。";
+        empty.textContent = "ロードマップはまだ登録されていません。上のフォームから付箋を追加してください。";
         list.appendChild(empty);
         return;
     }
 
-    items.forEach(function (item) {
+    const groups = groupRoadmapItemsByDate(items);
 
-        const row = document.createElement("div");
-        row.className = "koma" + (item.completed ? " done" : "");
+    groups.forEach(function (group) {
 
-        const head = document.createElement("div");
-        head.className = "koma-head";
+        const groupEl = document.createElement("div");
+        groupEl.className = "roadmap-date-group";
 
-        const dateTag = document.createElement("span");
-        dateTag.className = "koma-tag";
-        dateTag.textContent = formatShortDate(item.date);
+        const heading = document.createElement("div");
+        heading.className = "roadmap-date-heading";
+        heading.textContent = (group.date === "（日付未設定）")
+            ? group.date
+            : formatShortDate(group.date);
+        groupEl.appendChild(heading);
 
-        const title = document.createElement("span");
-        title.className = "koma-subject";
-        title.textContent = item.title || "（無題）";
+        const board = document.createElement("div");
+        board.className = "roadmap-board";
 
-        head.append(dateTag, title);
-        row.appendChild(head);
-
-        if (item.content) {
-            const content = document.createElement("p");
-            content.className = "koma-detail";
-            content.textContent = item.content;
-            row.appendChild(content);
-        }
-
-        if (item.memo) {
-            const memo = document.createElement("p");
-            memo.className = "koma-detail";
-            memo.textContent = "📌 " + item.memo;
-            row.appendChild(memo);
-        }
-
-        const actions = document.createElement("div");
-        actions.className = "koma-actions";
-
-        const completeButton = makeButton(
-            item.completed ? "✓ 完了済み" : "完了にする",
-            item.completed ? "ghost" : "primary"
-        );
-
-        completeButton.addEventListener("click", function () {
-            item.completed = !item.completed;
-            saveRoadmapItems();
-            renderRoadmap();
+        group.items.forEach(function (item) {
+            board.appendChild(makeRoadmapStickyNote(item));
         });
 
-        const deleteButton = makeButton("削除", "ghost");
+        groupEl.appendChild(board);
+        list.appendChild(groupEl);
+    });
+}
 
-        deleteButton.addEventListener("click", function () {
-            roadmapItems = roadmapItems.filter(function (entry) {
-                return entry.id !== item.id;
-            });
-            saveRoadmapItems();
-            renderRoadmap();
-        });
-
-        actions.append(completeButton, deleteButton);
-        row.appendChild(actions);
-
-        list.appendChild(row);
+function updateRoadmapColorPickerUI() {
+    document.querySelectorAll("#roadmapColorPicker .roadmap-color-dot").forEach(function (dot) {
+        dot.classList.toggle("selected", dot.dataset.color === roadmapSelectedColor);
     });
 }
 
 function setupRoadmap() {
+
+    document.querySelectorAll("#roadmapColorPicker .roadmap-color-dot").forEach(function (dot) {
+        dot.addEventListener("click", function () {
+            roadmapSelectedColor = dot.dataset.color || "yellow";
+            updateRoadmapColorPickerUI();
+        });
+    });
+
+    updateRoadmapColorPickerUI();
 
     $("roadmapAddBtn")?.addEventListener("click", function () {
 
         const date = $("roadmapAddDate")?.value || "";
         const title = $("roadmapAddTitle")?.value.trim() || "";
         const content = $("roadmapAddContent")?.value.trim() || "";
-        const memo = $("roadmapAddSticky")?.value.trim() || "";
 
         if (!date) {
             alert("日付を入力してください。");
@@ -7281,7 +7325,7 @@ function setupRoadmap() {
             date: date,
             title: title,
             content: content,
-            memo: memo,
+            color: ROADMAP_COLORS.includes(roadmapSelectedColor) ? roadmapSelectedColor : "yellow",
             completed: false,
             createdAt: nowText()
         });
@@ -7290,7 +7334,6 @@ function setupRoadmap() {
 
         if ($("roadmapAddTitle")) { $("roadmapAddTitle").value = ""; }
         if ($("roadmapAddContent")) { $("roadmapAddContent").value = ""; }
-        if ($("roadmapAddSticky")) { $("roadmapAddSticky").value = ""; }
 
         renderRoadmap();
 
