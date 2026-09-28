@@ -578,8 +578,8 @@
             <h2>🛤 ロードマップ作成</h2>
 
             <p class="sub">
-                受験までの計画を、日付ごとの項目として自由に登録できます。
-                既存の「受験マップ」とは別の機能で、データも独立しています。
+                受験までの計画を、色つきの付箋として自由に書き込めます。
+                日付ごとにまとまって並びます。既存の「受験マップ」とは別の機能で、データも独立しています。
             </p>
 
             <div class="form-grid">
@@ -592,18 +592,25 @@
                     <input type="text" id="roadmapAddTitle" placeholder="例：過去問1周目を終える">
                 </label>
 
-                <label class="wide">内容
-                    <textarea id="roadmapAddContent" rows="2" placeholder="内容を入力（任意）"></textarea>
+                <label class="wide">内容・メモ
+                    <textarea id="roadmapAddContent" rows="3" placeholder="自由にメモを書けます（任意）"></textarea>
                 </label>
 
-                <label class="wide">付箋メモ
-                    <input type="text" id="roadmapAddSticky" placeholder="ちょっとしたメモ（任意）">
+                <label class="wide">付箋の色
+                    <div class="roadmap-color-picker" id="roadmapColorPicker">
+                        <button type="button" class="roadmap-color-dot" data-color="yellow" title="黄色"></button>
+                        <button type="button" class="roadmap-color-dot" data-color="pink" title="ピンク"></button>
+                        <button type="button" class="roadmap-color-dot" data-color="blue" title="青"></button>
+                        <button type="button" class="roadmap-color-dot" data-color="green" title="緑"></button>
+                        <button type="button" class="roadmap-color-dot" data-color="orange" title="オレンジ"></button>
+                        <button type="button" class="roadmap-color-dot" data-color="purple" title="紫"></button>
+                    </div>
                 </label>
 
             </div>
 
             <div class="btn-row">
-                <button id="roadmapAddBtn" class="primary">＋ ロードマップに追加</button>
+                <button id="roadmapAddBtn" class="primary">＋ 付箋を追加</button>
                 <button id="roadmapSortToggleBtn" class="ghost">日付順：古い→新しい</button>
             </div>
 
