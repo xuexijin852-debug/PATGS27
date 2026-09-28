@@ -89,6 +89,18 @@ function patgsSetSyncStatusText(text) {
   }
 }
 
+/* エラーの詳細（Firebaseのエラーコード等）を画面にそのまま出す。
+   devtoolsを開けない環境でも、何が原因で失敗しているか
+   （例：database/invalid-url、PERMISSION_DENIED 等）が
+   ひと目で分かるようにするため。 */
+function patgsErrorDetail(error) {
+  if (!error) {
+    return "";
+  }
+  const code = error.code || error.message || String(error);
+  return "（" + code + "）";
+}
+
 /* Realtime Database のキーとして使えない文字（. # $ [ ]）を含むキーは
    安全のため同期対象から除外する（script.js の既存キーには通常出現しない）。 */
 function patgsIsRtdbSafeKey(key) {
@@ -281,7 +293,7 @@ async function patgsApplyReconcilePlan(uid, db, plan) {
         "Realtime DB へのアップロードに失敗しました（オフライン？）:",
         error
       );
-      patgsSetSyncStatusText("オフライン（同期待ち）");
+      patgsSetSyncStatusText("オフライン（同期待ち）" + patgsErrorDetail(error));
       // ここで失敗しても lastSyncedSnapshot は更新しない。
       // 次回のポーリング／再読み込みで再試行される。
       return;
@@ -359,7 +371,7 @@ async function patgsUploadChangesToRealtimeDB(uid, db) {
       "Realtime DB へのアップロードに失敗しました（オフライン？）:",
       error
     );
-    patgsSetSyncStatusText("オフライン（同期待ち）");
+    patgsSetSyncStatusText("オフライン（同期待ち）" + patgsErrorDetail(error));
     // オフライン時はここで失敗しても localStorage は使えるので
     // アプリは継続動作する。次回のポーリングで再試行される。
   } finally {
@@ -447,7 +459,7 @@ function patgsStartListeningToRealtimeChanges(uid, db) {
         "Realtime DB のリッスン中にエラーが発生しました:",
         error
       );
-      patgsSetSyncStatusText("オフライン（同期待ち）");
+      patgsSetSyncStatusText("オフライン（同期待ち）" + patgsErrorDetail(error));
     }
   );
 
@@ -529,7 +541,7 @@ async function patgsInitializeRealtimeSync(uid, app, db) {
 
   } catch (error) {
     console.error("Realtime DB 同期の初期化に失敗しました:", error);
-    patgsSetSyncStatusText("オフライン（同期待ち）");
+    patgsSetSyncStatusText("オフライン（同期待ち）" + patgsErrorDetail(error));
     // エラーが発生してもアプリケーションは継続する
     // （localStorage はそのまま使えるので、オフラインモードとして動作）
   }
