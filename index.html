@@ -620,6 +620,30 @@
 
 
         <!-- =================================================
+             AI学習アシスタント（Cloudflare Workers AI連携）
+        ================================================== -->
+
+        <section data-screen="aichat" class="panel panel-main" id="aichatPanel">
+
+            <h2>🤖 AI学習アシスタント</h2>
+
+            <p class="sub">
+                分からないことや、今日の学習の相談を気軽に聞いてみましょう。
+            </p>
+
+            <div id="aichatLog" class="aichat-log"></div>
+
+            <div class="aichat-input-row">
+                <textarea id="aichatInput" rows="2" placeholder="質問を入力（Enterで送信／Shift+Enterで改行）"></textarea>
+                <button id="aichatSendBtn" class="primary">送信</button>
+            </div>
+
+            <p class="sub" id="aichatStatus"></p>
+
+        </section>
+
+
+        <!-- =================================================
              取り消しの記録
         ================================================== -->
 
