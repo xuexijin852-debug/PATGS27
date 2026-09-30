@@ -6580,6 +6580,7 @@ const SCREEN_TITLES = {
     growth: "🌱 成長",
     map: "🗺️ 受験マップ",
     roadmap: "🛤 ロードマップ作成",
+    aichat: "🤖 AI学習アシスタント",
     week: "📊 今週",
     unresolved: "❓ 未解決",
     achievements: "🏆 実績",
@@ -6673,6 +6674,7 @@ function renderFabMenu() {
         { screen: "growth", icon: "🌱", label: "成長" },
         { screen: "map", icon: "🗺️", label: "受験マップ" },
         { screen: "roadmap", icon: "🛤", label: "ロードマップ作成" },
+        { screen: "aichat", icon: "🤖", label: "AI相談" },
         { screen: "week", icon: "📊", label: "今週" },
         { screen: "achievements", icon: "🏆", label: "実績" },
         { screen: "settings", icon: "🔔", label: "演出設定" }
@@ -7362,6 +7364,152 @@ function setupRoadmap() {
 }
 
 
+/* =========================================================
+   AI学習アシスタント（Cloudflare Workers AI連携チャット）
+   第五次改革の追加機能。既存機能・データには一切触れない。
+   ========================================================= */
+
+const AICHAT_API_URL = "https://patgs27-ai.xuexijin852.workers.dev/chat";
+
+let aichatHistory = loadJSON("patgs27_aichat_history", []);
+let aichatSending = false;
+
+function saveAichatHistory() {
+    saveJSON("patgs27_aichat_history", aichatHistory);
+}
+
+function renderAichatLog() {
+
+    const log = $("aichatLog");
+
+    if (!log) {
+        return;
+    }
+
+    log.innerHTML = "";
+
+    if (aichatHistory.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "empty-note";
+        empty.textContent = "まだ会話はありません。下の欄から質問してみましょう。";
+        log.appendChild(empty);
+        return;
+    }
+
+    aichatHistory.forEach(function (entry) {
+
+        const bubble = document.createElement("div");
+        bubble.className = "aichat-bubble " + (entry.role || "ai");
+        bubble.textContent = entry.text || "";
+
+        if (entry.at) {
+            const time = document.createElement("span");
+            time.className = "aichat-bubble-time";
+            time.textContent = entry.at;
+            bubble.appendChild(time);
+        }
+
+        log.appendChild(bubble);
+    });
+
+    log.scrollTop = log.scrollHeight;
+}
+
+async function sendAichatMessage() {
+
+    if (aichatSending) {
+        return;
+    }
+
+    const input = $("aichatInput");
+    const message = input?.value.trim() || "";
+
+    if (!message) {
+        return;
+    }
+
+    aichatHistory.push({ role: "user", text: message, at: clockOnly(nowText()) });
+    saveAichatHistory();
+    renderAichatLog();
+
+    if (input) {
+        input.value = "";
+    }
+
+    aichatSending = true;
+
+    if ($("aichatStatus")) {
+        $("aichatStatus").textContent = "AIが考え中…";
+    }
+    if ($("aichatSendBtn")) {
+        $("aichatSendBtn").disabled = true;
+    }
+
+    try {
+
+        const response = await fetch(AICHAT_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: message })
+        });
+
+        if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+        }
+
+        const data = await response.json();
+        const reply = (data && typeof data.reply === "string" && data.reply.trim())
+            ? data.reply.trim()
+            : "（AIから空の応答が返ってきました）";
+
+        aichatHistory.push({ role: "ai", text: reply, at: clockOnly(nowText()) });
+        saveAichatHistory();
+        renderAichatLog();
+
+        if ($("aichatStatus")) {
+            $("aichatStatus").textContent = "";
+        }
+
+    } catch (error) {
+        console.error("AIチャットの通信に失敗しました:", error);
+
+        aichatHistory.push({
+            role: "error",
+            text: "通信エラー：AIに接続できませんでした。しばらくしてからもう一度試してください。",
+            at: clockOnly(nowText())
+        });
+        saveAichatHistory();
+        renderAichatLog();
+
+        if ($("aichatStatus")) {
+            $("aichatStatus").textContent = "オフライン、またはAIサーバーに接続できません。";
+        }
+
+    } finally {
+        aichatSending = false;
+        if ($("aichatSendBtn")) {
+            $("aichatSendBtn").disabled = false;
+        }
+    }
+}
+
+function setupAichat() {
+
+    $("aichatSendBtn")?.addEventListener("click", function () {
+        sendAichatMessage();
+    });
+
+    $("aichatInput")?.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendAichatMessage();
+        }
+    });
+
+    renderAichatLog();
+}
+
+
 function initializePATGS27() {
 
     /* コマ制度 */
@@ -7427,6 +7575,9 @@ function initializePATGS27() {
 
     /* ＋ ロードマップ作成（第五次改革・追加機能） */
     setupRoadmap();
+
+    /* 🤖 AI学習アシスタント（Cloudflare Workers AI連携） */
+    setupAichat();
 
     console.log("PATGS27 script.js (" + PATGS_VERSION + ") loaded successfully.");
 }
