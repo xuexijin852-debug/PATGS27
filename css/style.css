@@ -1662,3 +1662,93 @@ canvas {
     font-size: 11px;
     padding: 4px 8px;
 }
+
+/* =========================================================
+   AI学習アシスタント（Cloudflare Workers AI連携チャット）
+   ========================================================= */
+
+.aichat-log {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 50vh;
+    overflow-y: auto;
+    padding: 12px;
+    background: var(--card);
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius-sm);
+    margin-bottom: 12px;
+}
+
+.aichat-bubble {
+    max-width: 82%;
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    box-shadow: var(--shadow-sm);
+}
+
+.aichat-bubble.user {
+    align-self: flex-end;
+    background: var(--coral);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+}
+
+.aichat-bubble.ai {
+    align-self: flex-start;
+    background: #eee7ff;
+    color: var(--ink);
+    border-bottom-left-radius: 4px;
+}
+
+.aichat-bubble.error {
+    align-self: center;
+    background: var(--red-soft);
+    color: var(--red-deep, var(--red));
+    font-size: 13px;
+    max-width: 100%;
+    text-align: center;
+}
+
+.aichat-bubble-time {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    opacity: 0.65;
+}
+
+.aichat-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.aichat-input-row textarea {
+    flex: 1;
+    resize: none;
+}
+
+@media (max-width: 480px) {
+    .aichat-log {
+        max-height: 45vh;
+        padding: 8px;
+    }
+
+    .aichat-bubble {
+        max-width: 92%;
+        font-size: 13px;
+    }
+
+    .aichat-input-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .aichat-input-row button {
+        width: 100%;
+    }
+}
