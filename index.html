@@ -6,14 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PATGS27</title>
 
-    <link rel="stylesheet" href="css/style.css?v=20260923a">
+    <link rel="stylesheet" href="css/style.css?v=20261005a">
 </head>
 
 <body>
 
-    <!-- =====================================================
-         ログイン画面
-    ====================================================== -->
+    <!-- ログイン画面 -->
 
     <div id="loginScreen">
 
@@ -21,28 +19,21 @@
 
         <p>利用するにはログインしてください</p>
 
-        <button id="loginBtn">
-            Googleでログイン
-        </button>
+        <button id="loginBtn">Googleでログイン</button>
 
-        <p id="userName">
-            未ログイン
-        </p>
+        <p id="userName">未ログイン</p>
 
         <hr>
 
         <h3>メールアドレスでログイン</h3>
 
         <div class="form-grid">
-
             <label class="wide">メールアドレス
                 <input type="text" id="emailInput" placeholder="メールアドレス">
             </label>
-
             <label class="wide">パスワード
                 <input type="password" id="passwordInput" placeholder="パスワード">
             </label>
-
         </div>
 
         <div class="btn-row">
@@ -57,15 +48,12 @@
         <h3>学校用IDでログイン</h3>
 
         <div class="form-grid">
-
             <label class="wide">学校用ID
                 <input type="text" id="schoolIdInput" placeholder="学校用ID">
             </label>
-
             <label class="wide">パスワード
                 <input type="password" id="schoolPasswordInput" placeholder="パスワード">
             </label>
-
         </div>
 
         <div class="btn-row">
@@ -77,15 +65,9 @@
     </div>
 
 
-    <!-- =====================================================
-         メインアプリ
-    ====================================================== -->
+    <!-- メインアプリ -->
 
     <div id="mainApp">
-
-        <!-- =================================================
-             ヘッダー
-        ================================================== -->
 
         <header class="patgs-header">
 
@@ -95,23 +77,15 @@
 
                 <h1>PATGS27</h1>
 
-                <p class="patgs-subtitle" id="screenTitle">
-                    ― 受験管理システム／第五次改革（コマ制度）―
-                </p>
+                <p class="patgs-subtitle" id="screenTitle">― 受験管理システム／第七次改革（週間時間割）―</p>
 
-                <p class="patgs-today">
-                    今日：<span id="todayDate">-</span>
-                </p>
+                <p class="patgs-today">今日：<span id="todayDate">-</span></p>
 
-                <p class="patgs-today">
-                    クラウド同期：<span id="cloudSyncStatus">-</span>
-                </p>
+                <p class="patgs-today">クラウド同期：<span id="cloudSyncStatus">-</span></p>
 
             </div>
 
-            <button id="logoutBtn" class="logout-button">
-                ログアウト
-            </button>
+            <button id="logoutBtn" class="logout-button">ログアウト</button>
 
         </header>
 
@@ -124,75 +98,26 @@
         </div>
 
         <div class="fab-wrap">
-
             <div id="fabMenu" class="fab-menu" style="display:none;"></div>
-
             <button id="motivationFab" class="motivation-fab" title="クイックランチャー">＋</button>
-
         </div>
 
 
         <!-- =================================================
-             今日のPATGS
+             ホーム：今日のPATGS（今日の時間割中心）
         ================================================== -->
 
         <section data-screen="home" class="panel panel-main">
 
             <h2>🗓 今日のPATGS</h2>
 
-            <div class="next-koma" id="nextReservationBox"></div>
+            <div class="next-koma" id="homeNextPlan"></div>
 
-            <h3>今日</h3>
+            <h3>今日の時間割</h3>
 
-            <div class="stat-row">
+            <div id="todayPlanList"></div>
 
-                <div class="stat">
-                    <span class="stat-num" id="todayReservedCount">0</span>
-                    <span class="stat-label">予約</span>
-                </div>
-
-                <div class="stat">
-                    <span class="stat-num stat-done" id="todayDoneCount">0</span>
-                    <span class="stat-label">完了</span>
-                </div>
-
-                <div class="stat">
-                    <span class="stat-num stat-missed" id="todayMissedCount">0</span>
-                    <span class="stat-label">未実行</span>
-                </div>
-
-                <div class="stat">
-                    <span class="stat-num" id="todayMovedCount">0</span>
-                    <span class="stat-label">振替</span>
-                </div>
-
-            </div>
-
-            <h3>今週（<span id="weekRangeLabel">-</span>）</h3>
-
-            <div class="stat-row">
-
-                <div class="stat">
-                    <span class="stat-num" id="weekRequiredCount">0</span>
-                    <span class="stat-label">必要</span>
-                </div>
-
-                <div class="stat">
-                    <span class="stat-num stat-done" id="weekDoneCount">0</span>
-                    <span class="stat-label">完了</span>
-                </div>
-
-                <div class="stat">
-                    <span class="stat-num stat-missed" id="weekMissedCount">0</span>
-                    <span class="stat-label">未実行</span>
-                </div>
-
-                <div class="stat">
-                    <span class="stat-num stat-debt" id="weekDebtCount">0</span>
-                    <span class="stat-label">債務</span>
-                </div>
-
-            </div>
+            <p class="sub" id="homeLifeSummary"></p>
 
             <p class="sub">
                 🎯 今日の目標：<span id="summaryGoal">未設定</span>
@@ -202,6 +127,10 @@
             <p class="sub" id="randomMessage"></p>
 
             <p class="sub" id="homeExamCountdown"></p>
+
+            <div class="btn-row">
+                <button id="homeOpenWeeklyPlanBtn" class="primary">🗓 週間時間割を開く</button>
+            </div>
 
         </section>
 
@@ -216,7 +145,7 @@
 
 
         <!-- =================================================
-             今後の重要予定（上部に配置）
+             予定
         ================================================== -->
 
         <section data-screen="schedule" class="panel panel-main">
@@ -228,17 +157,13 @@
         </section>
 
 
-        <!-- =================================================
-             PATGS27内蔵カレンダー
-        ================================================== -->
-
         <section data-screen="schedule" class="panel panel-main" id="calendarPanel">
 
             <h2>🗓 カレンダー</h2>
 
             <p class="sub">
-                「予定」（学校行事・テスト・提出物・私用・重要予定）と「コマ」（学習の実行）は分けて表示します。
-                マス内の色つきの札が予定です。日付をクリックすると、その日の内容が下に出ます。
+                「予定」（学校行事・テスト・提出物・私用・重要予定）を表示します。
+                日付をクリックすると、その日の内容が下に出ます。
             </p>
 
             <div class="cal-toolbar">
@@ -322,18 +247,531 @@
         </section>
 
 
+        <section data-screen="schedule" class="panel">
+
+            <h2>⚙️ 日付・予定設定</h2>
+
+            <p class="sub">ここから重要予定の日付を変更・追加できます。</p>
+
+            <div id="patgsDateSettings"></div>
+
+            <button id="addScheduleSettingBtn">＋予定を追加</button>
+
+        </section>
+
+
+        <section data-screen="schedule" class="panel">
+
+            <h2>📅 テスト・提出物</h2>
+
+            <div id="examList"></div>
+
+            <button id="addExamBtn">＋追加</button>
+
+        </section>
+
+
+        <section data-screen="schedule" class="panel">
+
+            <h2>📅 学習以外の予定</h2>
+
+            <div id="otherScheduleList"></div>
+
+            <button id="addOtherScheduleBtn">＋予定を追加</button>
+
+        </section>
+
+
         <!-- =================================================
-             コマ予約
+             学習（予約に依存しないもの）
         ================================================== -->
 
+        <section data-screen="study" class="panel" id="timerPanel">
+
+            <h2>⏱ 学習タイマー</h2>
+
+            <p class="sub">
+                単体で3・5・10・30・50・60分を計れます。時間が来たらお知らせするだけで、
+                学習を止める機能ではありません。再読み込みしても続きから表示されます。
+            </p>
+
+            <div id="timerDisplay" class="timer-display"></div>
+
+            <div class="btn-row" id="timerQuickButtons">
+                <button class="timer-quick" data-minutes="3">3分</button>
+                <button class="timer-quick" data-minutes="5">5分</button>
+                <button class="timer-quick" data-minutes="10">10分</button>
+                <button class="timer-quick" data-minutes="30">30分</button>
+                <button class="timer-quick" data-minutes="50">50分</button>
+                <button class="timer-quick" data-minutes="60">60分</button>
+            </div>
+
+        </section>
+
+
         <section data-screen="study" class="panel">
+
+            <h2>🗒 学習メモ</h2>
+
+            <p class="sub">
+                難しかった問題、予定外の出来事、学習できなかった理由、次回への対応などを短く残します。
+            </p>
+
+            <div class="form-grid">
+
+                <label>種類
+                    <select id="memoCategory">
+                        <option value="難しかった問題">難しかった問題</option>
+                        <option value="後で確認したいこと">後で確認したいこと</option>
+                        <option value="学習中に気づいたこと">学習中に気づいたこと</option>
+                        <option value="次回やること">次回やること</option>
+                        <option value="予定外の出来事">予定外の出来事</option>
+                        <option value="学習できなかった理由">学習できなかった理由</option>
+                        <option value="その他">その他</option>
+                    </select>
+                </label>
+
+                <label class="wide">内容
+                    <input type="text" id="memoText" placeholder="内容を入力">
+                </label>
+
+            </div>
+
+            <div class="btn-row">
+                <button id="addMemoBtn" class="primary">＋メモを追加</button>
+            </div>
+
+            <div id="memoList"></div>
+
+        </section>
+
+
+        <section data-screen="study" class="panel">
+            <h2>🎯 今日の目標</h2>
+            <textarea id="goalText" rows="3" placeholder="今日の目標を入力"></textarea>
+        </section>
+
+
+        <section data-screen="study" class="panel">
+            <h2>📋 今日の予定</h2>
+            <div id="todoList"></div>
+            <button id="addTodoBtn">＋予定を追加</button>
+            <p id="todoRate">達成率 0%</p>
+            <p id="todoComment">📝予定を追加しよう！</p>
+            <progress id="todoBar" value="0" max="100"></progress>
+        </section>
+
+
+        <section data-screen="study" class="panel">
+            <h2>💬 今日の一言</h2>
+            <textarea id="messageText" rows="3" placeholder="今日の一言"></textarea>
+        </section>
+
+
+        <section data-screen="study" class="panel">
+            <h2>📝 今日の実績</h2>
+            <textarea id="resultText" rows="5" placeholder="今日の学習実績"></textarea>
+        </section>
+
+
+        <section data-screen="study" class="panel">
+
+            <h2>📚 教科別 学習法メモ</h2>
+
+            <p class="sub">教科ごとに効果的な学習法を残しておく場所です。</p>
+
+            <div id="subjectPlanList"></div>
+
+            <span id="subjectPlanSaveStatus" class="save-status">自動保存</span>
+
+        </section>
+
+
+        <section data-screen="study" class="panel">
+            <h2>📚 教材</h2>
+            <div id="materialList"></div>
+            <button id="addMaterialBtn">＋教材追加</button>
+        </section>
+
+
+        <section data-screen="study" class="panel">
+
+            <h2>❓ 質問・確認事項メモ</h2>
+
+            <select id="questionTarget">
+                <option value="">相手を選択</option>
+                <option value="Claude">Claude</option>
+                <option value="Gemini">Gemini</option>
+                <option value="ChatGPT">ChatGPT</option>
+                <option value="Theta Wave">Theta Wave</option>
+                <option value="先生">先生</option>
+            </select>
+
+            <select id="questionCategory">
+                <option value="">内容を選択</option>
+                <option value="進路">進路</option>
+                <option value="学習">学習</option>
+                <option value="部活">部活</option>
+                <option value="委員会">委員会</option>
+            </select>
+
+            <input type="text" id="questionText" placeholder="聞きたいことを入力">
+
+            <button id="addQuestionBtn">＋追加</button>
+
+            <div id="questionList"></div>
+
+        </section>
+
+
+        <section data-screen="unresolved" class="panel">
+
+            <h2>🧩 未解決事項</h2>
+
+            <p class="sub">
+                学習結果の記録で「未解決」に書いた内容がここに並びます。弱点・苦手分野の管理にも使えます。
+            </p>
+
+            <div id="unresolvedList"></div>
+
+        </section>
+
+
+        <!-- =================================================
+             ロードマップ／AI／週間時間割
+        ================================================== -->
+
+        <section data-screen="roadmap" class="panel panel-main" id="roadmapPanel">
+
+            <h2>🛤 ロードマップ作成</h2>
+
+            <p class="sub">
+                受験までの計画を、色つきの付箋として自由に書き込めます。日付ごとにまとまって並びます。
+            </p>
+
+            <div class="form-grid">
+
+                <label>日付
+                    <input type="date" id="roadmapAddDate">
+                </label>
+
+                <label class="wide">タイトル
+                    <input type="text" id="roadmapAddTitle" placeholder="例：過去問1周目を終える">
+                </label>
+
+                <label class="wide">内容・メモ
+                    <textarea id="roadmapAddContent" rows="3" placeholder="自由にメモを書けます（任意）"></textarea>
+                </label>
+
+                <label class="wide">付箋の色
+                    <div class="roadmap-color-picker" id="roadmapColorPicker">
+                        <button type="button" class="roadmap-color-dot" data-color="yellow" title="黄色"></button>
+                        <button type="button" class="roadmap-color-dot" data-color="pink" title="ピンク"></button>
+                        <button type="button" class="roadmap-color-dot" data-color="blue" title="青"></button>
+                        <button type="button" class="roadmap-color-dot" data-color="green" title="緑"></button>
+                        <button type="button" class="roadmap-color-dot" data-color="orange" title="オレンジ"></button>
+                        <button type="button" class="roadmap-color-dot" data-color="purple" title="紫"></button>
+                    </div>
+                </label>
+
+            </div>
+
+            <div class="btn-row">
+                <button id="roadmapAddBtn" class="primary">＋ 付箋を追加</button>
+                <button id="roadmapSortToggleBtn" class="ghost">日付順：古い→新しい</button>
+            </div>
+
+            <div id="roadmapList"></div>
+
+        </section>
+
+
+        <section data-screen="aichat" class="panel panel-main" id="aichatPanel">
+
+            <h2>🤖 AI学習アシスタント</h2>
+
+            <p class="sub">
+                分からないことや学習の相談を気軽に聞けます。ファイル（txt・PDF・画像）も添付できます。
+            </p>
+
+            <div class="aichat-toolbar">
+                <span class="aichat-conv-title" id="aichatConvTitle">新しい会話</span>
+                <div class="aichat-toolbar-buttons">
+                    <button id="aichatNewBtn" class="ghost">＋ 新規</button>
+                    <button id="aichatListBtn" class="ghost">📂 会話一覧</button>
+                    <button id="aichatRenameBtn" class="ghost">✏️ 名前変更</button>
+                    <button id="aichatSaveBtn" class="primary">💾 この会話を保存</button>
+                </div>
+            </div>
+
+            <div id="aichatLog" class="aichat-log"></div>
+
+            <div class="aichat-attach-row">
+                <button id="aichatAttachBtn" type="button" class="ghost">📎 ファイル添付</button>
+                <input type="file" id="aichatFileInput" accept=".txt,.pdf,text/plain,application/pdf,image/*" hidden>
+                <span class="sub" id="aichatAttachPreview"></span>
+                <button id="aichatAttachCancelBtn" type="button" class="ghost">添付を取り消す</button>
+            </div>
+
+            <div class="aichat-input-row">
+                <textarea id="aichatInput" rows="2" placeholder="質問を入力（Enterで送信／Shift+Enterで改行）"></textarea>
+                <button id="aichatSendBtn" class="primary">送信</button>
+            </div>
+
+            <p class="sub" id="aichatStatus"></p>
+
+        </section>
+
+
+        <section data-screen="aichatlist" class="panel panel-main" id="aichatlistPanel">
+
+            <h2>📂 AI会話一覧</h2>
+
+            <p class="sub">
+                保存した会話と今の未保存の会話が並びます。未保存の会話は、新しい会話を始めると片付けられます。
+            </p>
+
+            <div id="aichatConvList"></div>
+
+        </section>
+
+
+        <section data-screen="aiknowledge" class="panel panel-main" id="aiknowledgePanel">
+
+            <h2>🧠 AI知識ベース</h2>
+
+            <p class="sub">
+                単語・英文・覚えたい知識を登録すると、関連する質問のときにAIが参照します。
+            </p>
+
+            <div class="form-grid">
+
+                <label class="wide">用語・英文
+                    <input type="text" id="aiKnowledgeTermInput" placeholder="例：ubiquitous">
+                </label>
+
+                <label class="wide">説明・意味
+                    <textarea id="aiKnowledgeContentInput" rows="2" placeholder="例：至る所にある、遍在する"></textarea>
+                </label>
+
+            </div>
+
+            <div class="btn-row">
+                <button id="aiKnowledgeAddBtn" class="primary">＋ 登録</button>
+            </div>
+
+            <label class="wide">検索
+                <input type="text" id="aiKnowledgeSearch" placeholder="用語・説明で検索">
+            </label>
+
+            <div id="aiKnowledgeList"></div>
+
+        </section>
+
+
+        <section data-screen="weeklyplan" class="panel panel-main" id="weeklyPlanPanel">
+
+            <h2>🗓 週間時間割</h2>
+
+            <p class="sub">
+                週の時間割を組み、学習の開始・終了・未着手・予定変更を記録します。
+                平日は35分学習・5分休憩、土日祝日は50分学習・10分休憩が目安です。
+            </p>
+
+            <div class="btn-row">
+                <button id="weeklyPlanPrevWeekBtn" class="ghost">← 前週</button>
+                <span class="patgs-today" id="weeklyPlanWeekLabel">-</span>
+                <button id="weeklyPlanTodayWeekBtn" class="ghost">今週</button>
+                <button id="weeklyPlanNextWeekBtn" class="ghost">次週 →</button>
+            </div>
+
+            <p class="sub" id="weeklyPlanCounts"></p>
+
+            <p class="flow-note" id="weeklyPlanLimitNotice" style="display:none;">
+                未着手・予定変更が多めです。責めるためのお知らせではありません。
+                「週次レビュー」から、計画そのものを見直してみましょう。
+            </p>
+
+            <div id="weeklyPlanSlotList"></div>
+
+            <h3>＋ コマを追加</h3>
+
+            <div class="form-grid">
+
+                <label>曜日
+                    <select id="weeklyPlanAddDay">
+                        <option value="0">日</option>
+                        <option value="1">月</option>
+                        <option value="2">火</option>
+                        <option value="3">水</option>
+                        <option value="4">木</option>
+                        <option value="5">金</option>
+                        <option value="6">土</option>
+                    </select>
+                </label>
+
+                <label>時刻
+                    <input type="time" id="weeklyPlanAddTime">
+                </label>
+
+                <label class="wide">教科
+                    <input type="text" id="weeklyPlanAddSubject" placeholder="例：数学">
+                </label>
+
+                <label class="wide">学習課題
+                    <input type="text" id="weeklyPlanAddTask" placeholder="例：青チャート例題32〜40">
+                </label>
+
+            </div>
+
+            <div class="btn-row">
+                <button id="weeklyPlanAddSlotBtn" class="primary">＋ 追加</button>
+                <span class="sub" id="weeklyPlanAddStatus"></span>
+            </div>
+
+            <div class="btn-row">
+                <button id="weeklyPlanReviewOpenBtn" class="ghost">📝 今週の週次レビューを開く</button>
+            </div>
+
+        </section>
+
+
+        <section data-screen="weeklyplanreview" class="panel panel-main" id="weeklyPlanReviewPanel">
+
+            <h2>📝 週次レビュー（週間時間割）</h2>
+
+            <p class="sub">
+                毎週土曜 8:00〜10:00 を目安に、計画と実績を振り返ります。
+                実施できなかった場合は、理由と再実施予定だけ記録してください。
+            </p>
+
+            <p class="patgs-today" id="weeklyPlanReviewWeekLabel">-</p>
+            <p class="sub" id="weeklyPlanReviewCounts"></p>
+
+            <div id="weeklyPlanReviewDetailList"></div>
+
+            <label class="wide">振り返り（短くてOK）
+                <textarea id="weeklyPlanReviewText" rows="3" placeholder="今週できたこと・次週に活かしたいことなど（任意）"></textarea>
+            </label>
+
+            <div class="btn-row">
+                <button id="weeklyPlanReviewSaveBtn" class="primary">保存する</button>
+                <button id="weeklyPlanReviewNotDoneBtn" class="ghost">今回は未実施として記録する</button>
+                <span class="sub" id="weeklyPlanReviewSaveStatus"></span>
+            </div>
+
+            <p class="sub">AIによる自動要約は現在未接続です（手動の振り返りはいつでも保存できます）。</p>
+
+            <div class="btn-row">
+                <button id="weeklyPlanReviewNextWeekBtn" class="primary">次週の時間割を編集する</button>
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             今週（旧コマ管理に依存しない部分）
+        ================================================== -->
+
+        <section data-screen="week" class="panel panel-quiet">
+
+            <h2>📅 学習カレンダー（過去30日）</h2>
+
+            <div id="studyHeatmap"></div>
+
+            <p class="sub">🟩 学習記録あり（濃いほど多い）／🟦 開いたが記録なし／⬜ 未使用</p>
+
+            <p class="sub">
+                連続で開いた日数：<span id="streakCount">0</span>日
+                ／ 自己ベスト：<span id="bestStreakCount">0</span>日
+            </p>
+
+        </section>
+
+
+        <section data-screen="week" class="panel">
+
+            <h2>📅 週次レビュー（従来）</h2>
+
+            <div id="weeklyReviewNoticeLarge" class="weekly-notice"></div>
+
+            <div id="weeklyKomaReport" class="summary-box"></div>
+
+            <textarea id="weeklyReviewText" rows="8" placeholder="今週の振り返り・改善点など"></textarea>
+
+            <div class="btn-row">
+                <button id="weeklyReviewSaveBtn" class="primary small">💾 保存</button>
+                <button id="weeklyReviewCancelEditBtn" class="ghost small" style="display:none;">編集をやめる</button>
+            </div>
+
+            <p id="weeklyReviewSaveStatus" class="save-status"></p>
+
+            <h3>過去のレビュー</h3>
+
+            <div id="weeklyReviewList"></div>
+
+        </section>
+
+
+        <section class="panel panel-main" data-screen="week" id="weeklyReportPanel">
+
+            <h2>📈 週次振り返り自動生成</h2>
+
+            <p class="sub">今週のデータから、PATGS27が自動でまとめます。</p>
+
+            <div class="btn-row">
+                <button id="generateWeeklyReportBtn" class="primary small">今週のレポートを作る</button>
+                <button id="copyReportToReviewBtn" class="ghost small">週次レビューに転記</button>
+            </div>
+
+            <div id="weeklyReportBox" class="summary-box"></div>
+
+        </section>
+
+
+        <!-- =================================================
+             旧コマ予約（過去の記録・メインでは使わない）
+        ================================================== -->
+
+        <section data-screen="legacy" class="panel panel-quiet">
+
+            <h2>📦 旧コマ予約（過去の記録）</h2>
+
+            <p class="flow-note">
+                第七次改革により、予約制度はメインでは使いません。この画面は、
+                これまでの予約・完了・未実行の記録を見返したり、必要なときだけ使うために残しています。
+                データは消えていません。普段の学習は「週間時間割」で行います。
+            </p>
+
+            <div class="next-koma" id="nextReservationBox"></div>
+
+            <h3>今日</h3>
+
+            <div class="stat-row">
+                <div class="stat"><span class="stat-num" id="todayReservedCount">0</span><span class="stat-label">予約</span></div>
+                <div class="stat"><span class="stat-num stat-done" id="todayDoneCount">0</span><span class="stat-label">完了</span></div>
+                <div class="stat"><span class="stat-num stat-missed" id="todayMissedCount">0</span><span class="stat-label">未実行</span></div>
+                <div class="stat"><span class="stat-num" id="todayMovedCount">0</span><span class="stat-label">振替</span></div>
+            </div>
+
+            <h3>今週（<span id="weekRangeLabel">-</span>）</h3>
+
+            <div class="stat-row">
+                <div class="stat"><span class="stat-num" id="weekRequiredCount">0</span><span class="stat-label">必要</span></div>
+                <div class="stat"><span class="stat-num stat-done" id="weekDoneCount">0</span><span class="stat-label">完了</span></div>
+                <div class="stat"><span class="stat-num stat-missed" id="weekMissedCount">0</span><span class="stat-label">未実行</span></div>
+                <div class="stat"><span class="stat-num stat-debt" id="weekDebtCount">0</span><span class="stat-label">債務</span></div>
+            </div>
+
+        </section>
+
+
+        <section data-screen="legacy" class="panel">
 
             <h2>📌 コマ予約</h2>
 
             <p class="sub">
-                開始時刻は固定枠です。日付 → 種類 → 開始時刻 の順に選んでください。
-                通常学習は30分（＋休憩10分の40分周期）、模試・過去問は70分（実施50分＋採点分析20分）。
-                予約は2週間先まで、義務ではありません。開始2時間前を過ぎた変更は記録に残ります。
+                開始時刻は固定枠です。通常学習は30分、模試・過去問は70分。予約は2週間先まで。
             </p>
 
             <div class="form-grid">
@@ -396,15 +834,8 @@
             </div>
 
             <div class="btn-row">
-
-                <button id="addReservationBtn" class="primary">
-                    この内容で予約する
-                </button>
-
-                <button id="cancelEditBtn" class="ghost" style="display:none;">
-                    編集をやめる
-                </button>
-
+                <button id="addReservationBtn" class="primary">この内容で予約する</button>
+                <button id="cancelEditBtn" class="ghost" style="display:none;">編集をやめる</button>
             </div>
 
             <p id="reservationFormStatus" class="form-status"></p>
@@ -421,46 +852,9 @@
         </section>
 
 
-        <!-- =================================================
-             PATGS27内蔵タイマー
-        ================================================== -->
-
-        <section data-screen="study" class="panel" id="timerPanel">
-
-            <h2>⏱ 学習タイマー</h2>
-
-            <p class="sub">
-                通常学習コマを「開始」すると、自動で30分のタイマーが動きます。単体でも3・5・10・30・50・60分を計れます。
-                時間が来ても学習を止める機能ではなく、「予約した時間が終わった」ことをお知らせするだけです。
-                画面を閉じても再読み込みしても、続きから表示されます。
-            </p>
-
-            <div id="timerDisplay" class="timer-display"></div>
-
-            <div class="btn-row" id="timerQuickButtons">
-                <button class="timer-quick" data-minutes="3">3分</button>
-                <button class="timer-quick" data-minutes="5">5分</button>
-                <button class="timer-quick" data-minutes="10">10分</button>
-                <button class="timer-quick" data-minutes="30">30分</button>
-                <button class="timer-quick" data-minutes="50">50分</button>
-                <button class="timer-quick" data-minutes="60">60分</button>
-            </div>
-
-        </section>
-
-
-        <!-- =================================================
-             空き枠検索
-        ================================================== -->
-
-        <section data-screen="study" class="panel">
+        <section data-screen="legacy" class="panel">
 
             <h2>🔍 空き枠検索</h2>
-
-            <p class="sub">
-                「明日、数学を1コマ足したい」というときに、その日の空いている固定枠を出します。
-                枠を押すと上の予約フォームにその日時が入ります。
-            </p>
 
             <div class="form-grid">
 
@@ -486,17 +880,12 @@
         </section>
 
 
-        <!-- =================================================
-             未実行コマ
-        ================================================== -->
-
-        <section data-screen="study" class="panel">
+        <section data-screen="legacy" class="panel">
 
             <h2>⏳ 未実行コマ</h2>
 
             <p class="sub">
-                開始から15分たっても開始されなかったコマは、自動で未実行になります。
-                未実行は違反ではありません。原因を4分類で記録し、同じ週の別の枠へ振り替えてください。
+                開始から15分たっても開始されなかったコマは未実行になります。原因を4分類で記録し、同じ週の別の枠へ振り替えられます。
             </p>
 
             <div id="hardStartNotice"></div>
@@ -506,378 +895,43 @@
         </section>
 
 
-        <!-- =================================================
-             未解決事項
-        ================================================== -->
+        <section data-screen="legacy" class="panel">
 
-        <section data-screen="unresolved" class="panel">
+            <h2>📊 週間コマ管理</h2>
 
-            <h2>🧩 未解決事項</h2>
-
-            <p class="sub">
-                コマ終了時の記録で「未解決」に書いた内容がここに並びます。
-                理解・解決コマの記録画面で、この一覧から選んで紐付けられます。
-            </p>
-
-            <p class="flow-note">
-                通常演習 → 結果入力 → 正答率60%未満 → 理解・解決枠へ進む、という流れで未解決が生まれます。
-            </p>
-
-            <div id="unresolvedList"></div>
-
-        </section>
-
-
-        <!-- =================================================
-             学習メモ
-        ================================================== -->
-
-        <section data-screen="study" class="panel">
-
-            <h2>🗒 学習メモ</h2>
-
-            <p class="sub">
-                難しかった問題、後で確認したいこと、気づいたこと、次回やることなど、
-                短く残しておくためのメモです。
-            </p>
-
-            <div class="form-grid">
-
-                <label>種類
-                    <select id="memoCategory">
-                        <option value="難しかった問題">難しかった問題</option>
-                        <option value="後で確認したいこと">後で確認したいこと</option>
-                        <option value="学習中に気づいたこと">学習中に気づいたこと</option>
-                        <option value="次回やること">次回やること</option>
-                        <option value="その他">その他</option>
-                    </select>
-                </label>
-
-                <label class="wide">内容
-                    <input type="text" id="memoText" placeholder="内容を入力">
-                </label>
-
-            </div>
-
-            <div class="btn-row">
-                <button id="addMemoBtn" class="primary">＋メモを追加</button>
-            </div>
-
-            <div id="memoList"></div>
-
-        </section>
-
-
-        <!-- =================================================
-             ロードマップ作成（第五次改革・追加機能）
-             ※ 既存の「受験マップ」（mapPanel）とは別画面・別データ。
-        ================================================== -->
-
-        <section data-screen="roadmap" class="panel panel-main" id="roadmapPanel">
-
-            <h2>🛤 ロードマップ作成</h2>
-
-            <p class="sub">
-                受験までの計画を、色つきの付箋として自由に書き込めます。
-                日付ごとにまとまって並びます。既存の「受験マップ」とは別の機能で、データも独立しています。
-            </p>
-
-            <div class="form-grid">
-
-                <label>日付
-                    <input type="date" id="roadmapAddDate">
-                </label>
-
-                <label class="wide">タイトル
-                    <input type="text" id="roadmapAddTitle" placeholder="例：過去問1周目を終える">
-                </label>
-
-                <label class="wide">内容・メモ
-                    <textarea id="roadmapAddContent" rows="3" placeholder="自由にメモを書けます（任意）"></textarea>
-                </label>
-
-                <label class="wide">付箋の色
-                    <div class="roadmap-color-picker" id="roadmapColorPicker">
-                        <button type="button" class="roadmap-color-dot" data-color="yellow" title="黄色"></button>
-                        <button type="button" class="roadmap-color-dot" data-color="pink" title="ピンク"></button>
-                        <button type="button" class="roadmap-color-dot" data-color="blue" title="青"></button>
-                        <button type="button" class="roadmap-color-dot" data-color="green" title="緑"></button>
-                        <button type="button" class="roadmap-color-dot" data-color="orange" title="オレンジ"></button>
-                        <button type="button" class="roadmap-color-dot" data-color="purple" title="紫"></button>
-                    </div>
-                </label>
-
-            </div>
-
-            <div class="btn-row">
-                <button id="roadmapAddBtn" class="primary">＋ 付箋を追加</button>
-                <button id="roadmapSortToggleBtn" class="ghost">日付順：古い→新しい</button>
-            </div>
-
-            <div id="roadmapList"></div>
-
-        </section>
-
-
-        <!-- =================================================
-             AI学習アシスタント（Cloudflare Workers AI連携）
-        ================================================== -->
-
-        <section data-screen="aichat" class="panel panel-main" id="aichatPanel">
-
-            <h2>🤖 AI学習アシスタント</h2>
-
-            <p class="sub">
-                分からないことや、今日の学習の相談を気軽に聞いてみましょう。
-                ファイル（txt・PDF・画像）を添付して質問することもできます。
-            </p>
-
-            <div class="aichat-toolbar">
-                <span class="aichat-conv-title" id="aichatConvTitle">新しい会話</span>
-                <div class="aichat-toolbar-buttons">
-                    <button id="aichatNewBtn" class="ghost">＋ 新規</button>
-                    <button id="aichatListBtn" class="ghost">📂 会話一覧</button>
-                    <button id="aichatRenameBtn" class="ghost">✏️ 名前変更</button>
-                    <button id="aichatSaveBtn" class="primary">💾 この会話を保存</button>
-                </div>
-            </div>
-
-            <div id="aichatLog" class="aichat-log"></div>
-
-            <div class="aichat-attach-row">
-                <button id="aichatAttachBtn" type="button" class="ghost">📎 ファイル添付</button>
-                <input type="file" id="aichatFileInput" accept=".txt,.pdf,text/plain,application/pdf,image/*" hidden>
-                <span class="sub" id="aichatAttachPreview"></span>
-                <button id="aichatAttachCancelBtn" type="button" class="ghost">添付を取り消す</button>
-            </div>
-
-            <div class="aichat-input-row">
-                <textarea id="aichatInput" rows="2" placeholder="質問を入力（Enterで送信／Shift+Enterで改行）"></textarea>
-                <button id="aichatSendBtn" class="primary">送信</button>
-            </div>
-
-            <p class="sub" id="aichatStatus"></p>
-
-        </section>
-
-
-        <!-- =================================================
-             AI会話一覧
-        ================================================== -->
-
-        <section data-screen="aichatlist" class="panel panel-main" id="aichatlistPanel">
-
-            <h2>📂 AI会話一覧</h2>
-
-            <p class="sub">
-                保存した会話と、今の未保存の会話が並びます。未保存の会話は、
-                新しい会話を始めると自動的に片付けられます（残したい場合は保存してください）。
-            </p>
-
-            <div id="aichatConvList"></div>
-
-        </section>
-
-
-        <!-- =================================================
-             AI知識ベース
-        ================================================== -->
-
-        <section data-screen="aiknowledge" class="panel panel-main" id="aiknowledgePanel">
-
-            <h2>🧠 AI知識ベース</h2>
-
-            <p class="sub">
-                単語・英文・覚えたい知識を登録しておくと、関連する質問をしたときにAIが参照します。
-            </p>
-
-            <div class="form-grid">
-
-                <label class="wide">用語・英文
-                    <input type="text" id="aiKnowledgeTermInput" placeholder="例：ubiquitous">
-                </label>
-
-                <label class="wide">説明・意味
-                    <textarea id="aiKnowledgeContentInput" rows="2" placeholder="例：至る所にある、遍在する"></textarea>
-                </label>
-
-            </div>
-
-            <div class="btn-row">
-                <button id="aiKnowledgeAddBtn" class="primary">＋ 登録</button>
-            </div>
-
-            <label class="wide">検索
-                <input type="text" id="aiKnowledgeSearch" placeholder="用語・説明で検索">
+            <label class="inline-label">
+                今週の必要コマ数：
+                <input type="number" id="weekRequiredInput" min="0" step="1">
+                コマ
             </label>
 
-            <div id="aiKnowledgeList"></div>
+            <div id="weekKomaSummary" class="summary-box"></div>
+
+            <h3>今週の完了コマ（教科別）</h3>
+
+            <canvas id="subjectKomaChart" width="600" height="220"></canvas>
+
+            <h3>過去の週</h3>
+
+            <div id="weekHistoryList"></div>
 
         </section>
 
 
-        <!-- =================================================
-             週間時間割（第七次改革・最小構成）
-             ※ 既存の30分固定枠コマ制度・既存の週次レビューとは別データ・別画面
-        ================================================== -->
-
-        <section data-screen="weeklyplan" class="panel panel-main" id="weeklyPlanPanel">
-
-            <h2>🗓 週間時間割</h2>
-
-            <p class="sub">
-                部活動や休日を考えながら、週の時間割を自由に組めます。
-                平日は35分学習・5分休憩、土日祝日は50分学習・10分休憩が目安です。
-                既存の「コマ予約」とは別の機能です。
-            </p>
-
-            <div class="btn-row">
-                <button id="weeklyPlanPrevWeekBtn" class="ghost">← 前週</button>
-                <span class="patgs-today" id="weeklyPlanWeekLabel">-</span>
-                <button id="weeklyPlanTodayWeekBtn" class="ghost">今週</button>
-                <button id="weeklyPlanNextWeekBtn" class="ghost">次週 →</button>
-            </div>
-
-            <p class="sub" id="weeklyPlanCounts"></p>
-
-            <p class="flow-note" id="weeklyPlanLimitNotice" style="display:none;">
-                未着手・予定変更が多めです。責めるためのお知らせではありません。
-                「週次レビュー」から、計画そのものを見直してみましょう。
-            </p>
-
-            <div id="weeklyPlanSlotList"></div>
-
-            <h3>＋ コマを追加</h3>
-
-            <div class="form-grid">
-
-                <label>曜日
-                    <select id="weeklyPlanAddDay">
-                        <option value="0">日</option>
-                        <option value="1">月</option>
-                        <option value="2">火</option>
-                        <option value="3">水</option>
-                        <option value="4">木</option>
-                        <option value="5">金</option>
-                        <option value="6">土</option>
-                    </select>
-                </label>
-
-                <label>時刻
-                    <input type="time" id="weeklyPlanAddTime">
-                </label>
-
-                <label class="wide">教科
-                    <input type="text" id="weeklyPlanAddSubject" placeholder="例：数学">
-                </label>
-
-                <label class="wide">学習課題
-                    <input type="text" id="weeklyPlanAddTask" placeholder="例：青チャート例題32〜40">
-                </label>
-
-            </div>
-
-            <div class="btn-row">
-                <button id="weeklyPlanAddSlotBtn" class="primary">＋ 追加</button>
-                <span class="sub" id="weeklyPlanAddStatus"></span>
-            </div>
-
-            <div class="btn-row">
-                <button id="weeklyPlanReviewOpenBtn" class="ghost">📝 今週の週次レビューを開く</button>
-            </div>
-
-        </section>
-
-
-        <!-- =================================================
-             週次レビュー（週間時間割専用）
-        ================================================== -->
-
-        <section data-screen="weeklyplanreview" class="panel panel-main" id="weeklyPlanReviewPanel">
-
-            <h2>📝 週次レビュー（週間時間割）</h2>
-
-            <p class="sub">
-                毎週土曜 8:00〜10:00 を目安に、計画と実績を振り返ります。
-                200字以上書く必要はありません。実施できなかった場合は、理由と再実施予定だけ記録してください。
-            </p>
-
-            <p class="patgs-today" id="weeklyPlanReviewWeekLabel">-</p>
-            <p class="sub" id="weeklyPlanReviewCounts"></p>
-
-            <div id="weeklyPlanReviewDetailList"></div>
-
-            <label class="wide">振り返り（短くてOK）
-                <textarea id="weeklyPlanReviewText" rows="3" placeholder="今週できたこと・次週に活かしたいことなど（任意）"></textarea>
-            </label>
-
-            <div class="btn-row">
-                <button id="weeklyPlanReviewSaveBtn" class="primary">保存する</button>
-                <button id="weeklyPlanReviewNotDoneBtn" class="ghost">今回は未実施として記録する</button>
-                <span class="sub" id="weeklyPlanReviewSaveStatus"></span>
-            </div>
-
-            <p class="sub">
-                AIによる自動要約は現在未接続です（手動での振り返りは上の欄からいつでも保存できます）。
-            </p>
-
-            <div class="btn-row">
-                <button id="weeklyPlanReviewNextWeekBtn" class="primary">次週の時間割を編集する</button>
-            </div>
-
-        </section>
-
-
-        <!-- =================================================
-             取り消しの記録
-        ================================================== -->
-
-        <section data-screen="study" class="panel">
-
-            <h2>🗂 取り消し・変更の記録</h2>
-
-            <p class="sub">
-                予定が崩れた理由を後から見返すための記録です。
-            </p>
-
-            <h3>取り消した理由</h3>
-            <div id="cancelLogList"></div>
-
-            <h3>開始2時間前以降の変更</h3>
-            <div id="changeLogList"></div>
-
-        </section>
-
-
-        <!-- =================================================
-             債務
-        ================================================== -->
-
-        <section data-screen="study" class="panel">
+        <section data-screen="legacy" class="panel">
 
             <h2>🧾 債務</h2>
 
-            <p class="sub">
-                週が終わった時点で、必要コマ数に届かなかった分が債務として残ります。
-                返済したら「返済済みにする」を押してください。
-            </p>
+            <p class="sub">週が終わった時点で必要コマ数に届かなかった分が債務として残ります。</p>
 
             <div id="debtList"></div>
 
         </section>
 
 
-        <!-- =================================================
-             LS記録
-        ================================================== -->
-
-        <section data-screen="study" class="panel">
+        <section data-screen="legacy" class="panel">
 
             <h2>🔥 LS記録（30分を超えた学習）</h2>
-
-            <p class="sub">
-                1コマ（30分）を超えて続けた学習は、LSとしてここに記録します。
-            </p>
 
             <div class="form-grid">
 
@@ -916,93 +970,184 @@
         </section>
 
 
+        <section data-screen="legacy" class="panel">
+
+            <h2>🗂 取り消し・変更の記録</h2>
+
+            <h3>取り消した理由</h3>
+            <div id="cancelLogList"></div>
+
+            <h3>開始2時間前以降の変更</h3>
+            <div id="changeLogList"></div>
+
+        </section>
+
+
         <!-- =================================================
-             週間コマ管理
+             成長／マップ／実績
         ================================================== -->
 
-        <section data-screen="week" class="panel">
+        <section class="panel panel-main" data-screen="growth" id="growthPanel">
 
-            <h2>📊 週間コマ管理</h2>
+            <h2>🌱 成長</h2>
+
+            <p class="sub">
+                学習を完了するたびに、その教科の生き物が少しずつ育ちます。枯れることはありません。
+                種 → 芽 → 若葉 → 花 → 木 → 大木、の順で育ちます。
+            </p>
+
+            <div id="growthList" class="growth-list"></div>
+
+        </section>
+
+
+        <section class="panel panel-main" data-screen="map" id="mapPanel">
+
+            <h2>🗺️ 受験マップ</h2>
+
+            <p class="sub">入試までの道のりを可視化します。実際の学習記録と連動しています。</p>
 
             <label class="inline-label">
-                今週の必要コマ数：
-                <input type="number" id="weekRequiredInput" min="0" step="1">
-                コマ
+                目標にする重要予定：
+                <select id="mapGoalSelect"></select>
             </label>
 
-            <div id="weekKomaSummary" class="summary-box"></div>
+            <div id="mapBoard" class="map-board"></div>
 
-            <h3>今週の完了コマ（教科別）</h3>
+            <p id="mapSummary" class="sub"></p>
 
-            <canvas id="subjectKomaChart" width="600" height="220"></canvas>
+        </section>
 
-            <h3>過去の週</h3>
 
-            <div id="weekHistoryList"></div>
+        <section class="panel panel-main" data-screen="achievements" id="achievementsPanel">
+
+            <h2>🏆 実績</h2>
+
+            <p class="sub">学習実績を達成するとバッジが増えます。一度獲得したバッジは残ります。</p>
+
+            <h3>獲得済み</h3>
+            <div id="badgeGridUnlocked" class="badge-grid"></div>
+
+            <h3>未獲得</h3>
+            <div id="badgeGridLocked" class="badge-grid"></div>
 
         </section>
 
 
         <!-- =================================================
-             今日の目標・予定・一言・実績
+             成績
         ================================================== -->
 
-        <section data-screen="study" class="panel">
+        <section data-screen="grades" class="panel">
 
-            <h2>🎯 今日の目標</h2>
+            <h2>📊 模試結果</h2>
 
-            <textarea id="goalText" rows="3" placeholder="今日の目標を入力"></textarea>
+            <button id="addMockBtn">＋模試結果を入力</button>
 
-        </section>
+            <div id="mockExamForm"></div>
 
+            <div id="mockExamList"></div>
 
-        <section data-screen="study" class="panel">
+            <h3>偏差値の推移</h3>
 
-            <h2>📋 今日の予定</h2>
-
-            <div id="todoList"></div>
-
-            <button id="addTodoBtn">＋予定を追加</button>
-
-            <p id="todoRate">達成率 0%</p>
-
-            <p id="todoComment">📝予定を追加しよう！</p>
-
-            <progress id="todoBar" value="0" max="100"></progress>
+            <canvas id="scoreTrendChart" width="600" height="240"></canvas>
 
         </section>
 
 
-        <section data-screen="study" class="panel">
+        <section data-screen="grades" class="panel">
 
-            <h2>💬 今日の一言</h2>
+            <h2>📚 過去問記録</h2>
 
-            <textarea id="messageText" rows="3" placeholder="今日の一言"></textarea>
+            <h3>🏫 公立高校過去問</h3>
+
+            <p class="sub">平均点との比較を記録します。</p>
+
+            <button id="addPublicPastBtn">＋公立過去問を追加</button>
+
+            <div id="publicPastList"></div>
+
+            <canvas id="publicPastChart" width="600" height="240"></canvas>
+
+            <canvas id="publicDeviationChart" width="600" height="240"></canvas>
+
+            <h3>🏫 つるふ過去問</h3>
+
+            <p class="sub">前回記録との推移を記録します。</p>
+
+            <button id="addPrivatePastBtn">＋つるふ過去問を追加</button>
+
+            <div id="privatePastList"></div>
+
+            <canvas id="privatePastChart" width="600" height="240"></canvas>
 
         </section>
 
 
-        <section data-screen="study" class="panel">
+        <section data-screen="grades" class="panel">
 
-            <h2>📝 今日の実績</h2>
+            <h2>📊 内申点管理</h2>
 
-            <textarea id="resultText" rows="5" placeholder="今日の学習実績"></textarea>
+            <p class="sub">教科ごとに現在の評定と目標の評定を入力してください（1〜5）。</p>
+
+            <div id="naishinList"></div>
+
+            <p id="naishinTotal">現在合計：- ／ 目標合計：-</p>
+
+        </section>
+
+
+        <section data-screen="grades" class="panel">
+
+            <h2>📌 弱点単元・要復習リスト</h2>
+
+            <select id="weakPointSubject">
+                <option value="">教科を選択</option>
+                <option value="国語">国語</option>
+                <option value="数学">数学</option>
+                <option value="理科">理科</option>
+                <option value="社会">社会</option>
+                <option value="英語">英語</option>
+                <option value="保健体育">保健体育</option>
+                <option value="音楽">音楽</option>
+                <option value="技術家庭">技術家庭</option>
+                <option value="美術">美術</option>
+                <option value="その他">その他</option>
+            </select>
+
+            <input type="text" id="weakPointText" placeholder="内容を入力">
+
+            <button id="addWeakPointBtn">＋追加</button>
+
+            <div id="weakPointList"></div>
 
         </section>
 
 
         <!-- =================================================
-             ログイン方法の追加（アカウント連携）
+             設定・その他
         ================================================== -->
+
+        <section data-screen="settings" class="panel">
+
+            <h2>📦 旧コマ予約</h2>
+
+            <p class="sub">
+                第七次改革でメインから外した予約制度です。過去の記録を見返したいときだけ開いてください。
+            </p>
+
+            <button id="legacyOpenBtn">旧コマ予約を開く</button>
+
+        </section>
+
 
         <section data-screen="settings" class="panel">
 
             <h2>🔗 ログイン方法の追加</h2>
 
             <p class="sub">
-                今ログイン中のこのアカウントに、メールアドレス＋パスワード、
-                または学校用ID＋パスワードでもログインできるように追加できます。
-                追加後は、どちらの方法でログインしても同じデータになります。
+                今ログイン中のアカウントに、メールアドレス＋パスワード、または学校用ID＋パスワードでも
+                ログインできるように追加できます。どの方法でも同じデータになります。
             </p>
 
             <div class="form-grid">
@@ -1044,10 +1189,6 @@
         </section>
 
 
-        <!-- =================================================
-             生活リズム
-        ================================================== -->
-
         <section data-screen="settings" class="panel">
 
             <h2>🕐 生活リズム</h2>
@@ -1084,69 +1225,6 @@
         </section>
 
 
-        <!-- =================================================
-             日付・予定設定
-        ================================================== -->
-
-        <section data-screen="schedule" class="panel">
-
-            <h2>⚙️ 日付・予定設定</h2>
-
-            <p class="sub">ここから重要予定の日付を変更・追加できます。</p>
-
-            <div id="patgsDateSettings"></div>
-
-            <button id="addScheduleSettingBtn">＋予定を追加</button>
-
-        </section>
-
-
-        <!-- =================================================
-             教科別 学習法メモ
-        ================================================== -->
-
-        <section data-screen="study" class="panel">
-
-            <h2>📚 教科別 学習法メモ</h2>
-
-            <p class="sub">
-                教科ごとに効果的な学習法を残しておく場所です。
-                コマ数の記録はコマ予約側に移りました。
-            </p>
-
-            <div id="subjectPlanList"></div>
-
-            <span id="subjectPlanSaveStatus" class="save-status">自動保存</span>
-
-        </section>
-
-
-        <!-- =================================================
-             学習カレンダー
-        ================================================== -->
-
-        <section data-screen="week" class="panel panel-quiet">
-
-            <h2>📅 学習カレンダー（過去30日）</h2>
-
-            <div id="studyHeatmap"></div>
-
-            <p class="sub">
-                🟩 完了コマあり（濃いほど多い）／🟦 開いたが記録なし／⬜ 未使用
-            </p>
-
-            <p class="sub">
-                連続で開いた日数：<span id="streakCount">0</span>日
-                ／ 自己ベスト：<span id="bestStreakCount">0</span>日
-            </p>
-
-        </section>
-
-
-        <!-- =================================================
-             誘惑報告
-        ================================================== -->
-
         <section data-screen="settings" class="panel">
 
             <h2>⚠️ 誘惑報告</h2>
@@ -1162,119 +1240,12 @@
         </section>
 
 
-        <!-- =================================================
-             模試結果
-        ================================================== -->
-
-        <section data-screen="grades" class="panel">
-
-            <h2>📊 模試結果</h2>
-
-            <button id="addMockBtn">＋模試結果を入力</button>
-
-            <div id="mockExamForm"></div>
-
-            <div id="mockExamList"></div>
-
-            <h3>偏差値の推移</h3>
-
-            <canvas id="scoreTrendChart" width="600" height="240"></canvas>
-
-        </section>
-
-
-        <!-- =================================================
-             過去問記録
-        ================================================== -->
-
-        <section data-screen="grades" class="panel">
-
-            <h2>📚 過去問記録</h2>
-
-            <h3>🏫 公立高校過去問</h3>
-
-            <p class="sub">平均点との比較を記録します。</p>
-
-            <button id="addPublicPastBtn">＋公立過去問を追加</button>
-
-            <div id="publicPastList"></div>
-
-            <canvas id="publicPastChart" width="600" height="240"></canvas>
-
-            <canvas id="publicDeviationChart" width="600" height="240"></canvas>
-
-            <h3>🏫 つるふ過去問</h3>
-
-            <p class="sub">前回記録との推移を記録します。</p>
-
-            <button id="addPrivatePastBtn">＋つるふ過去問を追加</button>
-
-            <div id="privatePastList"></div>
-
-            <canvas id="privatePastChart" width="600" height="240"></canvas>
-
-        </section>
-
-
-        <!-- =================================================
-             内申点
-        ================================================== -->
-
-        <section data-screen="grades" class="panel">
-
-            <h2>📊 内申点管理</h2>
-
-            <p class="sub">教科ごとに現在の評定と目標の評定を入力してください（1〜5）。</p>
-
-            <div id="naishinList"></div>
-
-            <p id="naishinTotal">現在合計：- ／ 目標合計：-</p>
-
-        </section>
-
-
-        <!-- =================================================
-             弱点単元
-        ================================================== -->
-
-        <section data-screen="grades" class="panel">
-
-            <h2>📌 弱点単元・要復習リスト</h2>
-
-            <select id="weakPointSubject">
-                <option value="">教科を選択</option>
-                <option value="国語">国語</option>
-                <option value="数学">数学</option>
-                <option value="理科">理科</option>
-                <option value="社会">社会</option>
-                <option value="英語">英語</option>
-                <option value="保健体育">保健体育</option>
-                <option value="音楽">音楽</option>
-                <option value="技術家庭">技術家庭</option>
-                <option value="美術">美術</option>
-                <option value="その他">その他</option>
-            </select>
-
-            <input type="text" id="weakPointText" placeholder="内容を入力">
-
-            <button id="addWeakPointBtn">＋追加</button>
-
-            <div id="weakPointList"></div>
-
-        </section>
-
-
-        <!-- =================================================
-             違反ログ
-        ================================================== -->
-
         <section data-screen="settings" class="panel">
 
             <h2>⚖️ 違反ログ</h2>
 
             <p class="sub">
-                未実行コマは違反ではありません。ここに記録するのは、
-                生活規律・誘惑対策などの違反だけです。
+                未実行や未着手は違反ではありません。ここに記録するのは、生活規律・誘惑対策などの違反だけです。
             </p>
 
             <select id="violationLevel">
@@ -1293,169 +1264,11 @@
         </section>
 
 
-        <!-- =================================================
-             週次レビュー
-        ================================================== -->
-
-        <section data-screen="week" class="panel">
-
-            <h2>📅 週次レビュー</h2>
-
-            <div id="weeklyReviewNoticeLarge" class="weekly-notice"></div>
-
-            <div id="weeklyKomaReport" class="summary-box"></div>
-
-            <textarea id="weeklyReviewText" rows="8" placeholder="今週の振り返り・改善点など"></textarea>
-
-            <div class="btn-row">
-                <button id="weeklyReviewSaveBtn" class="primary small">💾 保存</button>
-                <button id="weeklyReviewCancelEditBtn" class="ghost small" style="display:none;">編集をやめる</button>
-            </div>
-
-            <p id="weeklyReviewSaveStatus" class="save-status"></p>
-
-            <h3>過去のレビュー</h3>
-
-            <div id="weeklyReviewList"></div>
-
-        </section>
-
-
-        <!-- =================================================
-             テスト・提出物／教材／学習以外の予定
-        ================================================== -->
-
-        <section data-screen="schedule" class="panel">
-
-            <h2>📅 テスト・提出物</h2>
-
-            <div id="examList"></div>
-
-            <button id="addExamBtn">＋追加</button>
-
-        </section>
-
-
-        <section data-screen="study" class="panel">
-
-            <h2>📚 教材</h2>
-
-            <div id="materialList"></div>
-
-            <button id="addMaterialBtn">＋教材追加</button>
-
-        </section>
-
-
-        <section data-screen="schedule" class="panel">
-
-            <h2>📅 学習以外の予定</h2>
-
-            <div id="otherScheduleList"></div>
-
-            <button id="addOtherScheduleBtn">＋予定を追加</button>
-
-        </section>
-
-
-        <!-- =================================================
-             質問メモ
-        ================================================== -->
-
-        <section data-screen="study" class="panel">
-
-            <h2>❓ 質問・確認事項メモ</h2>
-
-            <select id="questionTarget">
-                <option value="">相手を選択</option>
-                <option value="Claude">Claude</option>
-                <option value="Gemini">Gemini</option>
-                <option value="ChatGPT">ChatGPT</option>
-                <option value="Theta Wave">Theta Wave</option>
-                <option value="先生">先生</option>
-            </select>
-
-            <select id="questionCategory">
-                <option value="">内容を選択</option>
-                <option value="進路">進路</option>
-                <option value="学習">学習</option>
-                <option value="部活">部活</option>
-                <option value="委員会">委員会</option>
-            </select>
-
-            <input type="text" id="questionText" placeholder="聞きたいことを入力">
-
-            <button id="addQuestionBtn">＋追加</button>
-
-            <div id="questionList"></div>
-
-        </section>
-
-
-        <!-- =================================================
-             ＋ やる気を高める機能
-        ================================================== -->
-
-        <section class="panel panel-main" data-screen="growth" id="growthPanel">
-
-            <h2>🌱 成長</h2>
-
-            <p class="sub">
-                通常学習コマを完了するたびに、その教科の生き物が少しずつ育ちます。
-                学習しない日があっても枯れません。成長が止まるだけです。
-                種 → 芽 → 若葉 → 花 → 木 → 大木、の順で育ちます。
-            </p>
-
-            <div id="growthList" class="growth-list"></div>
-
-        </section>
-
-
-        <section class="panel panel-main" data-screen="map" id="mapPanel">
-
-            <h2>🗺️ 受験マップ</h2>
-
-            <p class="sub">
-                入試までの道のりを可視化します。実際の学習記録（完了コマ）と連動しています。
-            </p>
-
-            <label class="inline-label">
-                目標にする重要予定：
-                <select id="mapGoalSelect"></select>
-            </label>
-
-            <div id="mapBoard" class="map-board"></div>
-
-            <p id="mapSummary" class="sub"></p>
-
-        </section>
-
-
-        <section class="panel panel-main" data-screen="week" id="weeklyReportPanel">
-
-            <h2>📈 週次振り返り自動生成</h2>
-
-            <p class="sub">
-                今週のデータから、PATGS27が自動でまとめます。
-            </p>
-
-            <div class="btn-row">
-                <button id="generateWeeklyReportBtn" class="primary small">今週のレポートを作る</button>
-                <button id="copyReportToReviewBtn" class="ghost small">週次レビューに転記</button>
-            </div>
-
-            <div id="weeklyReportBox" class="summary-box"></div>
-
-        </section>
-
-
         <section class="panel" data-screen="settings" id="fxSettingsPanel">
 
             <h2>🔔 演出</h2>
 
-            <p class="sub">
-                記録した時などに、軽い音とアニメーションでお知らせします。重くしすぎない範囲です。
-            </p>
+            <p class="sub">記録した時などに、軽い音とアニメーションでお知らせします。</p>
 
             <label class="check-label-row">
                 <input type="checkbox" id="fxSoundToggle">
@@ -1470,47 +1283,18 @@
         </section>
 
 
-        <section class="panel panel-main" data-screen="achievements" id="achievementsPanel">
-
-            <h2>🏆 実績</h2>
-
-            <p class="sub">
-                特定の学習実績を達成すると、バッジが増えていきます。一度獲得したバッジは残ります。
-                バッジ集め自体が目的ではないので、気楽に眺めてください。
-            </p>
-
-            <h3>獲得済み</h3>
-            <div id="badgeGridUnlocked" class="badge-grid"></div>
-
-            <h3>未獲得</h3>
-            <div id="badgeGridLocked" class="badge-grid"></div>
-
-        </section>
-
-
-        <!-- =================================================
-             予約不足の段階的介入・設定
-        ================================================== -->
-
         <section data-screen="settings" class="panel">
 
-            <h2>⏰ 予約不足の段階的介入</h2>
+            <h2>⏰ 予約不足の段階的介入（旧コマ予約用）</h2>
 
             <p class="sub">
-                その日の予約が無いまま時間が過ぎると、段階的に警戒レベルが上がります。
-                前日の警告 → 当日の警戒 → 強制介入画面 → 重大事象（Gemini判定待ち）の順です。
-                予約が入れば、次に開いたときに自動で通常状態へ戻ります。
-                Geminiへの自動送信は行いません（状態遷移のみです）。
+                旧コマ予約を使っている間だけ働く仕組みです。その日の予約が無いまま時間が過ぎると、
+                段階的に警戒レベルが上がります。Geminiへの自動送信は行いません。
             </p>
 
             <div id="interventionDayTypeSettings"></div>
 
             <h3>特別な日の登録（祝日・休校日／長期休暇）</h3>
-
-            <p class="sub">
-                期間を指定して「祝日・休校日」「長期休暇」を登録できます。指定のない日は、
-                土日を「土休日」、それ以外を「平日」として自動判定します。
-            </p>
 
             <div class="form-grid">
 
@@ -1540,22 +1324,14 @@
         </section>
 
 
-        <!-- =================================================
-             通知設定
-        ================================================== -->
-
         <section data-screen="settings" class="panel">
 
             <h2>🔔 通知設定</h2>
 
             <p class="sub">
-                届く通知は4種類です。予約の5分前、予約の開始時刻、未実行になった時（いずれも予約の内容つき）、
-                そして毎時00分（6:00〜23:00）の学習確認。土曜8:00には週次レビューの通知が届きます。
-            </p>
-
-            <p class="sub">
-                ブラウザでこのページを開いている間だけ届きます。閉じている間は届きません。
-                https で公開されているサイト（Firebase Hostingなど）で開いている必要があります。
+                ブラウザでこのページを開いている間だけ届きます。毎時00分（6:00〜23:00）の学習確認、
+                土曜8:00の週次レビュー、旧コマ予約を使っている場合は予約の通知が届きます。
+                https で公開されているサイトで開いている必要があります。
             </p>
 
             <button id="enableNotificationBtn">🔔 通知を許可する</button>
@@ -1565,17 +1341,13 @@
         </section>
 
 
-        <!-- =================================================
-             バックアップ
-        ================================================== -->
-
         <section data-screen="settings" class="panel">
 
             <h2>💾 データのバックアップ</h2>
 
             <p class="sub">
                 全データをファイルに書き出したり、書き出したファイルから復元したりできます。
-                機種変更やブラウザのデータ消去に備えて、定期的に書き出しておくのがおすすめです。
+                定期的に書き出しておくのがおすすめです。
             </p>
 
             <button id="exportDataBtn">⬇️ データを書き出す</button>
@@ -1588,10 +1360,6 @@
 
         </section>
 
-
-        <!-- =================================================
-             PATGS27憲法
-        ================================================== -->
 
         <section data-screen="settings" class="panel panel-law">
 
@@ -1732,10 +1500,6 @@
         </section>
 
 
-        <!-- =================================================
-             PATGS代理ローテーション
-        ================================================== -->
-
         <section data-screen="settings" class="panel">
 
             <h2>🔄 PATGS代理ローテーション</h2>
@@ -1757,28 +1521,17 @@
         </section>
 
 
-        <!-- =================================================
-             受験リンク集
-        ================================================== -->
-
         <section data-screen="settings" class="panel">
 
             <h2>🔗 受験リンク集</h2>
 
             <ul class="link-list">
-
                 <li><a href="https://www.pen-kanagawa.ed.jp/kohoku-h/" target="_blank" rel="noopener">港北高校</a></li>
-
                 <li><a href="https://www.edu.city.yokohama.jp/sch/hs/higashi/index.html" target="_blank" rel="noopener">東高校</a></li>
-
                 <li><a href="https://www.pen-kanagawa.ed.jp/tsurumi-h/" target="_blank" rel="noopener">鶴見高校</a></li>
-
                 <li><a href="https://www.tsurumi-fuzoku.ed.jp/" target="_blank" rel="noopener">鶴見大学附属高校</a></li>
-
                 <li><a href="https://www.soei.ed.jp/" target="_blank" rel="noopener">創英高校</a></li>
-
                 <li><a href="https://www.pref.kanagawa.jp/docs/dc4/" target="_blank" rel="noopener">神奈川県教育委員会</a></li>
-
             </ul>
 
         </section>
@@ -1786,14 +1539,12 @@
     </div>
 
 
-    <!-- =====================================================
-         JavaScript
-    ====================================================== -->
+    <!-- JavaScript -->
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.5.141/pdf.min.js"></script>
-    <script src="js/patgs27-storage-guard.js?v=20260926a"></script>
-    <script src="js/script.js?v=20260923a"></script>
-    <script type="module" src="js/firebase.js?v=20260923a"></script>
+    <script src="js/patgs27-storage-guard.js?v=20261005a"></script>
+    <script src="js/script.js?v=20261005a"></script>
+    <script type="module" src="js/firebase.js?v=20261005a"></script>
 
 </body>
 
