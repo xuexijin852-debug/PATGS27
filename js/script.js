@@ -6581,6 +6581,10 @@ const SCREEN_TITLES = {
     map: "🗺️ 受験マップ",
     roadmap: "🛤 ロードマップ作成",
     aichat: "🤖 AI学習アシスタント",
+    aichatlist: "📂 AI会話一覧",
+    aiknowledge: "🧠 AI知識ベース",
+    weeklyplan: "🗓 週間時間割",
+    weeklyplanreview: "📝 週次レビュー（時間割）",
     week: "📊 今週",
     unresolved: "❓ 未解決",
     achievements: "🏆 実績",
@@ -6593,6 +6597,9 @@ const HOME_CARDS = [
     { screen: "study", icon: "📚", label: "学習" },
     { screen: "growth", icon: "🌱", label: "成長" },
     { screen: "map", icon: "🗺️", label: "受験マップ" },
+    { screen: "roadmap", icon: "🛤", label: "ロードマップ作成" },
+    { screen: "aichat", icon: "🤖", label: "AI相談" },
+    { screen: "weeklyplan", icon: "🗓", label: "週間時間割" },
     { screen: "week", icon: "📊", label: "今週" },
     { screen: "unresolved", icon: "❓", label: "未解決" },
     { screen: "achievements", icon: "🏆", label: "実績" },
@@ -6675,6 +6682,7 @@ function renderFabMenu() {
         { screen: "map", icon: "🗺️", label: "受験マップ" },
         { screen: "roadmap", icon: "🛤", label: "ロードマップ作成" },
         { screen: "aichat", icon: "🤖", label: "AI相談" },
+        { screen: "aiknowledge", icon: "🧠", label: "AI知識ベース" },
         { screen: "week", icon: "📊", label: "今週" },
         { screen: "achievements", icon: "🏆", label: "実績" },
         { screen: "settings", icon: "🔔", label: "演出設定" }
@@ -7367,28 +7375,335 @@ function setupRoadmap() {
 /* =========================================================
    AI学習アシスタント（Cloudflare Workers AI連携チャット）
    第五次改革の追加機能。既存機能・データには一切触れない。
+
+   内訳：
+   ・会話管理（新規作成／一覧／名前変更／削除／保存）
+   ・知識ベース（登録／検索／編集／削除、AIへの参照）
+   ・添付ファイル（テキスト／PDF／画像）
    ========================================================= */
 
 const AICHAT_API_URL = "https://patgs27-ai.xuexijin852.workers.dev/chat";
+const AICHAT_VISION_API_URL = "https://patgs27-ai.xuexijin852.workers.dev/vision";
 
-let aichatHistory = loadJSON("patgs27_aichat_history", []);
+const AICHAT_MAX_SAVED = 20;        // 保存できる会話数の上限
+const AICHAT_HISTORY_WINDOW = 10;   // AIに渡す直近メッセージ数
+const AICHAT_MAX_ATTACH_BYTES = 5 * 1024 * 1024; // 添付ファイルサイズ上限（5MB）
+const AICHAT_MAX_ATTACH_TEXT = 20000; // 添付テキストの文字数上限
+
+const PDFJS_WORKER_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.5.141/pdf.worker.min.js";
+
+let aichatConversations = loadJSON("patgs27_aichat_conversations", {});
+let aichatActiveId = loadJSON("patgs27_aichat_active_id", null);
 let aichatSending = false;
+let aichatPendingFile = null; // { kind: "text"|"image", name, text?, dataUrl? }
 
-function saveAichatHistory() {
-    saveJSON("patgs27_aichat_history", aichatHistory);
+/* ---- 会話データの保存 ---- */
+
+function saveAichatConversations() {
+    saveJSON("patgs27_aichat_conversations", aichatConversations);
+}
+
+function saveAichatActiveId() {
+    saveJSON("patgs27_aichat_active_id", aichatActiveId);
+}
+
+function makeAichatConvId() {
+    return "aichat_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+}
+
+/* ---- 既存データの移行（旧：単一履歴 → 新：会話単位） ---- */
+
+function migrateOldAichatHistoryIfNeeded() {
+
+    if (Object.keys(aichatConversations).length > 0) {
+        return;
+    }
+
+    const old = loadJSON("patgs27_aichat_history", null);
+
+    if (!Array.isArray(old) || old.length === 0) {
+        return;
+    }
+
+    const id = makeAichatConvId();
+
+    aichatConversations[id] = {
+        title: "これまでの会話",
+        messages: old,
+        createdAt: nowText(),
+        updatedAt: nowText(),
+        saved: true // 既存データなので保存済み扱いにし、上限チェックで消えないようにする
+    };
+
+    aichatActiveId = id;
+    saveAichatConversations();
+    saveAichatActiveId();
+}
+
+function discardUnsavedActiveConversationIfAny() {
+
+    const current = aichatConversations[aichatActiveId];
+
+    if (current && !current.saved) {
+        delete aichatConversations[aichatActiveId];
+    }
+}
+
+function ensureActiveAichatConversation() {
+
+    migrateOldAichatHistoryIfNeeded();
+
+    if (aichatActiveId && aichatConversations[aichatActiveId]) {
+        return;
+    }
+
+    const id = makeAichatConvId();
+
+    aichatConversations[id] = {
+        title: "新しい会話",
+        messages: [],
+        createdAt: nowText(),
+        updatedAt: nowText(),
+        saved: false
+    };
+
+    aichatActiveId = id;
+    saveAichatConversations();
+    saveAichatActiveId();
+}
+
+function createNewAichatConversation() {
+
+    discardUnsavedActiveConversationIfAny();
+
+    const id = makeAichatConvId();
+
+    aichatConversations[id] = {
+        title: "新しい会話",
+        messages: [],
+        createdAt: nowText(),
+        updatedAt: nowText(),
+        saved: false
+    };
+
+    aichatActiveId = id;
+    saveAichatConversations();
+    saveAichatActiveId();
+
+    renderAichatLog();
+    renderAichatToolbar();
+}
+
+function switchAichatConversation(id) {
+
+    if (!aichatConversations[id]) {
+        return;
+    }
+
+    if (id !== aichatActiveId) {
+        discardUnsavedActiveConversationIfAny();
+    }
+
+    aichatActiveId = id;
+    saveAichatActiveId();
+
+    renderAichatLog();
+    renderAichatToolbar();
+    showScreen("aichat");
+}
+
+function markActiveAichatConversationSaved() {
+
+    const current = aichatConversations[aichatActiveId];
+
+    if (!current || current.saved) {
+        return;
+    }
+
+    const savedCount = Object.values(aichatConversations).filter(function (c) {
+        return c.saved;
+    }).length;
+
+    if (savedCount >= AICHAT_MAX_SAVED) {
+        alert("保存できる会話は" + AICHAT_MAX_SAVED + "件までです。会話一覧から不要な会話を削除してから保存してください。");
+        return;
+    }
+
+    current.saved = true;
+    saveAichatConversations();
+    renderAichatToolbar();
+    renderAichatConversationList();
+}
+
+function renameAichatConversation(id) {
+
+    const current = aichatConversations[id];
+
+    if (!current) {
+        return;
+    }
+
+    const name = prompt("会話の名前を入力してください", current.title || "");
+
+    if (name === null) {
+        return;
+    }
+
+    const trimmed = name.trim();
+
+    if (!trimmed) {
+        return;
+    }
+
+    current.title = trimmed;
+    saveAichatConversations();
+    renderAichatToolbar();
+    renderAichatConversationList();
+}
+
+function deleteAichatConversation(id) {
+
+    if (!confirm("この会話を削除しますか？元に戻せません。")) {
+        return;
+    }
+
+    delete aichatConversations[id];
+    saveAichatConversations();
+
+    if (aichatActiveId === id) {
+        aichatActiveId = null;
+        ensureActiveAichatConversation();
+    }
+
+    saveAichatActiveId();
+    renderAichatConversationList();
+    renderAichatLog();
+    renderAichatToolbar();
+}
+
+/* ---- 会話一覧画面 ---- */
+
+function renderAichatConversationList() {
+
+    const list = $("aichatConvList");
+
+    if (!list) {
+        return;
+    }
+
+    list.innerHTML = "";
+
+    const entries = Object.keys(aichatConversations).map(function (id) {
+        return Object.assign({ id: id }, aichatConversations[id]);
+    });
+
+    entries.sort(function (a, b) {
+        return (b.updatedAt || "").localeCompare(a.updatedAt || "");
+    });
+
+    if (entries.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "empty-note";
+        empty.textContent = "会話がありません。";
+        list.appendChild(empty);
+        return;
+    }
+
+    entries.forEach(function (entry) {
+
+        const row = document.createElement("div");
+        row.className = "koma" + (entry.id === aichatActiveId ? " done" : "");
+
+        const head = document.createElement("div");
+        head.className = "koma-head";
+
+        const tag = document.createElement("span");
+        tag.className = "koma-tag";
+        tag.textContent = entry.saved ? "保存済み" : "未保存";
+
+        const title = document.createElement("span");
+        title.className = "koma-subject";
+        title.textContent = entry.title || "（無題）";
+
+        head.append(tag, title);
+        row.appendChild(head);
+
+        const lastMessage = (entry.messages && entry.messages.length > 0)
+            ? entry.messages[entry.messages.length - 1]
+            : null;
+
+        if (lastMessage) {
+            const preview = document.createElement("p");
+            preview.className = "koma-detail";
+            preview.textContent = (lastMessage.text || "").slice(0, 60);
+            row.appendChild(preview);
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "koma-actions";
+
+        const openButton = makeButton("開く", "primary");
+        openButton.addEventListener("click", function () {
+            switchAichatConversation(entry.id);
+        });
+
+        const renameButton = makeButton("名前変更", "ghost");
+        renameButton.addEventListener("click", function () {
+            renameAichatConversation(entry.id);
+        });
+
+        actions.append(openButton, renameButton);
+
+        if (entry.saved) {
+            const deleteButton = makeButton("削除", "ghost");
+            deleteButton.addEventListener("click", function () {
+                deleteAichatConversation(entry.id);
+            });
+            actions.appendChild(deleteButton);
+        }
+
+        row.appendChild(actions);
+        list.appendChild(row);
+    });
+}
+
+/* ---- チャット画面の描画 ---- */
+
+function renderAichatToolbar() {
+
+    const conv = aichatConversations[aichatActiveId];
+
+    if (!conv) {
+        return;
+    }
+
+    if ($("aichatConvTitle")) {
+        $("aichatConvTitle").textContent = conv.title || "新しい会話";
+    }
+
+    if ($("aichatSaveBtn")) {
+        if (conv.saved) {
+            $("aichatSaveBtn").textContent = "✓ 保存済み";
+            $("aichatSaveBtn").disabled = true;
+        } else {
+            $("aichatSaveBtn").textContent = "💾 この会話を保存";
+            $("aichatSaveBtn").disabled = false;
+        }
+    }
 }
 
 function renderAichatLog() {
 
     const log = $("aichatLog");
+    const conv = aichatConversations[aichatActiveId];
 
-    if (!log) {
+    if (!log || !conv) {
         return;
     }
 
     log.innerHTML = "";
 
-    if (aichatHistory.length === 0) {
+    if (conv.messages.length === 0) {
         const empty = document.createElement("p");
         empty.className = "empty-note";
         empty.textContent = "まだ会話はありません。下の欄から質問してみましょう。";
@@ -7396,7 +7711,7 @@ function renderAichatLog() {
         return;
     }
 
-    aichatHistory.forEach(function (entry) {
+    conv.messages.forEach(function (entry) {
 
         const bubble = document.createElement("div");
         bubble.className = "aichat-bubble " + (entry.role || "ai");
@@ -7415,6 +7730,315 @@ function renderAichatLog() {
     log.scrollTop = log.scrollHeight;
 }
 
+/* ---- 知識ベース（単語・英文・知識の登録／検索／編集／削除） ---- */
+
+let aiKnowledgeItems = loadJSON("patgs27_ai_knowledge", []);
+
+function saveAiKnowledgeItems() {
+    saveJSON("patgs27_ai_knowledge", aiKnowledgeItems);
+}
+
+function makeKnowledgeId() {
+    return "knowledge_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+}
+
+function matchRelevantKnowledge(message) {
+
+    if (!message) {
+        return [];
+    }
+
+    const lower = message.toLowerCase();
+
+    return aiKnowledgeItems
+        .filter(function (item) {
+            return item.term && lower.indexOf(item.term.toLowerCase()) !== -1;
+        })
+        .slice(0, 5)
+        .map(function (item) {
+            return { term: item.term, content: item.content };
+        });
+}
+
+function renderAiKnowledgeList() {
+
+    const list = $("aiKnowledgeList");
+
+    if (!list) {
+        return;
+    }
+
+    list.innerHTML = "";
+
+    const query = ($("aiKnowledgeSearch")?.value || "").trim().toLowerCase();
+
+    const items = aiKnowledgeItems.filter(function (item) {
+        if (!query) {
+            return true;
+        }
+        return (item.term || "").toLowerCase().indexOf(query) !== -1 ||
+               (item.content || "").toLowerCase().indexOf(query) !== -1;
+    });
+
+    if (items.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "empty-note";
+        empty.textContent = aiKnowledgeItems.length === 0
+            ? "まだ知識が登録されていません。"
+            : "検索に一致する項目がありません。";
+        list.appendChild(empty);
+        return;
+    }
+
+    items.forEach(function (item) {
+
+        const row = document.createElement("div");
+        row.className = "koma";
+
+        const head = document.createElement("div");
+        head.className = "koma-head";
+
+        const term = document.createElement("span");
+        term.className = "koma-tag";
+        term.textContent = item.term;
+
+        head.appendChild(term);
+        row.appendChild(head);
+
+        const content = document.createElement("p");
+        content.className = "koma-detail";
+        content.textContent = item.content;
+        row.appendChild(content);
+
+        const actions = document.createElement("div");
+        actions.className = "koma-actions";
+
+        const editButton = makeButton("編集", "ghost");
+        editButton.addEventListener("click", function () {
+
+            const newTerm = prompt("用語", item.term);
+            if (newTerm === null) {
+                return;
+            }
+
+            const newContent = prompt("説明", item.content);
+            if (newContent === null) {
+                return;
+            }
+
+            item.term = newTerm.trim() || item.term;
+            item.content = newContent.trim() || item.content;
+            saveAiKnowledgeItems();
+            renderAiKnowledgeList();
+        });
+
+        const deleteButton = makeButton("削除", "ghost");
+        deleteButton.addEventListener("click", function () {
+
+            if (!confirm("この知識を削除しますか？")) {
+                return;
+            }
+
+            aiKnowledgeItems = aiKnowledgeItems.filter(function (entry) {
+                return entry.id !== item.id;
+            });
+            saveAiKnowledgeItems();
+            renderAiKnowledgeList();
+        });
+
+        actions.append(editButton, deleteButton);
+        row.appendChild(actions);
+
+        list.appendChild(row);
+    });
+}
+
+function setupAiKnowledge() {
+
+    $("aiKnowledgeAddBtn")?.addEventListener("click", function () {
+
+        const term = $("aiKnowledgeTermInput")?.value.trim() || "";
+        const content = $("aiKnowledgeContentInput")?.value.trim() || "";
+
+        if (!term || !content) {
+            alert("用語と説明の両方を入力してください。");
+            return;
+        }
+
+        aiKnowledgeItems.push({
+            id: makeKnowledgeId(),
+            term: term,
+            content: content,
+            createdAt: nowText()
+        });
+
+        saveAiKnowledgeItems();
+
+        if ($("aiKnowledgeTermInput")) { $("aiKnowledgeTermInput").value = ""; }
+        if ($("aiKnowledgeContentInput")) { $("aiKnowledgeContentInput").value = ""; }
+
+        renderAiKnowledgeList();
+    });
+
+    $("aiKnowledgeSearch")?.addEventListener("input", function () {
+        renderAiKnowledgeList();
+    });
+
+    renderAiKnowledgeList();
+}
+
+/* ---- 添付ファイル（テキスト／PDF／画像） ---- */
+
+function readFileAsText(file) {
+    return new Promise(function (resolve, reject) {
+        const reader = new FileReader();
+        reader.onload = function () { resolve(reader.result); };
+        reader.onerror = reject;
+        reader.readAsText(file);
+    });
+}
+
+function readFileAsDataURL(file) {
+    return new Promise(function (resolve, reject) {
+        const reader = new FileReader();
+        reader.onload = function () { resolve(reader.result); };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+async function extractPdfText(file) {
+
+    if (typeof pdfjsLib === "undefined") {
+        throw new Error("PDF読み込みライブラリが利用できません");
+    }
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    let text = "";
+    const maxPages = Math.min(pdf.numPages, 20); // ページ数上限（負荷・容量対策）
+
+    for (let i = 1; i <= maxPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map(function (item) { return item.str; }).join(" ") + "\n";
+    }
+
+    return text;
+}
+
+function clearAichatPendingFile() {
+    aichatPendingFile = null;
+    if ($("aichatFileInput")) { $("aichatFileInput").value = ""; }
+    if ($("aichatAttachPreview")) { $("aichatAttachPreview").textContent = ""; }
+}
+
+async function handleAichatFileSelected(e) {
+
+    const file = e.target.files && e.target.files[0];
+
+    if (!file) {
+        return;
+    }
+
+    if (file.size > AICHAT_MAX_ATTACH_BYTES) {
+        alert("ファイルサイズが大きすぎます（5MBまで）。");
+        clearAichatPendingFile();
+        return;
+    }
+
+    if ($("aichatAttachPreview")) {
+        $("aichatAttachPreview").textContent = "読み込み中…：" + file.name;
+    }
+
+    try {
+
+        if (file.type === "text/plain") {
+
+            const text = await readFileAsText(file);
+            aichatPendingFile = { kind: "text", name: file.name, text: text.slice(0, AICHAT_MAX_ATTACH_TEXT) };
+
+        } else if (file.type === "application/pdf") {
+
+            const text = await extractPdfText(file);
+            aichatPendingFile = { kind: "text", name: file.name, text: text.slice(0, AICHAT_MAX_ATTACH_TEXT) };
+
+        } else if (file.type.indexOf("image/") === 0) {
+
+            const dataUrl = await readFileAsDataURL(file);
+            aichatPendingFile = { kind: "image", name: file.name, dataUrl: dataUrl };
+
+        } else {
+
+            alert("対応していないファイル形式です（txt・pdf・画像のみ）。");
+            aichatPendingFile = null;
+        }
+
+    } catch (error) {
+        console.error("ファイル読み込みエラー:", error);
+        alert("ファイルの読み込みに失敗しました。");
+        aichatPendingFile = null;
+    }
+
+    if ($("aichatAttachPreview")) {
+        $("aichatAttachPreview").textContent = aichatPendingFile
+            ? "📎 " + aichatPendingFile.name + "（送信時に利用されます）"
+            : "";
+    }
+}
+
+/* ---- API呼び出し ---- */
+
+async function callAichatChatApi(message, conv) {
+
+    const recentHistory = conv.messages
+        .filter(function (m) { return m.role === "user" || m.role === "ai"; })
+        .slice(-AICHAT_HISTORY_WINDOW)
+        .map(function (m) {
+            return { role: m.role === "user" ? "user" : "assistant", content: m.text };
+        });
+
+    const knowledge = matchRelevantKnowledge(message);
+
+    const response = await fetch(AICHAT_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: message, messages: recentHistory, knowledge: knowledge })
+    });
+
+    if (!response.ok) {
+        throw new Error("HTTP " + response.status);
+    }
+
+    const data = await response.json();
+
+    return (data && typeof data.reply === "string" && data.reply.trim())
+        ? data.reply.trim()
+        : "（AIから空の応答が返ってきました）";
+}
+
+async function callAichatVisionApi(dataUrl, caption) {
+
+    const response = await fetch(AICHAT_VISION_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: dataUrl, message: caption })
+    });
+
+    if (!response.ok) {
+        throw new Error("HTTP " + response.status);
+    }
+
+    const data = await response.json();
+
+    return (data && typeof data.reply === "string" && data.reply.trim())
+        ? data.reply.trim()
+        : "（AIから空の応答が返ってきました）";
+}
+
 async function sendAichatMessage() {
 
     if (aichatSending) {
@@ -7422,19 +8046,36 @@ async function sendAichatMessage() {
     }
 
     const input = $("aichatInput");
-    const message = input?.value.trim() || "";
+    const typed = input?.value.trim() || "";
+    const pendingFile = aichatPendingFile;
 
-    if (!message) {
+    if (!typed && !pendingFile) {
         return;
     }
 
-    aichatHistory.push({ role: "user", text: message, at: clockOnly(nowText()) });
-    saveAichatHistory();
+    ensureActiveAichatConversation();
+    const conv = aichatConversations[aichatActiveId];
+
+    let displayText = typed;
+    if (pendingFile) {
+        displayText = (typed ? typed + "\n" : "") + "📎 添付：" + pendingFile.name;
+    }
+
+    conv.messages.push({ role: "user", text: displayText, at: clockOnly(nowText()) });
+    conv.updatedAt = nowText();
+
+    if (conv.title === "新しい会話" && typed) {
+        conv.title = typed.slice(0, 20);
+    }
+
+    saveAichatConversations();
     renderAichatLog();
+    renderAichatToolbar();
 
     if (input) {
         input.value = "";
     }
+    clearAichatPendingFile();
 
     aichatSending = true;
 
@@ -7447,23 +8088,25 @@ async function sendAichatMessage() {
 
     try {
 
-        const response = await fetch(AICHAT_API_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: message })
-        });
+        let reply;
 
-        if (!response.ok) {
-            throw new Error("HTTP " + response.status);
+        if (pendingFile && pendingFile.kind === "image") {
+            reply = await callAichatVisionApi(pendingFile.dataUrl, typed);
+        } else {
+
+            let messageForApi = typed;
+
+            if (pendingFile && pendingFile.kind === "text") {
+                messageForApi = (typed ? typed + "\n\n" : "") +
+                    "[添付ファイル「" + pendingFile.name + "」の内容]\n" + pendingFile.text;
+            }
+
+            reply = await callAichatChatApi(messageForApi, conv);
         }
 
-        const data = await response.json();
-        const reply = (data && typeof data.reply === "string" && data.reply.trim())
-            ? data.reply.trim()
-            : "（AIから空の応答が返ってきました）";
-
-        aichatHistory.push({ role: "ai", text: reply, at: clockOnly(nowText()) });
-        saveAichatHistory();
+        conv.messages.push({ role: "ai", text: reply, at: clockOnly(nowText()) });
+        conv.updatedAt = nowText();
+        saveAichatConversations();
         renderAichatLog();
 
         if ($("aichatStatus")) {
@@ -7473,12 +8116,13 @@ async function sendAichatMessage() {
     } catch (error) {
         console.error("AIチャットの通信に失敗しました:", error);
 
-        aichatHistory.push({
+        conv.messages.push({
             role: "error",
             text: "通信エラー：AIに接続できませんでした。しばらくしてからもう一度試してください。",
             at: clockOnly(nowText())
         });
-        saveAichatHistory();
+        conv.updatedAt = nowText();
+        saveAichatConversations();
         renderAichatLog();
 
         if ($("aichatStatus")) {
@@ -7495,6 +8139,8 @@ async function sendAichatMessage() {
 
 function setupAichat() {
 
+    ensureActiveAichatConversation();
+
     $("aichatSendBtn")?.addEventListener("click", function () {
         sendAichatMessage();
     });
@@ -7506,7 +8152,565 @@ function setupAichat() {
         }
     });
 
+    $("aichatNewBtn")?.addEventListener("click", function () {
+        createNewAichatConversation();
+    });
+
+    $("aichatSaveBtn")?.addEventListener("click", function () {
+        markActiveAichatConversationSaved();
+    });
+
+    $("aichatListBtn")?.addEventListener("click", function () {
+        renderAichatConversationList();
+        showScreen("aichatlist");
+    });
+
+    $("aichatRenameBtn")?.addEventListener("click", function () {
+        renameAichatConversation(aichatActiveId);
+    });
+
+    $("aichatAttachBtn")?.addEventListener("click", function () {
+        $("aichatFileInput")?.click();
+    });
+
+    $("aichatFileInput")?.addEventListener("change", handleAichatFileSelected);
+
+    $("aichatAttachCancelBtn")?.addEventListener("click", function () {
+        clearAichatPendingFile();
+    });
+
     renderAichatLog();
+    renderAichatToolbar();
+}
+
+
+/* =========================================================
+   週間時間割・学習記録（第七次改革・最小構成）
+   ※ 既存の「30分固定枠コマ制度」（NORMAL_SLOTS/EXAM_SLOTS、
+     dayTypeOf、予約・実行・完了の一連の関数）には一切触れない。
+     既存の「週次レビュー」（patgs27_weekly_reviews、
+     weeklyReviews配列）とも別データ・別画面として併存させる。
+   ========================================================= */
+
+/* 固定祝日リスト（土日とあわせて「休日」扱いにする）
+   出典：2026年＝国立天文台暦計算室、2027年＝内閣府発表分
+   ★年が変わったら、ここに新しい年の祝日を追記する必要がある★ */
+const PATGS_FIXED_HOLIDAYS = [
+    "2026-01-01", "2026-01-12", "2026-02-11", "2026-02-23", "2026-03-20",
+    "2026-04-29", "2026-05-03", "2026-05-04", "2026-05-05", "2026-05-06",
+    "2026-07-20", "2026-08-11", "2026-09-21", "2026-09-22", "2026-09-23",
+    "2026-10-12", "2026-11-03", "2026-11-23",
+    "2027-01-01", "2027-01-11", "2027-02-11", "2027-02-23", "2027-03-21",
+    "2027-03-22", "2027-04-29", "2027-05-03", "2027-05-04", "2027-05-05",
+    "2027-07-19", "2027-08-11", "2027-09-20", "2027-09-23", "2027-10-11",
+    "2027-11-03", "2027-11-23"
+];
+
+const WEEKLYPLAN_REASON_CATEGORIES = ["開始困難", "体調", "部活動", "急用", "意図的な予定変更", "その他"];
+const WEEKLYPLAN_NOT_STARTED_LIMIT = 3;
+const WEEKLYPLAN_CHANGE_LIMIT = 10;
+const WEEKLYPLAN_WEEKDAY_STUDY_MIN = 35;
+const WEEKLYPLAN_WEEKDAY_BREAK_MIN = 5;
+const WEEKLYPLAN_HOLIDAY_STUDY_MIN = 50;
+const WEEKLYPLAN_HOLIDAY_BREAK_MIN = 10;
+const WEEKLYPLAN_DAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
+
+function patgsIsHolidayDate(dateKey) {
+    const day = new Date(dateKey + "T00:00:00").getDay();
+    if (day === 0 || day === 6) {
+        return true;
+    }
+    return PATGS_FIXED_HOLIDAYS.indexOf(dateKey) !== -1;
+}
+
+function weeklyPlanDayType(dateKey) {
+    return patgsIsHolidayDate(dateKey) ? "holiday" : "weekday";
+}
+
+function weeklyPlanDurations(dateKey) {
+    return weeklyPlanDayType(dateKey) === "holiday"
+        ? { study: WEEKLYPLAN_HOLIDAY_STUDY_MIN, rest: WEEKLYPLAN_HOLIDAY_BREAK_MIN }
+        : { study: WEEKLYPLAN_WEEKDAY_STUDY_MIN, rest: WEEKLYPLAN_WEEKDAY_BREAK_MIN };
+}
+
+/* ---- データ ---- */
+
+let weeklyPlanTimetables = loadJSON("patgs27_weeklyplan_timetable", {});
+let weeklyPlanRecords = loadJSON("patgs27_weeklyplan_records", {});
+let weeklyPlanReviews = loadJSON("patgs27_weeklyplan_reviews", {});
+let weeklyPlanViewWeek = getWeekStartKey(todayKey());
+
+function saveWeeklyPlanTimetables() { saveJSON("patgs27_weeklyplan_timetable", weeklyPlanTimetables); }
+function saveWeeklyPlanRecords() { saveJSON("patgs27_weeklyplan_records", weeklyPlanRecords); }
+function saveWeeklyPlanReviews() { saveJSON("patgs27_weeklyplan_reviews", weeklyPlanReviews); }
+
+function makeWeeklyPlanSlotId() {
+    return "wp_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+}
+
+/* その週の時間割が無ければ、前週の内容（教科・課題・時間）を土台として複製する。
+   「空きコマ」指定は週ごとにリセットする（毎週引き継がない）。
+   ※この「前週を複製して土台にする」挙動は要件上の明記がなかったための仮の設計です。 */
+function getOrCreateWeeklyPlanWeek(weekStartKey) {
+
+    if (weeklyPlanTimetables[weekStartKey]) {
+        return weeklyPlanTimetables[weekStartKey];
+    }
+
+    const prevWeekKey = addDaysToKey(weekStartKey, -7);
+    const prev = weeklyPlanTimetables[prevWeekKey];
+
+    weeklyPlanTimetables[weekStartKey] = {
+        slots: prev
+            ? prev.slots.map(function (s) {
+                return {
+                    id: makeWeeklyPlanSlotId(),
+                    dayOfWeek: s.dayOfWeek,
+                    time: s.time,
+                    subject: s.subject,
+                    task: s.task,
+                    isEmpty: false,
+                    emptyReason: ""
+                };
+            })
+            : [],
+        createdAt: nowText(),
+        updatedAt: nowText()
+    };
+
+    saveWeeklyPlanTimetables();
+    return weeklyPlanTimetables[weekStartKey];
+}
+
+function addWeeklyPlanSlot(weekStartKey, dayOfWeek, time, subject, task) {
+    const week = getOrCreateWeeklyPlanWeek(weekStartKey);
+    week.slots.push({
+        id: makeWeeklyPlanSlotId(),
+        dayOfWeek: dayOfWeek,
+        time: time,
+        subject: subject,
+        task: task,
+        isEmpty: false,
+        emptyReason: ""
+    });
+    week.updatedAt = nowText();
+    saveWeeklyPlanTimetables();
+}
+
+function deleteWeeklyPlanSlot(weekStartKey, slotId) {
+    const week = weeklyPlanTimetables[weekStartKey];
+    if (!week) { return; }
+    week.slots = week.slots.filter(function (s) { return s.id !== slotId; });
+    week.updatedAt = nowText();
+    saveWeeklyPlanTimetables();
+}
+
+/* ---- 実施記録（開始・終了・未着手・予定変更） ---- */
+
+function getWeekRecordStore(weekStartKey) {
+    if (!weeklyPlanRecords[weekStartKey]) {
+        weeklyPlanRecords[weekStartKey] = {};
+    }
+    return weeklyPlanRecords[weekStartKey];
+}
+
+function recordWeeklyPlanStatus(weekStartKey, slotId, status, extra) {
+    const store = getWeekRecordStore(weekStartKey);
+    const prev = store[slotId] || {};
+    store[slotId] = Object.assign({}, prev, extra || {}, {
+        status: status,
+        recordedAt: nowText()
+    });
+    saveWeeklyPlanRecords();
+}
+
+function startWeeklyPlanSlot(weekStartKey, slotId) {
+    recordWeeklyPlanStatus(weekStartKey, slotId, "in_progress", {
+        startedAt: clockOnly(nowText())
+    });
+    renderWeeklyPlan();
+}
+
+function finishWeeklyPlanSlot(weekStartKey, slotId) {
+
+    const store = getWeekRecordStore(weekStartKey);
+    const prev = store[slotId] || {};
+
+    const actualContent = prompt("実際に行った内容を入力してください（空欄でも保存できます）", prev.actualContent || "");
+
+    if (actualContent === null) {
+        return;
+    }
+
+    recordWeeklyPlanStatus(weekStartKey, slotId, "done", {
+        startedAt: prev.startedAt || clockOnly(nowText()),
+        endedAt: clockOnly(nowText()),
+        actualContent: actualContent
+    });
+
+    renderWeeklyPlan();
+}
+
+function markWeeklyPlanNotStarted(weekStartKey, slotId) {
+
+    const categoryList = WEEKLYPLAN_REASON_CATEGORIES.join(" / ");
+    const reasonCategory = prompt("未着手の理由を選んでください（" + categoryList + "）", WEEKLYPLAN_REASON_CATEGORIES[0]);
+
+    if (reasonCategory === null) {
+        return;
+    }
+
+    const reasonDetail = prompt("補足（任意・短くてOK）", "") || "";
+    const makeupPlan = prompt("挽回の予定（いつ・何をするか／任意）", "") || "";
+
+    recordWeeklyPlanStatus(weekStartKey, slotId, "not_started", {
+        reasonCategory: reasonCategory.trim() || "その他",
+        reasonDetail: reasonDetail.trim(),
+        makeupPlan: makeupPlan.trim()
+    });
+
+    renderWeeklyPlan();
+}
+
+function markWeeklyPlanSlotEmpty(weekStartKey, slotId) {
+
+    const categoryList = WEEKLYPLAN_REASON_CATEGORIES.join(" / ");
+    const reasonCategory = prompt("空きコマにする理由を選んでください（" + categoryList + "）", WEEKLYPLAN_REASON_CATEGORIES[0]);
+
+    if (reasonCategory === null) {
+        return;
+    }
+
+    const reasonDetail = prompt("補足（任意・短くてOK）", "") || "";
+
+    const week = weeklyPlanTimetables[weekStartKey];
+    const slot = week && week.slots.find(function (s) { return s.id === slotId; });
+
+    if (slot) {
+        slot.isEmpty = true;
+        slot.emptyReason = reasonCategory.trim() + (reasonDetail.trim() ? "：" + reasonDetail.trim() : "");
+        week.updatedAt = nowText();
+        saveWeeklyPlanTimetables();
+    }
+
+    recordWeeklyPlanStatus(weekStartKey, slotId, "plan_changed", {
+        reasonCategory: reasonCategory.trim() || "その他",
+        reasonDetail: reasonDetail.trim()
+    });
+
+    renderWeeklyPlan();
+}
+
+/* ---- 回数の集計（保存された記録から毎回計算。別途カウンタは持たない） ---- */
+
+function weeklyPlanCounts(weekStartKey) {
+
+    const store = weeklyPlanRecords[weekStartKey] || {};
+    let notStarted = 0;
+    let changed = 0;
+
+    Object.values(store).forEach(function (r) {
+        if (r.status === "not_started") { notStarted++; }
+        if (r.status === "plan_changed") { changed++; }
+    });
+
+    return { notStarted: notStarted, changed: changed };
+}
+
+/* ---- 週次レビュー（第七次改革専用。既存の weeklyReviews とは別物） ---- */
+
+function getWeeklyPlanReview(weekStartKey) {
+    return weeklyPlanReviews[weekStartKey] || null;
+}
+
+function saveWeeklyPlanReviewEntry(weekStartKey, data) {
+    const prev = weeklyPlanReviews[weekStartKey] || {};
+    weeklyPlanReviews[weekStartKey] = Object.assign({}, prev, data, { updatedAt: nowText() });
+    saveWeeklyPlanReviews();
+}
+
+/* ---- 画面描画 ---- */
+
+function weeklyPlanWeekLabel(weekStartKey) {
+    const endKey = addDaysToKey(weekStartKey, 6);
+    return formatShortDate(weekStartKey) + "〜" + formatShortDate(endKey);
+}
+
+function renderWeeklyPlan() {
+
+    const list = $("weeklyPlanSlotList");
+    if (!list) { return; }
+
+    const weekKey = weeklyPlanViewWeek;
+    const week = getOrCreateWeeklyPlanWeek(weekKey);
+
+    if ($("weeklyPlanWeekLabel")) {
+        $("weeklyPlanWeekLabel").textContent = weeklyPlanWeekLabel(weekKey);
+    }
+
+    const counts = weeklyPlanCounts(weekKey);
+    const limitReached = counts.notStarted >= WEEKLYPLAN_NOT_STARTED_LIMIT ||
+                          counts.changed >= WEEKLYPLAN_CHANGE_LIMIT;
+
+    if ($("weeklyPlanCounts")) {
+        $("weeklyPlanCounts").textContent =
+            "未着手 " + counts.notStarted + "／" + WEEKLYPLAN_NOT_STARTED_LIMIT +
+            "　予定変更 " + counts.changed + "／" + WEEKLYPLAN_CHANGE_LIMIT;
+    }
+
+    if ($("weeklyPlanLimitNotice")) {
+        $("weeklyPlanLimitNotice").style.display = limitReached ? "block" : "none";
+    }
+
+    list.innerHTML = "";
+
+    const recordStore = weeklyPlanRecords[weekKey] || {};
+
+    const sortedSlots = week.slots.slice().sort(function (a, b) {
+        if (a.dayOfWeek !== b.dayOfWeek) { return a.dayOfWeek - b.dayOfWeek; }
+        return (a.time || "").localeCompare(b.time || "");
+    });
+
+    if (sortedSlots.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "empty-note";
+        empty.textContent = "この週の時間割はまだありません。下のフォームから追加してください。";
+        list.appendChild(empty);
+        return;
+    }
+
+    sortedSlots.forEach(function (slot) {
+
+        const dateKey = addDaysToKey(weekKey, slot.dayOfWeek);
+        const durations = weeklyPlanDurations(dateKey);
+        const record = recordStore[slot.id];
+        const status = slot.isEmpty ? "empty" : (record ? record.status : "planned");
+
+        const row = document.createElement("div");
+        row.className = "koma" + (status === "done" ? " done" : "") + (status === "empty" ? " missed" : "");
+
+        const head = document.createElement("div");
+        head.className = "koma-head";
+
+        const dayTag = document.createElement("span");
+        dayTag.className = "koma-tag";
+        dayTag.textContent = WEEKLYPLAN_DAY_LABELS[slot.dayOfWeek] + "曜 " + (slot.time || "") +
+            "（" + (weeklyPlanDayType(dateKey) === "holiday" ? "休日" : "平日") +
+            "・" + durations.study + "分学習/" + durations.rest + "分休憩）";
+
+        const subject = document.createElement("span");
+        subject.className = "koma-subject";
+        subject.textContent = slot.subject || "（教科未設定）";
+
+        head.append(dayTag, subject);
+        row.appendChild(head);
+
+        if (slot.task) {
+            const task = document.createElement("p");
+            task.className = "koma-detail";
+            task.textContent = "課題：" + slot.task;
+            row.appendChild(task);
+        }
+
+        const statusLine = document.createElement("p");
+        statusLine.className = "koma-detail";
+
+        if (status === "empty") {
+            statusLine.textContent = "空きコマ（理由：" + (slot.emptyReason || "未記録") + "）";
+        } else if (status === "done") {
+            statusLine.textContent = "完了　" + (record.startedAt || "") + "〜" + (record.endedAt || "") +
+                (record.actualContent ? "　実施内容：" + record.actualContent : "");
+        } else if (status === "in_progress") {
+            statusLine.textContent = "学習中（開始 " + (record.startedAt || "") + "）";
+        } else if (status === "not_started") {
+            statusLine.textContent = "未着手（理由：" + (record.reasonCategory || "") +
+                (record.reasonDetail ? "・" + record.reasonDetail : "") +
+                (record.makeupPlan ? "／挽回予定：" + record.makeupPlan : "") + "）";
+        } else if (status === "plan_changed") {
+            statusLine.textContent = "予定変更（理由：" + (record.reasonCategory || "") +
+                (record.reasonDetail ? "・" + record.reasonDetail : "") + "）";
+        } else {
+            statusLine.textContent = "未記録";
+        }
+
+        row.appendChild(statusLine);
+
+        const actions = document.createElement("div");
+        actions.className = "koma-actions";
+
+        if (status !== "empty" && status !== "done") {
+
+            if (status !== "in_progress") {
+                const startButton = makeButton("学習開始", "primary");
+                startButton.addEventListener("click", function () {
+                    startWeeklyPlanSlot(weekKey, slot.id);
+                });
+                actions.appendChild(startButton);
+            } else {
+                const finishButton = makeButton("終了して記録", "primary");
+                finishButton.addEventListener("click", function () {
+                    finishWeeklyPlanSlot(weekKey, slot.id);
+                });
+                actions.appendChild(finishButton);
+            }
+
+            const notStartedButton = makeButton("未着手として記録", "ghost");
+            notStartedButton.addEventListener("click", function () {
+                markWeeklyPlanNotStarted(weekKey, slot.id);
+            });
+            actions.appendChild(notStartedButton);
+
+            const emptyButton = makeButton("空きコマにする", "ghost");
+            emptyButton.addEventListener("click", function () {
+                markWeeklyPlanSlotEmpty(weekKey, slot.id);
+            });
+            actions.appendChild(emptyButton);
+        }
+
+        const deleteButton = makeButton("削除", "ghost");
+        deleteButton.addEventListener("click", function () {
+            if (!confirm("このコマを削除しますか？")) { return; }
+            deleteWeeklyPlanSlot(weekKey, slot.id);
+            renderWeeklyPlan();
+        });
+        actions.appendChild(deleteButton);
+
+        row.appendChild(actions);
+        list.appendChild(row);
+    });
+}
+
+function renderWeeklyPlanReviewScreen() {
+
+    const weekKey = getWeekStartKey(todayKey());
+    const counts = weeklyPlanCounts(weekKey);
+    const existing = getWeeklyPlanReview(weekKey);
+
+    if ($("weeklyPlanReviewWeekLabel")) {
+        $("weeklyPlanReviewWeekLabel").textContent = weeklyPlanWeekLabel(weekKey);
+    }
+
+    if ($("weeklyPlanReviewCounts")) {
+        $("weeklyPlanReviewCounts").textContent =
+            "未着手 " + counts.notStarted + "件　予定変更 " + counts.changed + "件";
+    }
+
+    if ($("weeklyPlanReviewText")) {
+        $("weeklyPlanReviewText").value = existing?.summaryText || "";
+    }
+
+    const detailList = $("weeklyPlanReviewDetailList");
+    if (detailList) {
+
+        detailList.innerHTML = "";
+        const store = weeklyPlanRecords[weekKey] || {};
+
+        const items = Object.values(store).filter(function (r) {
+            return r.status === "not_started" || r.status === "plan_changed";
+        });
+
+        if (items.length === 0) {
+            const empty = document.createElement("p");
+            empty.className = "empty-note";
+            empty.textContent = "未着手・予定変更はありませんでした。";
+            detailList.appendChild(empty);
+        } else {
+            items.forEach(function (r) {
+                const line = document.createElement("p");
+                line.className = "koma-detail";
+                line.textContent =
+                    (r.status === "not_started" ? "未着手：" : "予定変更：") +
+                    (r.reasonCategory || "") +
+                    (r.reasonDetail ? "・" + r.reasonDetail : "") +
+                    (r.makeupPlan ? "／挽回予定：" + r.makeupPlan : "");
+                detailList.appendChild(line);
+            });
+        }
+    }
+}
+
+function setupWeeklyPlan() {
+
+    weeklyPlanViewWeek = getWeekStartKey(todayKey());
+
+    $("weeklyPlanPrevWeekBtn")?.addEventListener("click", function () {
+        weeklyPlanViewWeek = addDaysToKey(weeklyPlanViewWeek, -7);
+        renderWeeklyPlan();
+    });
+
+    $("weeklyPlanTodayWeekBtn")?.addEventListener("click", function () {
+        weeklyPlanViewWeek = getWeekStartKey(todayKey());
+        renderWeeklyPlan();
+    });
+
+    $("weeklyPlanNextWeekBtn")?.addEventListener("click", function () {
+        weeklyPlanViewWeek = addDaysToKey(weeklyPlanViewWeek, 7);
+        renderWeeklyPlan();
+    });
+
+    $("weeklyPlanAddSlotBtn")?.addEventListener("click", function () {
+
+        const dayOfWeek = parseInt($("weeklyPlanAddDay")?.value || "0", 10);
+        const time = $("weeklyPlanAddTime")?.value || "";
+        const subject = $("weeklyPlanAddSubject")?.value.trim() || "";
+        const task = $("weeklyPlanAddTask")?.value.trim() || "";
+
+        if (!time || !subject) {
+            alert("時刻と教科は必須です。");
+            return;
+        }
+
+        addWeeklyPlanSlot(weeklyPlanViewWeek, dayOfWeek, time, subject, task);
+
+        if ($("weeklyPlanAddTime")) { $("weeklyPlanAddTime").value = ""; }
+        if ($("weeklyPlanAddSubject")) { $("weeklyPlanAddSubject").value = ""; }
+        if ($("weeklyPlanAddTask")) { $("weeklyPlanAddTask").value = ""; }
+
+        renderWeeklyPlan();
+        showSave("weeklyPlanAddStatus", "✓ 追加しました");
+    });
+
+    $("weeklyPlanReviewOpenBtn")?.addEventListener("click", function () {
+        renderWeeklyPlanReviewScreen();
+        showScreen("weeklyplanreview");
+    });
+
+    $("weeklyPlanReviewSaveBtn")?.addEventListener("click", function () {
+
+        const weekKey = getWeekStartKey(todayKey());
+        const text = $("weeklyPlanReviewText")?.value || "";
+
+        saveWeeklyPlanReviewEntry(weekKey, {
+            completed: true,
+            completedAt: nowText(),
+            summaryText: text
+        });
+
+        showSave("weeklyPlanReviewSaveStatus", "✓ 保存しました");
+    });
+
+    $("weeklyPlanReviewNotDoneBtn")?.addEventListener("click", function () {
+
+        const weekKey = getWeekStartKey(todayKey());
+        const reason = prompt("週次レビューを実施できなかった理由", "") || "";
+        const reschedule = prompt("再実施の予定（いつ行うか）", "") || "";
+
+        saveWeeklyPlanReviewEntry(weekKey, {
+            completed: false,
+            notDoneReason: reason,
+            rescheduledAt: reschedule
+        });
+
+        showSave("weeklyPlanReviewSaveStatus", "✓ 記録しました");
+    });
+
+    $("weeklyPlanReviewNextWeekBtn")?.addEventListener("click", function () {
+        weeklyPlanViewWeek = addDaysToKey(getWeekStartKey(todayKey()), 7);
+        showScreen("weeklyplan");
+        renderWeeklyPlan();
+    });
+
+    renderWeeklyPlan();
 }
 
 
@@ -7578,6 +8782,12 @@ function initializePATGS27() {
 
     /* 🤖 AI学習アシスタント（Cloudflare Workers AI連携） */
     setupAichat();
+
+    /* 🧠 AI知識ベース（単語・知識の登録／検索／編集／削除） */
+    setupAiKnowledge();
+
+    /* 🗓 週間時間割・学習記録（第七次改革・最小構成） */
+    setupWeeklyPlan();
 
     console.log("PATGS27 script.js (" + PATGS_VERSION + ") loaded successfully.");
 }
