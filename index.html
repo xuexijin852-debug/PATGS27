@@ -629,9 +629,27 @@
 
             <p class="sub">
                 分からないことや、今日の学習の相談を気軽に聞いてみましょう。
+                ファイル（txt・PDF・画像）を添付して質問することもできます。
             </p>
 
+            <div class="aichat-toolbar">
+                <span class="aichat-conv-title" id="aichatConvTitle">新しい会話</span>
+                <div class="aichat-toolbar-buttons">
+                    <button id="aichatNewBtn" class="ghost">＋ 新規</button>
+                    <button id="aichatListBtn" class="ghost">📂 会話一覧</button>
+                    <button id="aichatRenameBtn" class="ghost">✏️ 名前変更</button>
+                    <button id="aichatSaveBtn" class="primary">💾 この会話を保存</button>
+                </div>
+            </div>
+
             <div id="aichatLog" class="aichat-log"></div>
+
+            <div class="aichat-attach-row">
+                <button id="aichatAttachBtn" type="button" class="ghost">📎 ファイル添付</button>
+                <input type="file" id="aichatFileInput" accept=".txt,.pdf,text/plain,application/pdf,image/*" hidden>
+                <span class="sub" id="aichatAttachPreview"></span>
+                <button id="aichatAttachCancelBtn" type="button" class="ghost">添付を取り消す</button>
+            </div>
 
             <div class="aichat-input-row">
                 <textarea id="aichatInput" rows="2" placeholder="質問を入力（Enterで送信／Shift+Enterで改行）"></textarea>
@@ -639,6 +657,173 @@
             </div>
 
             <p class="sub" id="aichatStatus"></p>
+
+        </section>
+
+
+        <!-- =================================================
+             AI会話一覧
+        ================================================== -->
+
+        <section data-screen="aichatlist" class="panel panel-main" id="aichatlistPanel">
+
+            <h2>📂 AI会話一覧</h2>
+
+            <p class="sub">
+                保存した会話と、今の未保存の会話が並びます。未保存の会話は、
+                新しい会話を始めると自動的に片付けられます（残したい場合は保存してください）。
+            </p>
+
+            <div id="aichatConvList"></div>
+
+        </section>
+
+
+        <!-- =================================================
+             AI知識ベース
+        ================================================== -->
+
+        <section data-screen="aiknowledge" class="panel panel-main" id="aiknowledgePanel">
+
+            <h2>🧠 AI知識ベース</h2>
+
+            <p class="sub">
+                単語・英文・覚えたい知識を登録しておくと、関連する質問をしたときにAIが参照します。
+            </p>
+
+            <div class="form-grid">
+
+                <label class="wide">用語・英文
+                    <input type="text" id="aiKnowledgeTermInput" placeholder="例：ubiquitous">
+                </label>
+
+                <label class="wide">説明・意味
+                    <textarea id="aiKnowledgeContentInput" rows="2" placeholder="例：至る所にある、遍在する"></textarea>
+                </label>
+
+            </div>
+
+            <div class="btn-row">
+                <button id="aiKnowledgeAddBtn" class="primary">＋ 登録</button>
+            </div>
+
+            <label class="wide">検索
+                <input type="text" id="aiKnowledgeSearch" placeholder="用語・説明で検索">
+            </label>
+
+            <div id="aiKnowledgeList"></div>
+
+        </section>
+
+
+        <!-- =================================================
+             週間時間割（第七次改革・最小構成）
+             ※ 既存の30分固定枠コマ制度・既存の週次レビューとは別データ・別画面
+        ================================================== -->
+
+        <section data-screen="weeklyplan" class="panel panel-main" id="weeklyPlanPanel">
+
+            <h2>🗓 週間時間割</h2>
+
+            <p class="sub">
+                部活動や休日を考えながら、週の時間割を自由に組めます。
+                平日は35分学習・5分休憩、土日祝日は50分学習・10分休憩が目安です。
+                既存の「コマ予約」とは別の機能です。
+            </p>
+
+            <div class="btn-row">
+                <button id="weeklyPlanPrevWeekBtn" class="ghost">← 前週</button>
+                <span class="patgs-today" id="weeklyPlanWeekLabel">-</span>
+                <button id="weeklyPlanTodayWeekBtn" class="ghost">今週</button>
+                <button id="weeklyPlanNextWeekBtn" class="ghost">次週 →</button>
+            </div>
+
+            <p class="sub" id="weeklyPlanCounts"></p>
+
+            <p class="flow-note" id="weeklyPlanLimitNotice" style="display:none;">
+                未着手・予定変更が多めです。責めるためのお知らせではありません。
+                「週次レビュー」から、計画そのものを見直してみましょう。
+            </p>
+
+            <div id="weeklyPlanSlotList"></div>
+
+            <h3>＋ コマを追加</h3>
+
+            <div class="form-grid">
+
+                <label>曜日
+                    <select id="weeklyPlanAddDay">
+                        <option value="0">日</option>
+                        <option value="1">月</option>
+                        <option value="2">火</option>
+                        <option value="3">水</option>
+                        <option value="4">木</option>
+                        <option value="5">金</option>
+                        <option value="6">土</option>
+                    </select>
+                </label>
+
+                <label>時刻
+                    <input type="time" id="weeklyPlanAddTime">
+                </label>
+
+                <label class="wide">教科
+                    <input type="text" id="weeklyPlanAddSubject" placeholder="例：数学">
+                </label>
+
+                <label class="wide">学習課題
+                    <input type="text" id="weeklyPlanAddTask" placeholder="例：青チャート例題32〜40">
+                </label>
+
+            </div>
+
+            <div class="btn-row">
+                <button id="weeklyPlanAddSlotBtn" class="primary">＋ 追加</button>
+                <span class="sub" id="weeklyPlanAddStatus"></span>
+            </div>
+
+            <div class="btn-row">
+                <button id="weeklyPlanReviewOpenBtn" class="ghost">📝 今週の週次レビューを開く</button>
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             週次レビュー（週間時間割専用）
+        ================================================== -->
+
+        <section data-screen="weeklyplanreview" class="panel panel-main" id="weeklyPlanReviewPanel">
+
+            <h2>📝 週次レビュー（週間時間割）</h2>
+
+            <p class="sub">
+                毎週土曜 8:00〜10:00 を目安に、計画と実績を振り返ります。
+                200字以上書く必要はありません。実施できなかった場合は、理由と再実施予定だけ記録してください。
+            </p>
+
+            <p class="patgs-today" id="weeklyPlanReviewWeekLabel">-</p>
+            <p class="sub" id="weeklyPlanReviewCounts"></p>
+
+            <div id="weeklyPlanReviewDetailList"></div>
+
+            <label class="wide">振り返り（短くてOK）
+                <textarea id="weeklyPlanReviewText" rows="3" placeholder="今週できたこと・次週に活かしたいことなど（任意）"></textarea>
+            </label>
+
+            <div class="btn-row">
+                <button id="weeklyPlanReviewSaveBtn" class="primary">保存する</button>
+                <button id="weeklyPlanReviewNotDoneBtn" class="ghost">今回は未実施として記録する</button>
+                <span class="sub" id="weeklyPlanReviewSaveStatus"></span>
+            </div>
+
+            <p class="sub">
+                AIによる自動要約は現在未接続です（手動での振り返りは上の欄からいつでも保存できます）。
+            </p>
+
+            <div class="btn-row">
+                <button id="weeklyPlanReviewNextWeekBtn" class="primary">次週の時間割を編集する</button>
+            </div>
 
         </section>
 
@@ -1605,6 +1790,7 @@
          JavaScript
     ====================================================== -->
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.5.141/pdf.min.js"></script>
     <script src="js/patgs27-storage-guard.js?v=20260926a"></script>
     <script src="js/script.js?v=20260923a"></script>
     <script type="module" src="js/firebase.js?v=20260923a"></script>
