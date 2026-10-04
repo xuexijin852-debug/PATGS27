@@ -1752,3 +1752,71 @@ canvas {
         width: 100%;
     }
 }
+
+/* =========================================================
+   AIチャット：会話ツールバー・添付行（第六次改革追加分）
+   ========================================================= */
+
+.aichat-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.aichat-conv-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--ink);
+}
+
+.aichat-toolbar-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.aichat-toolbar-buttons button {
+    font-size: 12px;
+    padding: 6px 10px;
+}
+
+.aichat-attach-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.aichat-attach-row button {
+    font-size: 12px;
+    padding: 6px 10px;
+}
+
+#aichatAttachPreview {
+    flex: 1;
+    min-width: 120px;
+}
+
+@media (max-width: 480px) {
+    .aichat-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .aichat-toolbar-buttons {
+        justify-content: stretch;
+    }
+
+    .aichat-toolbar-buttons button {
+        flex: 1;
+    }
+
+    .aichat-attach-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
