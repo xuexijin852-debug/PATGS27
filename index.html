@@ -89,14 +89,6 @@
 
         </header>
 
-        <div id="interventionBanner" class="intervention-banner" style="display:none;"></div>
-
-        <div id="interventionModalOverlay" class="intervention-overlay" style="display:none;">
-            <div class="intervention-modal">
-                <div id="interventionModalBody"></div>
-            </div>
-        </div>
-
         <div class="fab-wrap">
             <div id="fabMenu" class="fab-menu" style="display:none;"></div>
             <button id="motivationFab" class="motivation-fab" title="クイックランチャー">＋</button>
@@ -1279,47 +1271,6 @@
                 <input type="checkbox" id="fxAnimationToggle">
                 保存したときに軽いアニメーションを表示する
             </label>
-
-        </section>
-
-
-        <section data-screen="settings" class="panel">
-
-            <h2>⏰ 予約不足の段階的介入（旧コマ予約用）</h2>
-
-            <p class="sub">
-                旧コマ予約を使っている間だけ働く仕組みです。その日の予約が無いまま時間が過ぎると、
-                段階的に警戒レベルが上がります。Geminiへの自動送信は行いません。
-            </p>
-
-            <div id="interventionDayTypeSettings"></div>
-
-            <h3>特別な日の登録（祝日・休校日／長期休暇）</h3>
-
-            <div class="form-grid">
-
-                <label>開始日
-                    <input type="date" id="ivRangeStart">
-                </label>
-
-                <label>終了日
-                    <input type="date" id="ivRangeEnd">
-                </label>
-
-                <label>種類
-                    <select id="ivRangeType">
-                        <option value="specialHoliday">祝日・休校日</option>
-                        <option value="longVacation">長期休暇</option>
-                    </select>
-                </label>
-
-            </div>
-
-            <div class="btn-row">
-                <button id="ivRangeAddBtn" class="primary small">この期間を登録</button>
-            </div>
-
-            <div id="ivRangeList"></div>
 
         </section>
 
