@@ -2316,6 +2316,26 @@
         }
     }
 
+    /* 時間割の表を、ホームの一番上（メイン）に移す */
+
+    var planPanel = $("weeklyPlanPanel");
+    var firstHomePanel = document.querySelector('[data-screen="home"]');
+
+    if (planPanel && firstHomePanel) {
+
+        planPanel.setAttribute("data-screen", "home");
+        mainApp.insertBefore(planPanel, firstHomePanel);
+
+        var planIntro = planPanel.querySelector("p.sub");
+
+        if (planIntro) {
+            planIntro.textContent =
+                "【使い方】① 空いているセルや、入っているセルをクリックして、教科・学習内容・時間を入れます。" +
+                "② 今日の列のセルに出る「開始」を押し、200字以上の作文を書くと学習が始まります。" +
+                "③ 終わったら「終了」を押し、200字以上の作文を書くと完了です。";
+        }
+    }
+
     /* 週次レビュー：まとめ・AI・200字作文のパネルを追加し、古い入力欄を隠す */
 
     var reviewPanel = $("weeklyPlanReviewPanel");
@@ -3509,7 +3529,15 @@
 
     window.showScreen = function (name) {
 
-        previousShowScreen(name);
+        var target = (name === "weeklyplan") ? "home" : name;
+
+        previousShowScreen(target);
+
+        if (name === "weeklyplan") {
+            renderG7Table();
+            var planTop = $("weeklyPlanPanel");
+            if (planTop) { planTop.scrollIntoView({ behavior: "auto", block: "start" }); }
+        }
 
         if (name === "sugoroku") { renderSugoroku(); }
         if (name === "essays") { renderEssayList(); }
