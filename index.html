@@ -2088,6 +2088,8 @@
 
     var MORNING_TIMES = ["06:00", "06:40", "07:45"];
 
+    var SUBJECTS = ["国語", "数学", "英語", "理科", "社会", "音楽", "美術", "保健体育", "技術・家庭", "その他"];
+
     /* ---------------------------------------------------------
        共通の道具
        --------------------------------------------------------- */
@@ -2259,24 +2261,33 @@
     if (oldList) {
 
         oldList.insertAdjacentHTML("beforebegin",
-            '<div class="btn-row"><button id="g7AddSlotBtn" class="primary small">＋ 予定を追加</button></div>' +
+            '<p class="sub">セルをクリックすると、教科・学習内容・時間を編集できます。時間は曜日ごとに変えられます（15枠）。</p>' +
             '<div class="g7-table-wrap" id="g7PlanTable"></div>' +
-            '<div class="g7-ed" id="g7PlanEditor" style="display:none;">' +
-            '<h4 id="g7EdTitle">予定の編集</h4>' +
+
+            '<div id="g7CellOverlay" class="intervention-overlay" style="display:none;">' +
+            '<div class="intervention-modal g7-modal">' +
+            '<h3 id="g7CellTitle" style="color:var(--indigo-deep)"></h3>' +
             '<div class="form-grid">' +
-            '<label>曜日<select id="g7EdDay">' +
-            DAYS.map(function (d, i) { return '<option value="' + i + '">' + d + '</option>'; }).join("") +
+            '<label class="wide">教科<select id="g7EdSubject"><option value="">選んでください</option>' +
+            SUBJECTS.map(function (s) { return '<option value="' + s + '">' + s + '</option>'; }).join("") +
             '</select></label>' +
-            '<label>時刻<input type="time" id="g7EdTime"></label>' +
-            '<label>教科<input type="text" id="g7EdSubject" placeholder="例：数学"></label>' +
-            '<label>学習課題<input type="text" id="g7EdTask" placeholder="例：青チャート例題32〜40"></label>' +
+            '<label class="wide">学習内容<input type="text" id="g7EdTask" placeholder="例：青チャート例題32〜40"></label>' +
+            '<label>時間（開始）<input type="time" id="g7EdTime"></label>' +
+            '<label>空きコマにする理由<select id="g7EdReason">' +
+            ["開始困難", "体調", "部活動", "急用", "意図的な予定変更", "その他"].map(function (r) {
+                return '<option value="' + r + '">' + r + '</option>';
+            }).join("") + '</select></label>' +
             '<label class="wide check-label"><input type="checkbox" id="g7EdOptional">任意の予備枠（使わなくても棄権にならない）</label>' +
             '</div>' +
-            '<div class="btn-row"><button id="g7EdSave" class="primary small">保存</button>' +
-            '<button id="g7EdDelete" class="ghost small">削除</button>' +
-            '<button id="g7EdClose" class="ghost small">閉じる</button></div>' +
-            '<p class="form-status" id="g7EdStatus"></p></div>' +
-            '<details class="cal-add-details"><summary>📋 テンプレートから時間割を作る</summary>' +
+            '<div class="btn-row">' +
+            '<button id="g7EdSave" class="primary">保存</button>' +
+            '<button id="g7EdEmpty" class="ghost">空きコマにする</button>' +
+            '<button id="g7EdDelete" class="ghost">セルを削除</button>' +
+            '<button id="g7EdClose" class="ghost">閉じる</button></div>' +
+            '<p class="form-status" id="g7EdStatus"></p>' +
+            '</div></div>' +
+
+            '<details class="cal-add-details"><summary>📋 テンプレートから時間割を作る（任意）</summary>' +
             '<div class="form-grid">' +
             '<label>パターン<select id="g7TplPattern">' +
             Object.keys(TEMPLATES).map(function (k) {
@@ -2284,11 +2295,11 @@
             }).join("") +
             '</select></label>' +
             '<label>曜日<select id="g7TplDay">' +
-            DAYS.map(function (d, i) { return '<option value="' + i + '">' + d + '</option>'; }).join("") +
+            [1, 2, 3, 4, 5, 6, 0].map(function (i) { return '<option value="' + i + '">' + DAYS[i] + '</option>'; }).join("") +
             '</select></label>' +
             '<label class="wide check-label"><input type="checkbox" id="g7TplMorning">朝の予備枠（6:00・6:40・7:45）も追加する</label>' +
             '</div>' +
-            '<div class="btn-row"><button id="g7TplApply" class="primary small">この曜日に反映（教科は「未設定」で入ります）</button></div>' +
+            '<div class="btn-row"><button id="g7TplApply" class="primary small">この曜日に反映（空いている枠に入ります。教科はあとで表から入力）</button></div>' +
             '<p class="sub" id="g7TplFlow"></p><p class="form-status" id="g7TplStatus"></p></details>');
 
         var panel = $("weeklyPlanPanel");
@@ -2555,37 +2566,113 @@
        週間時間割の表
        --------------------------------------------------------- */
 
-    var editingSlotId = null;
+    /* ---------------------------------------------------------
+       週間時間割：学校の時間割表（曜日×15枠のマトリクス）
+       --------------------------------------------------------- */
 
-    function cellHtml(weekKey, slot, date) {
+    var COLS = [1, 2, 3, 4, 5, 6, 0];   /* 月 火 水 木 金 土 日 */
+    var MIN_PERIODS = 15;
+    var editingCell = null;
+
+    var mStyle = document.createElement("style");
+    mStyle.textContent =
+        ".g7m{border-collapse:separate;border-spacing:0;width:100%;min-width:820px;table-layout:fixed;font-size:12px}" +
+        ".g7m th,.g7m td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:4px;vertical-align:top;background:#fff}" +
+        ".g7m thead th{background:#f5f2ff;color:var(--indigo-deep);position:sticky;top:0;z-index:2;border-top:1px solid var(--line)}" +
+        ".g7m th:first-child,.g7m td:first-child{border-left:1px solid var(--line)}" +
+        ".g7m .g7-hol{background:#ffe9de!important}" +
+        ".g7m .g7-today{background:#fff2ee!important}" +
+        ".g7m .g7-pno{width:34px;text-align:center;background:#faf9f5;font-weight:800;color:var(--indigo-deep);position:sticky;left:0;z-index:1}" +
+        ".g7m td.g7-cell{height:74px;cursor:pointer}" +
+        ".g7m td.g7-cell:hover{background:#faf8ff}" +
+        ".g7m-time{font-size:10px;color:var(--ink-soft);font-variant-numeric:tabular-nums}" +
+        ".g7m-subj{font-weight:800;font-size:13px;line-height:1.3}" +
+        ".g7m-task{font-size:11px;color:var(--ink);word-break:break-word}" +
+        ".g7m-plus{color:#cfc8e8;font-size:16px}" +
+        ".g7m-item{border-left:4px solid var(--indigo);padding-left:5px;min-height:62px}" +
+        ".g7m-item.g7-done{background:var(--green-soft)}" +
+        ".g7m-item.g7-in_progress{background:#fff2ee}" +
+        ".g7m-item.g7-empty{background:#f1f1f1;color:var(--ink-soft)}" +
+        ".g7m-item.g7-forfeit{background:var(--red-soft)}" +
+        ".g7m-item .koma-tag{font-size:10px;padding:1px 6px}";
+    document.head.appendChild(mStyle);
+
+    var SUBJECT_COLOR = {
+        "国語": "#c62828", "数学": "#1565c0", "英語": "#2e7d32", "理科": "#ef6c00", "社会": "#6a1b9a",
+        "音楽": "#d81b60", "美術": "#00838f", "保健体育": "#558b2f", "技術・家庭": "#8d6e63", "その他": "#546e7a"
+    };
+
+    /* 枠番号（period）が無い既存のコマに、曜日ごとに時刻順で番号を振る（データは消さない） */
+    function ensurePeriods(week) {
+
+        var changed = false;
+
+        for (var dow = 0; dow < 7; dow++) {
+
+            var used = {};
+            var day = week.slots.filter(function (s) { return s.dayOfWeek === dow; });
+
+            day.forEach(function (s) { if (s.period) { used[s.period] = true; } });
+
+            day.filter(function (s) { return !s.period; })
+                .sort(function (a, b) { return (a.time || "").localeCompare(b.time || ""); })
+                .forEach(function (s) {
+                    var p = 1;
+                    while (used[p]) { p += 1; }
+                    s.period = p;
+                    used[p] = true;
+                    changed = true;
+                });
+        }
+
+        if (changed) { saveWeeklyPlanTimetables(); }
+    }
+
+    function slotAt(week, dow, period) {
+        return week.slots.find(function (s) { return s.dayOfWeek === dow && s.period === period; }) || null;
+    }
+
+    function cellInner(weekKey, slot, date) {
 
         var status = statusOf(weekKey, slot);
         var rec = recOf(weekKey, slot.id) || {};
         var forfeit = isForfeit(weekKey, slot);
+        var dur = weeklyPlanDurations(date).study;
+        var timeText = slot.time + "〜" + minutesToTime(timeToMinutes(slot.time) + dur);
+        var known = SUBJECT_COLOR[slot.subject];
+        var subj = (slot.subject && slot.subject !== "未設定") ? slot.subject : "";
 
-        var html = '<div class="g7-slot g7-' + (forfeit ? "forfeit" : status) + '"><b>' + esc(slot.subject) + '</b>';
+        var html = '<div class="g7m-item g7-' + (forfeit ? "forfeit" : status) + '" style="border-left-color:' + (known || "#8b8fa3") + '">';
 
-        if (isOptional(slot)) { html += ' <span class="koma-tag">任意</span>'; }
+        html += '<div class="g7m-time">' + esc(timeText) + (isOptional(slot) ? "（任意）" : "") + "</div>";
 
-        if (slot.task) { html += '<div class="g7-task">' + esc(slot.task) + '</div>'; }
+        if (status === "empty") {
+            return html + '<div class="g7m-subj">空きコマ</div>' +
+                (slot.emptyReason ? '<div class="g7m-task">' + esc(slot.emptyReason) + "</div>" : "") + "</div>";
+        }
 
-        html += '<div><span class="koma-tag">' + STATUS[status] + '</span>';
-        if (rec.penalty === "late") { html += ' <span class="koma-tag kind-exam">遅刻</span>'; }
-        if (rec.penalty === "out") { html += ' <span class="koma-tag kind-exam">アウト</span>'; }
-        if (forfeit) { html += ' <span class="koma-tag kind-exam">棄権</span>'; }
-        html += '</div><div class="g7-btns">';
+        html += '<div class="g7m-subj" style="color:' + (known || "var(--ink)") + '">' + (subj ? esc(subj) : "教科未設定") + "</div>";
+
+        if (slot.task) { html += '<div class="g7m-task">' + esc(slot.task) + "</div>"; }
+
+        var tags = "";
+
+        if (status !== "planned") { tags += '<span class="koma-tag">' + STATUS[status] + "</span> "; }
+        if (rec.penalty === "late") { tags += '<span class="koma-tag kind-exam">遅刻</span> '; }
+        if (rec.penalty === "out") { tags += '<span class="koma-tag kind-exam">アウト</span> '; }
+        if (forfeit) { tags += '<span class="koma-tag kind-exam">棄権</span> '; }
+
+        if (tags) { html += "<div>" + tags + "</div>"; }
 
         if (date === todayKey() && status === "planned" && !slotEnded(weekKey, slot)) {
-            html += '<button data-act="start" data-id="' + slot.id + '" class="primary">開始</button>';
+            html += '<div class="g7-btns"><button data-act="start" data-id="' + slot.id + '" class="primary">開始</button></div>';
         }
 
         if (status === "in_progress") {
-            html += '<button data-act="finish" data-id="' + slot.id + '" class="primary">終了</button>';
+            html += '<div class="g7-btns"><button data-act="finish" data-id="' + slot.id + '" class="primary">終了</button></div>';
         }
 
-        html += '<button data-act="edit" data-id="' + slot.id + '" class="ghost">編集</button></div></div>';
-
-        return html;
+        return html + "</div>";
     }
 
     function renderG7Table() {
@@ -2597,152 +2684,236 @@
         var weekKey = weeklyPlanViewWeek;
         var week = getOrCreateWeeklyPlanWeek(weekKey);
 
-        var times = [];
+        ensurePeriods(week);
 
-        week.slots.forEach(function (slot) {
-            if (times.indexOf(slot.time) === -1) { times.push(slot.time); }
+        var rows = MIN_PERIODS;
+
+        week.slots.forEach(function (s) { if (s.period > rows) { rows = s.period; } });
+
+        var today = todayKey();
+
+        var html = '<table class="g7m"><thead><tr><th class="g7-pno">枠</th>';
+
+        COLS.forEach(function (dow) {
+            var dateKey = addDaysToKey(weekKey, dow);
+            var cls = (patgsIsHolidayDate(dateKey) ? "g7-hol " : "") + (dateKey === today ? "g7-today" : "");
+            html += '<th class="' + cls + '">' + DAYS[dow] + "<br>" + formatShortDate(dateKey).replace(/\(.*\)/, "") + "</th>";
         });
-
-        times.sort();
-
-        var html = '<table class="g7-table"><thead><tr><th>時刻</th>';
-
-        for (var d = 0; d < 7; d++) {
-            var dateKey = addDaysToKey(weekKey, d);
-            var hol = patgsIsHolidayDate(dateKey);
-            html += '<th class="' + (hol ? "g7-hol" : "") + '">' + DAYS[d] + "<br>" + formatShortDate(dateKey).replace(/\(.*\)/, "") + (hol ? "（休）" : "") + "</th>";
-        }
 
         html += "</tr></thead><tbody>";
 
-        if (times.length === 0) {
-            html += '<tr><td colspan="8" class="empty-note">この週の時間割はまだありません。「＋予定を追加」かテンプレートから作れます。</td></tr>';
-        }
+        for (var p = 1; p <= rows; p++) {
 
-        times.forEach(function (time) {
+            html += '<tr><th class="g7-pno">' + p + "</th>";
 
-            html += '<tr><td class="g7-time">' + time + "</td>";
+            COLS.forEach(function (dow) {
 
-            for (var day = 0; day < 7; day++) {
+                var date = addDaysToKey(weekKey, dow);
+                var slot = slotAt(week, dow, p);
 
-                var date = addDaysToKey(weekKey, day);
-                var slots = week.slots.filter(function (s) { return s.dayOfWeek === day && s.time === time; });
-
-                html += "<td>";
-
-                if (slots.length === 0) {
-                    html += '<button class="ghost g7-add" data-act="add" data-dow="' + day + '" data-time="' + time + '">＋</button>';
-                } else {
-                    slots.forEach(function (slot) { html += cellHtml(weekKey, slot, date); });
-                }
-
-                html += "</td>";
-            }
+                html += '<td class="g7-cell' + (date === today ? " g7-today" : "") + '" data-dow="' + dow + '" data-period="' + p + '">' +
+                    (slot ? cellInner(weekKey, slot, date) : '<span class="g7m-plus">＋</span>') + "</td>";
+            });
 
             html += "</tr>";
-        });
+        }
 
         html += "</tbody></table>";
 
         box.innerHTML = html;
     }
 
-    function openEditor(slot, presetDay, presetTime) {
-
-        editingSlotId = slot ? slot.id : null;
-
-        $("g7EdTitle").textContent = slot ? "予定の編集" : "予定の追加";
-        $("g7EdDay").value = String(slot ? slot.dayOfWeek : (presetDay || 0));
-        $("g7EdTime").value = slot ? slot.time : (presetTime || "");
-        $("g7EdSubject").value = slot ? (slot.subject || "") : "";
-        $("g7EdTask").value = slot ? (slot.task || "") : "";
-        $("g7EdOptional").checked = slot ? isOptional(slot) : false;
-        $("g7EdDelete").style.display = slot ? "inline-block" : "none";
-        $("g7EdStatus").textContent = "";
-        $("g7PlanEditor").style.display = "block";
-        $("g7PlanEditor").scrollIntoView({ behavior: "smooth", block: "center" });
+    function setEdStatus(text, isError) {
+        $("g7EdStatus").textContent = text;
+        $("g7EdStatus").className = isError ? "form-status error" : "form-status";
     }
 
-    function saveEditor() {
+    function openCellEditor(dow, period) {
 
         var weekKey = weeklyPlanViewWeek;
         var week = getOrCreateWeeklyPlanWeek(weekKey);
+        var slot = slotAt(week, dow, period);
 
-        var day = parseInt($("g7EdDay").value, 10);
-        var time = $("g7EdTime").value;
-        var subject = $("g7EdSubject").value.trim();
-        var task = $("g7EdTask").value.trim();
-        var optional = $("g7EdOptional").checked;
+        editingCell = { weekKey: weekKey, dow: dow, period: period };
 
-        if (!time || !subject) {
-            $("g7EdStatus").textContent = "時刻と教科は必須です。";
-            $("g7EdStatus").className = "form-status error";
-            return;
+        $("g7CellTitle").textContent = DAYS[dow] + "曜日　枠" + period + (slot ? "" : "（新しく作る）");
+
+        var subject = slot ? (slot.subject || "") : "";
+
+        if (subject && SUBJECTS.indexOf(subject) === -1) {
+            if (subject === "未設定") {
+                subject = "";
+            } else {
+                var extra = document.createElement("option");
+                extra.value = subject;
+                extra.textContent = subject + "（以前の入力）";
+                extra.dataset.extra = "1";
+                $("g7EdSubject").appendChild(extra);
+            }
         }
+
+        $("g7EdSubject").value = subject;
+        $("g7EdTask").value = slot ? (slot.task || "") : "";
+
+        var time = slot ? slot.time : "";
+
+        if (!slot) {
+            var prev = slotAt(week, dow, period - 1);
+            if (prev) {
+                var d = weeklyPlanDurations(addDaysToKey(weekKey, dow));
+                time = minutesToTime(timeToMinutes(prev.time) + d.study + d.rest);
+            }
+        }
+
+        $("g7EdTime").value = time;
+        $("g7EdOptional").checked = slot ? isOptional(slot) : (time !== "" && time < "08:30");
+        $("g7EdEmpty").textContent = (slot && slot.isEmpty) ? "空きコマを解除する" : "空きコマにする";
+        $("g7EdEmpty").style.display = slot ? "inline-block" : "none";
+        $("g7EdDelete").style.display = slot ? "inline-block" : "none";
+
+        setEdStatus("", false);
+
+        $("g7CellOverlay").style.display = "flex";
+    }
+
+    function closeCellEditor() {
+
+        $("g7CellOverlay").style.display = "none";
+        editingCell = null;
+
+        Array.prototype.slice.call($("g7EdSubject").querySelectorAll("option[data-extra]")).forEach(function (o) {
+            o.remove();
+        });
+    }
+
+    function editableStatus(weekKey, slot) {
+        var s = statusOf(weekKey, slot);
+        return s === "planned" || s === "empty" || s === "plan_changed";
+    }
+
+    function saveCell() {
+
+        if (!editingCell) { return; }
+
+        var weekKey = editingCell.weekKey;
+        var week = getOrCreateWeeklyPlanWeek(weekKey);
+        var slot = slotAt(week, editingCell.dow, editingCell.period);
+
+        var subject = $("g7EdSubject").value;
+        var task = $("g7EdTask").value.trim();
+        var time = $("g7EdTime").value;
+
+        if (!subject) { setEdStatus("教科を選んでください。", true); return; }
+        if (!time) { setEdStatus("時間（開始）を入れてください。", true); return; }
 
         var duplicate = week.slots.some(function (s) {
-            return s.dayOfWeek === day && s.time === time && s.id !== editingSlotId;
+            return s.dayOfWeek === editingCell.dow && s.time === time && s !== slot;
         });
 
-        if (duplicate) {
-            $("g7EdStatus").textContent = "同じ曜日・時刻にすでに予定があります。";
-            $("g7EdStatus").className = "form-status error";
-            return;
-        }
+        if (duplicate) { setEdStatus("同じ曜日の同じ時刻に、別の枠があります。", true); return; }
 
-        if (editingSlotId) {
+        if (slot) {
 
-            var slot = findSlot(weekKey, editingSlotId);
-
-            if (!slot) { return; }
-
-            var status = statusOf(weekKey, slot);
-
-            if (status !== "planned" && status !== "empty") {
-                $("g7EdStatus").textContent = "学習の記録があるコマは変更できません（記録を守るため）。";
-                $("g7EdStatus").className = "form-status error";
+            if (!editableStatus(weekKey, slot)) {
+                setEdStatus("学習の記録があるコマは変更できません（記録を守るため）。", true);
                 return;
             }
 
-            slot.dayOfWeek = day; slot.time = time; slot.subject = subject; slot.task = task; slot.optional = optional;
-            logPlanChange(weekKey, "変更：" + DAYS[day] + " " + time + " " + subject);
+            slot.subject = subject; slot.task = task; slot.time = time;
+            slot.optional = $("g7EdOptional").checked;
+            logPlanChange(weekKey, "変更：" + DAYS[slot.dayOfWeek] + " 枠" + slot.period + " " + time + " " + subject);
 
         } else {
 
             week.slots.push({
-                id: makeWeeklyPlanSlotId(), dayOfWeek: day, time: time, subject: subject,
-                task: task, isEmpty: false, emptyReason: "", optional: optional
+                id: makeWeeklyPlanSlotId(), dayOfWeek: editingCell.dow, period: editingCell.period,
+                time: time, subject: subject, task: task, isEmpty: false, emptyReason: "",
+                optional: $("g7EdOptional").checked
             });
 
-            logPlanChange(weekKey, "追加：" + DAYS[day] + " " + time + " " + subject);
+            logPlanChange(weekKey, "追加：" + DAYS[editingCell.dow] + " 枠" + editingCell.period + " " + time + " " + subject);
         }
 
         week.updatedAt = nowText();
         saveWeeklyPlanTimetables();
 
-        $("g7PlanEditor").style.display = "none";
+        closeCellEditor();
         window.renderWeeklyPlan();
     }
 
-    function deleteEditorSlot() {
+    function toggleEmptyCell() {
 
-        var weekKey = weeklyPlanViewWeek;
-        var slot = findSlot(weekKey, editingSlotId);
+        if (!editingCell) { return; }
+
+        var weekKey = editingCell.weekKey;
+        var week = getOrCreateWeeklyPlanWeek(weekKey);
+        var slot = slotAt(week, editingCell.dow, editingCell.period);
 
         if (!slot) { return; }
 
-        if (statusOf(weekKey, slot) !== "planned" && statusOf(weekKey, slot) !== "empty") {
-            $("g7EdStatus").textContent = "学習の記録があるコマは削除できません。";
-            $("g7EdStatus").className = "form-status error";
+        if (!editableStatus(weekKey, slot)) {
+            setEdStatus("学習の記録があるコマは空きコマにできません。", true);
             return;
         }
 
-        if (!confirm("このコマを削除しますか？")) { return; }
+        if (slot.isEmpty) {
+
+            slot.isEmpty = false;
+            slot.emptyReason = "";
+
+            var store = weeklyPlanRecords[weekKey] || {};
+
+            if (store[slot.id] && store[slot.id].status === "plan_changed") {
+                delete store[slot.id];
+                saveWeeklyPlanRecords();
+            }
+
+        } else {
+
+            var reason = $("g7EdReason").value;
+
+            slot.isEmpty = true;
+            slot.emptyReason = reason;
+
+            recordWeeklyPlanStatus(weekKey, slot.id, "plan_changed", { reasonCategory: reason, reasonDetail: "" });
+        }
+
+        week.updatedAt = nowText();
+        saveWeeklyPlanTimetables();
+        logPlanChange(weekKey, (slot.isEmpty ? "空きコマ：" : "空きコマ解除：") + DAYS[slot.dayOfWeek] + " 枠" + slot.period);
+
+        closeCellEditor();
+        window.renderWeeklyPlan();
+    }
+
+    function deleteCell() {
+
+        if (!editingCell) { return; }
+
+        var weekKey = editingCell.weekKey;
+        var week = getOrCreateWeeklyPlanWeek(weekKey);
+        var slot = slotAt(week, editingCell.dow, editingCell.period);
+
+        if (!slot) { return; }
+
+        if (!editableStatus(weekKey, slot)) {
+            setEdStatus("学習の記録があるコマは削除できません。", true);
+            return;
+        }
+
+        if (!confirm("このセルを削除しますか？")) { return; }
+
+        var store = weeklyPlanRecords[weekKey] || {};
+
+        if (store[slot.id] && store[slot.id].status === "plan_changed") {
+            delete store[slot.id];
+            saveWeeklyPlanRecords();
+        }
 
         deleteWeeklyPlanSlot(weekKey, slot.id);
-        logPlanChange(weekKey, "削除：" + DAYS[slot.dayOfWeek] + " " + slot.time + " " + (slot.subject || ""));
+        logPlanChange(weekKey, "削除：" + DAYS[slot.dayOfWeek] + " 枠" + slot.period + " " + (slot.subject || ""));
 
-        $("g7PlanEditor").style.display = "none";
+        closeCellEditor();
         window.renderWeeklyPlan();
     }
 
@@ -2755,19 +2926,22 @@
         var times = tpl.times.map(function (t) { return { time: t, optional: false }; });
 
         if ($("g7TplMorning").checked) {
-            MORNING_TIMES.forEach(function (t) { times.unshift({ time: t, optional: true }); });
+            MORNING_TIMES.slice().reverse().forEach(function (t) { times.unshift({ time: t, optional: true }); });
         }
+
+        ensurePeriods(week);
 
         var added = 0;
 
         times.forEach(function (item) {
 
-            var exists = week.slots.some(function (s) { return s.dayOfWeek === day && s.time === item.time; });
+            if (week.slots.some(function (s) { return s.dayOfWeek === day && s.time === item.time; })) { return; }
 
-            if (exists) { return; }
+            var p = 1;
+            while (slotAt(week, day, p)) { p += 1; }
 
             week.slots.push({
-                id: makeWeeklyPlanSlotId(), dayOfWeek: day, time: item.time, subject: "未設定",
+                id: makeWeeklyPlanSlotId(), dayOfWeek: day, period: p, time: item.time, subject: "未設定",
                 task: "", isEmpty: false, emptyReason: "", optional: item.optional
             });
 
@@ -2778,7 +2952,7 @@
         saveWeeklyPlanTimetables();
         logPlanChange(weekKey, "テンプレート反映：" + DAYS[day] + "曜 " + tpl.label + "（" + added + "コマ）");
 
-        $("g7TplStatus").textContent = added + "コマ追加しました。教科は表の「編集」から入力してください。";
+        $("g7TplStatus").textContent = added + "コマ追加しました。表のセルをクリックして教科を入れてください。";
         window.renderWeeklyPlan();
     }
 
@@ -2790,24 +2964,53 @@
     $("g7PlanTable")?.addEventListener("click", function (event) {
 
         var button = event.target.closest("button[data-act]");
-
-        if (!button) { return; }
-
-        var act = button.dataset.act;
         var weekKey = weeklyPlanViewWeek;
 
-        if (act === "start") { window.startWeeklyPlanSlot(weekKey, button.dataset.id); }
-        if (act === "finish") { window.finishWeeklyPlanSlot(weekKey, button.dataset.id); }
-        if (act === "edit") { openEditor(findSlot(weekKey, button.dataset.id)); }
-        if (act === "add") { openEditor(null, parseInt(button.dataset.dow, 10), button.dataset.time); }
+        if (button) {
+            event.stopPropagation();
+            if (button.dataset.act === "start") { window.startWeeklyPlanSlot(weekKey, button.dataset.id); }
+            if (button.dataset.act === "finish") { window.finishWeeklyPlanSlot(weekKey, button.dataset.id); }
+            return;
+        }
+
+        var cell = event.target.closest("td.g7-cell");
+
+        if (cell) { openCellEditor(parseInt(cell.dataset.dow, 10), parseInt(cell.dataset.period, 10)); }
     });
 
-    $("g7AddSlotBtn")?.addEventListener("click", function () { openEditor(null, new Date().getDay(), ""); });
-    $("g7EdSave")?.addEventListener("click", saveEditor);
-    $("g7EdDelete")?.addEventListener("click", deleteEditorSlot);
-    $("g7EdClose")?.addEventListener("click", function () { $("g7PlanEditor").style.display = "none"; });
+    $("g7EdSave")?.addEventListener("click", saveCell);
+    $("g7EdEmpty")?.addEventListener("click", toggleEmptyCell);
+    $("g7EdDelete")?.addEventListener("click", deleteCell);
+    $("g7EdClose")?.addEventListener("click", closeCellEditor);
     $("g7TplApply")?.addEventListener("click", applyTemplate);
     $("g7TplPattern")?.addEventListener("change", updateTemplateFlow);
+
+    /* 前週から複製した週にも、枠番号・任意枠の設定を引き継ぐ */
+    var originalGetOrCreateWeek = window.getOrCreateWeeklyPlanWeek;
+
+    window.getOrCreateWeeklyPlanWeek = function (weekKey) {
+
+        var existed = !!weeklyPlanTimetables[weekKey];
+        var week = originalGetOrCreateWeek(weekKey);
+
+        if (!existed) {
+
+            var prev = weeklyPlanTimetables[addDaysToKey(weekKey, -7)];
+
+            if (prev) {
+                week.slots.forEach(function (s) {
+                    var p = prev.slots.find(function (x) { return x.dayOfWeek === s.dayOfWeek && x.time === s.time; });
+                    if (p) {
+                        if (p.period) { s.period = p.period; }
+                        if (p.optional !== undefined) { s.optional = p.optional; }
+                    }
+                });
+                saveWeeklyPlanTimetables();
+            }
+        }
+
+        return week;
+    };
 
     var previousRenderWeeklyPlan = window.renderWeeklyPlan;
 
