@@ -1524,6 +1524,24 @@
         return;
     }
 
+    /* Firebase は空の一覧（[]）を保存しないため、同期後に slots が無い週データが戻ってくることがある。
+       そのまま使うと表示が止まるので、読み出すたびに「空の一覧」として補う（データは消さない）。 */
+
+    var rawGetOrCreateWeek = window.getOrCreateWeeklyPlanWeek;
+
+    window.getOrCreateWeeklyPlanWeek = function (weekKey) {
+
+        var week = rawGetOrCreateWeek(weekKey);
+
+        if (!Array.isArray(week.slots)) {
+            week.slots = (week.slots && typeof week.slots === "object")
+                ? Object.keys(week.slots).map(function (k) { return week.slots[k]; })
+                : [];
+        }
+
+        return week;
+    };
+
     /* ---------------------------------------------------------
        共通：今日の時間割
        --------------------------------------------------------- */
@@ -1596,6 +1614,17 @@
        --------------------------------------------------------- */
 
     function renderHomePlan() {
+
+        try {
+            renderHomePlanMain();
+        } catch (error) {
+            console.error(error);
+            var failList = $("todayPlanList");
+            if (failList) { failList.textContent = "今日の時間割の表示でエラーが起きました：" + error.message; }
+        }
+    }
+
+    function renderHomePlanMain() {
 
         var list = $("todayPlanList");
         var nextBox = $("homeNextPlan");
@@ -2596,6 +2625,7 @@
 
     var mStyle = document.createElement("style");
     mStyle.textContent =
+        ".panel .patgs-today{color:var(--indigo-deep)!important;font-weight:800}" +
         ".g7m{border-collapse:separate;border-spacing:0;width:100%;min-width:820px;table-layout:fixed;font-size:12px}" +
         ".g7m th,.g7m td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:4px;vertical-align:top;background:#fff}" +
         ".g7m thead th{background:#f5f2ff;color:var(--indigo-deep);position:sticky;top:0;z-index:2;border-top:1px solid var(--line)}" +
@@ -2696,6 +2726,17 @@
     }
 
     function renderG7Table() {
+
+        try {
+            renderG7TableMain();
+        } catch (error) {
+            console.error(error);
+            var failBox = $("g7PlanTable");
+            if (failBox) { failBox.textContent = "表の表示でエラーが起きました：" + error.message; }
+        }
+    }
+
+    function renderG7TableMain() {
 
         var box = $("g7PlanTable");
 
